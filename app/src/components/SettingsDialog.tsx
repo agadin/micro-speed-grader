@@ -177,10 +177,10 @@ export function SettingsDialog({ onClose, asWindow = false }: { onClose: () => v
               {row(
                 "Buttons",
                 seg(s.swapMouse ? "swap" : "std", [
-                  ["std", "Left pans · Right selects"],
-                  ["swap", "Left selects · Right pans"],
+                  ["std", "Left pans"],
+                  ["swap", "Left selects"],
                 ], (v) => set({ swapMouse: v === "swap" })),
-                s.swapMouse ? "click a pin with either button to grade it" : "like NDP.view: drag the slide with the left button",
+                s.swapMouse ? "right-drag pans; click a pin with either button" : "right-drag selects, like NDP.view",
               )}
               {row(
                 "Scroll zoom speed",

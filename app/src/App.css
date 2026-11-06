@@ -1398,9 +1398,16 @@ button.phead:hover:not(:disabled) {
 }
 .prow2 .ctl {
   display: flex;
+  flex-wrap: wrap;
   align-items: center;
-  gap: 10px;
+  gap: 6px 10px;
   min-width: 0;
+  padding: 4px 0;
+}
+/* help text sits beside the control, or drops below it when there isn't room */
+.prow2 .ctl > .help {
+  flex: 1 1 150px;
+  min-width: 150px;
 }
 .prow2 .ctl .prow {
   grid-template-columns: 170px 76px;

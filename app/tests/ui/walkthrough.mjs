@@ -237,7 +237,7 @@ await step("brush (B) paints a selection and opens menu", async () => {
 await step("swapped buttons: left-drag lassos, right-drag pans", async () => {
   await emit("menu", "preferences");
   await page.getByRole("button", { name: "Mouse & keys" }).click();
-  await page.getByRole("button", { name: "Left selects · Right pans" }).click();
+  await page.getByRole("button", { name: "Left selects" }).click();
   await page.getByRole("button", { name: "Done" }).click();
   await page.keyboard.press("h");
   await waitTiles();
@@ -264,7 +264,7 @@ await step("swapped buttons: left-drag lassos, right-drag pans", async () => {
   // back to the standard layout for the rest of the run
   await emit("menu", "preferences");
   await page.getByRole("button", { name: "Mouse & keys" }).click();
-  await page.getByRole("button", { name: "Left pans · Right selects" }).click();
+  await page.getByRole("button", { name: "Left pans" }).click();
   await page.getByRole("button", { name: "Done" }).click();
   expect(panned, "right-drag did not pan");
   expect(!menuAfterPan, "right-drag opened a menu");
