@@ -11,9 +11,7 @@ Export goes to a D2L-ready CSV plus per-student feedback.
 ## Download
 
 **macOS (Apple Silicon):** grab the `.dmg` from [Releases](../../releases), open it and drag the app to
-Applications. OpenSlide is bundled, so nothing else needs installing. The build is signed but not yet
-notarized: the first time, right-click the app → **Open** (or System Settings → Privacy & Security →
-**Open Anyway**).
+Applications. OpenSlide is bundled, so nothing else needs installing. The build is signed and notarized.
 
 ## Features
 
