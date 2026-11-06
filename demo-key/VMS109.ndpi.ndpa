@@ -1,0 +1,1767 @@
+<?xml version="1.0" encoding="utf-8" standalone="yes"?>
+<annotations>
+	<ndpviewstate id="1">
+		<title>Q2 wrong: Artery</title>
+		<details/>
+		<coordformat>nanometers</coordformat>
+		<lens>10.0</lens>
+		<x>6580007</x>
+		<y>-1543351</y>
+		<z>0</z>
+		<showtitle>1</showtitle>
+		<showhistogram>0</showhistogram>
+		<showlineprofile>0</showlineprofile>
+		<annotation type="pin" displayname="AnnotatePin" color="#ff0000">
+			<x>6580007</x>
+			<y>-1543351</y>
+			<icon>flagred</icon>
+			<stricon>iconflagred</stricon>
+		</annotation>
+	</ndpviewstate>
+	<ndpviewstate id="2">
+		<title>Q1</title>
+		<details/>
+		<coordformat>nanometers</coordformat>
+		<lens>10.0</lens>
+		<x>10425978</x>
+		<y>-529086</y>
+		<z>0</z>
+		<showtitle>1</showtitle>
+		<showhistogram>0</showhistogram>
+		<showlineprofile>0</showlineprofile>
+		<annotation type="pin" displayname="AnnotatePin" color="#00ff00">
+			<x>10425978</x>
+			<y>-529086</y>
+			<icon>flagred</icon>
+			<stricon>iconflagred</stricon>
+		</annotation>
+	</ndpviewstate>
+	<ndpviewstate id="3">
+		<title>Q2 wrong: Pacinian corpuscle</title>
+		<details/>
+		<coordformat>nanometers</coordformat>
+		<lens>10.0</lens>
+		<x>10425978</x>
+		<y>-529086</y>
+		<z>0</z>
+		<showtitle>1</showtitle>
+		<showhistogram>0</showhistogram>
+		<showlineprofile>0</showlineprofile>
+		<annotation type="pin" displayname="AnnotatePin" color="#ff0000">
+			<x>10425978</x>
+			<y>-529086</y>
+			<icon>flagred</icon>
+			<stricon>iconflagred</stricon>
+		</annotation>
+	</ndpviewstate>
+	<ndpviewstate id="4">
+		<title>Q1</title>
+		<details/>
+		<coordformat>nanometers</coordformat>
+		<lens>10.0</lens>
+		<x>9704819</x>
+		<y>40868</y>
+		<z>0</z>
+		<showtitle>1</showtitle>
+		<showhistogram>0</showhistogram>
+		<showlineprofile>0</showlineprofile>
+		<annotation type="pin" displayname="AnnotatePin" color="#00ff00">
+			<x>9704819</x>
+			<y>40868</y>
+			<icon>flagred</icon>
+			<stricon>iconflagred</stricon>
+		</annotation>
+	</ndpviewstate>
+	<ndpviewstate id="5">
+		<title>Q2 wrong: Pacinian corpuscle</title>
+		<details/>
+		<coordformat>nanometers</coordformat>
+		<lens>10.0</lens>
+		<x>9704819</x>
+		<y>40868</y>
+		<z>0</z>
+		<showtitle>1</showtitle>
+		<showhistogram>0</showhistogram>
+		<showlineprofile>0</showlineprofile>
+		<annotation type="pin" displayname="AnnotatePin" color="#ff0000">
+			<x>9704819</x>
+			<y>40868</y>
+			<icon>flagred</icon>
+			<stricon>iconflagred</stricon>
+		</annotation>
+	</ndpviewstate>
+	<ndpviewstate id="6">
+		<title>Q1</title>
+		<details/>
+		<coordformat>nanometers</coordformat>
+		<lens>10.0</lens>
+		<x>7742266</x>
+		<y>43157</y>
+		<z>0</z>
+		<showtitle>1</showtitle>
+		<showhistogram>0</showhistogram>
+		<showlineprofile>0</showlineprofile>
+		<annotation type="pin" displayname="AnnotatePin" color="#00ff00">
+			<x>7742266</x>
+			<y>43157</y>
+			<icon>flagred</icon>
+			<stricon>iconflagred</stricon>
+		</annotation>
+	</ndpviewstate>
+	<ndpviewstate id="7">
+		<title>Q2 wrong: Pacinian corpuscle</title>
+		<details/>
+		<coordformat>nanometers</coordformat>
+		<lens>10.0</lens>
+		<x>7742266</x>
+		<y>43157</y>
+		<z>0</z>
+		<showtitle>1</showtitle>
+		<showhistogram>0</showhistogram>
+		<showlineprofile>0</showlineprofile>
+		<annotation type="pin" displayname="AnnotatePin" color="#ff0000">
+			<x>7742266</x>
+			<y>43157</y>
+			<icon>flagred</icon>
+			<stricon>iconflagred</stricon>
+		</annotation>
+	</ndpviewstate>
+	<ndpviewstate id="8">
+		<title>Q1</title>
+		<details/>
+		<coordformat>nanometers</coordformat>
+		<lens>10.0</lens>
+		<x>11040324</x>
+		<y>-1238495</y>
+		<z>0</z>
+		<showtitle>1</showtitle>
+		<showhistogram>0</showhistogram>
+		<showlineprofile>0</showlineprofile>
+		<annotation type="pin" displayname="AnnotatePin" color="#00ff00">
+			<x>11040324</x>
+			<y>-1238495</y>
+			<icon>flagred</icon>
+			<stricon>iconflagred</stricon>
+		</annotation>
+	</ndpviewstate>
+	<ndpviewstate id="9">
+		<title>Q2 wrong: Pacinian corpuscle</title>
+		<details/>
+		<coordformat>nanometers</coordformat>
+		<lens>10.0</lens>
+		<x>11040324</x>
+		<y>-1238495</y>
+		<z>0</z>
+		<showtitle>1</showtitle>
+		<showhistogram>0</showhistogram>
+		<showlineprofile>0</showlineprofile>
+		<annotation type="pin" displayname="AnnotatePin" color="#ff0000">
+			<x>11040324</x>
+			<y>-1238495</y>
+			<icon>flagred</icon>
+			<stricon>iconflagred</stricon>
+		</annotation>
+	</ndpviewstate>
+	<ndpviewstate id="10">
+		<title>Q1</title>
+		<details/>
+		<coordformat>nanometers</coordformat>
+		<lens>10.0</lens>
+		<x>10748733</x>
+		<y>-1127747</y>
+		<z>0</z>
+		<showtitle>1</showtitle>
+		<showhistogram>0</showhistogram>
+		<showlineprofile>0</showlineprofile>
+		<annotation type="pin" displayname="AnnotatePin" color="#00ff00">
+			<x>10748733</x>
+			<y>-1127747</y>
+			<icon>flagred</icon>
+			<stricon>iconflagred</stricon>
+		</annotation>
+	</ndpviewstate>
+	<ndpviewstate id="11">
+		<title>Q2 wrong: Pacinian corpuscle</title>
+		<details/>
+		<coordformat>nanometers</coordformat>
+		<lens>10.0</lens>
+		<x>10748733</x>
+		<y>-1127747</y>
+		<z>0</z>
+		<showtitle>1</showtitle>
+		<showhistogram>0</showhistogram>
+		<showlineprofile>0</showlineprofile>
+		<annotation type="pin" displayname="AnnotatePin" color="#ff0000">
+			<x>10748733</x>
+			<y>-1127747</y>
+			<icon>flagred</icon>
+			<stricon>iconflagred</stricon>
+		</annotation>
+	</ndpviewstate>
+	<ndpviewstate id="12">
+		<title>Q1 wrong: Eccrine sweat gland</title>
+		<details/>
+		<coordformat>nanometers</coordformat>
+		<lens>10.0</lens>
+		<x>6875339</x>
+		<y>658027</y>
+		<z>0</z>
+		<showtitle>1</showtitle>
+		<showhistogram>0</showhistogram>
+		<showlineprofile>0</showlineprofile>
+		<annotation type="pin" displayname="AnnotatePin" color="#ff0000">
+			<x>6875339</x>
+			<y>658027</y>
+			<icon>flagred</icon>
+			<stricon>iconflagred</stricon>
+		</annotation>
+	</ndpviewstate>
+	<ndpviewstate id="13">
+		<title>Q2 wrong: Eccrine sweat gland</title>
+		<details/>
+		<coordformat>nanometers</coordformat>
+		<lens>10.0</lens>
+		<x>6875339</x>
+		<y>658027</y>
+		<z>0</z>
+		<showtitle>1</showtitle>
+		<showhistogram>0</showhistogram>
+		<showlineprofile>0</showlineprofile>
+		<annotation type="pin" displayname="AnnotatePin" color="#ff0000">
+			<x>6875339</x>
+			<y>658027</y>
+			<icon>flagred</icon>
+			<stricon>iconflagred</stricon>
+		</annotation>
+	</ndpviewstate>
+	<ndpviewstate id="14">
+		<title>Q1 wrong: Eccrine sweat gland</title>
+		<details/>
+		<coordformat>nanometers</coordformat>
+		<lens>10.0</lens>
+		<x>7722029</x>
+		<y>505209</y>
+		<z>0</z>
+		<showtitle>1</showtitle>
+		<showhistogram>0</showhistogram>
+		<showlineprofile>0</showlineprofile>
+		<annotation type="pin" displayname="AnnotatePin" color="#ff0000">
+			<x>7722029</x>
+			<y>505209</y>
+			<icon>flagred</icon>
+			<stricon>iconflagred</stricon>
+		</annotation>
+	</ndpviewstate>
+	<ndpviewstate id="15">
+		<title>Q2 wrong: Eccrine sweat gland</title>
+		<details/>
+		<coordformat>nanometers</coordformat>
+		<lens>10.0</lens>
+		<x>7722029</x>
+		<y>505209</y>
+		<z>0</z>
+		<showtitle>1</showtitle>
+		<showhistogram>0</showhistogram>
+		<showlineprofile>0</showlineprofile>
+		<annotation type="pin" displayname="AnnotatePin" color="#ff0000">
+			<x>7722029</x>
+			<y>505209</y>
+			<icon>flagred</icon>
+			<stricon>iconflagred</stricon>
+		</annotation>
+	</ndpviewstate>
+	<ndpviewstate id="16">
+		<title>Q1 wrong: Eccrine sweat gland</title>
+		<details/>
+		<coordformat>nanometers</coordformat>
+		<lens>10.0</lens>
+		<x>7163428</x>
+		<y>583110</y>
+		<z>0</z>
+		<showtitle>1</showtitle>
+		<showhistogram>0</showhistogram>
+		<showlineprofile>0</showlineprofile>
+		<annotation type="pin" displayname="AnnotatePin" color="#ff0000">
+			<x>7163428</x>
+			<y>583110</y>
+			<icon>flagred</icon>
+			<stricon>iconflagred</stricon>
+		</annotation>
+	</ndpviewstate>
+	<ndpviewstate id="17">
+		<title>Q2 wrong: Eccrine sweat gland</title>
+		<details/>
+		<coordformat>nanometers</coordformat>
+		<lens>10.0</lens>
+		<x>7163428</x>
+		<y>583110</y>
+		<z>0</z>
+		<showtitle>1</showtitle>
+		<showhistogram>0</showhistogram>
+		<showlineprofile>0</showlineprofile>
+		<annotation type="pin" displayname="AnnotatePin" color="#ff0000">
+			<x>7163428</x>
+			<y>583110</y>
+			<icon>flagred</icon>
+			<stricon>iconflagred</stricon>
+		</annotation>
+	</ndpviewstate>
+	<ndpviewstate id="18">
+		<title>Q1 wrong: Eccrine sweat gland</title>
+		<details/>
+		<coordformat>nanometers</coordformat>
+		<lens>10.0</lens>
+		<x>8315441</x>
+		<y>367310</y>
+		<z>0</z>
+		<showtitle>1</showtitle>
+		<showhistogram>0</showhistogram>
+		<showlineprofile>0</showlineprofile>
+		<annotation type="pin" displayname="AnnotatePin" color="#ff0000">
+			<x>8315441</x>
+			<y>367310</y>
+			<icon>flagred</icon>
+			<stricon>iconflagred</stricon>
+		</annotation>
+	</ndpviewstate>
+	<ndpviewstate id="19">
+		<title>Q2 wrong: Eccrine sweat gland</title>
+		<details/>
+		<coordformat>nanometers</coordformat>
+		<lens>10.0</lens>
+		<x>8315441</x>
+		<y>367310</y>
+		<z>0</z>
+		<showtitle>1</showtitle>
+		<showhistogram>0</showhistogram>
+		<showlineprofile>0</showlineprofile>
+		<annotation type="pin" displayname="AnnotatePin" color="#ff0000">
+			<x>8315441</x>
+			<y>367310</y>
+			<icon>flagred</icon>
+			<stricon>iconflagred</stricon>
+		</annotation>
+	</ndpviewstate>
+	<ndpviewstate id="20">
+		<title>Q1 wrong: Eccrine sweat gland</title>
+		<details/>
+		<coordformat>nanometers</coordformat>
+		<lens>10.0</lens>
+		<x>9669045</x>
+		<y>-160145</y>
+		<z>0</z>
+		<showtitle>1</showtitle>
+		<showhistogram>0</showhistogram>
+		<showlineprofile>0</showlineprofile>
+		<annotation type="pin" displayname="AnnotatePin" color="#ff0000">
+			<x>9669045</x>
+			<y>-160145</y>
+			<icon>flagred</icon>
+			<stricon>iconflagred</stricon>
+		</annotation>
+	</ndpviewstate>
+	<ndpviewstate id="21">
+		<title>Q2 wrong: Eccrine sweat gland</title>
+		<details/>
+		<coordformat>nanometers</coordformat>
+		<lens>10.0</lens>
+		<x>9669045</x>
+		<y>-160145</y>
+		<z>0</z>
+		<showtitle>1</showtitle>
+		<showhistogram>0</showhistogram>
+		<showlineprofile>0</showlineprofile>
+		<annotation type="pin" displayname="AnnotatePin" color="#ff0000">
+			<x>9669045</x>
+			<y>-160145</y>
+			<icon>flagred</icon>
+			<stricon>iconflagred</stricon>
+		</annotation>
+	</ndpviewstate>
+	<ndpviewstate id="22">
+		<title>Q1</title>
+		<details/>
+		<coordformat>nanometers</coordformat>
+		<lens>10.0</lens>
+		<x>10963088</x>
+		<y>-884030</y>
+		<z>0</z>
+		<showtitle>1</showtitle>
+		<showhistogram>0</showhistogram>
+		<showlineprofile>0</showlineprofile>
+		<annotation type="pin" displayname="AnnotatePin" color="#00ff00">
+			<x>10963088</x>
+			<y>-884030</y>
+			<icon>flagred</icon>
+			<stricon>iconflagred</stricon>
+		</annotation>
+	</ndpviewstate>
+	<ndpviewstate id="23">
+		<title>Q2 wrong: Pacinian corpuscle</title>
+		<details/>
+		<coordformat>nanometers</coordformat>
+		<lens>10.0</lens>
+		<x>10963088</x>
+		<y>-884030</y>
+		<z>0</z>
+		<showtitle>1</showtitle>
+		<showhistogram>0</showhistogram>
+		<showlineprofile>0</showlineprofile>
+		<annotation type="pin" displayname="AnnotatePin" color="#ff0000">
+			<x>10963088</x>
+			<y>-884030</y>
+			<icon>flagred</icon>
+			<stricon>iconflagred</stricon>
+		</annotation>
+	</ndpviewstate>
+	<ndpviewstate id="24">
+		<title>Q1 wrong: Eccrine sweat gland</title>
+		<details/>
+		<coordformat>nanometers</coordformat>
+		<lens>10.0</lens>
+		<x>2899091</x>
+		<y>540770</y>
+		<z>0</z>
+		<showtitle>1</showtitle>
+		<showhistogram>0</showhistogram>
+		<showlineprofile>0</showlineprofile>
+		<annotation type="pin" displayname="AnnotatePin" color="#ff0000">
+			<x>2899091</x>
+			<y>540770</y>
+			<icon>flagred</icon>
+			<stricon>iconflagred</stricon>
+		</annotation>
+	</ndpviewstate>
+	<ndpviewstate id="25">
+		<title>Q2 wrong: Eccrine sweat gland</title>
+		<details/>
+		<coordformat>nanometers</coordformat>
+		<lens>10.0</lens>
+		<x>2899091</x>
+		<y>540770</y>
+		<z>0</z>
+		<showtitle>1</showtitle>
+		<showhistogram>0</showhistogram>
+		<showlineprofile>0</showlineprofile>
+		<annotation type="pin" displayname="AnnotatePin" color="#ff0000">
+			<x>2899091</x>
+			<y>540770</y>
+			<icon>flagred</icon>
+			<stricon>iconflagred</stricon>
+		</annotation>
+	</ndpviewstate>
+	<ndpviewstate id="26">
+		<title>Q1 wrong: Eccrine sweat gland</title>
+		<details/>
+		<coordformat>nanometers</coordformat>
+		<lens>10.0</lens>
+		<x>8028379</x>
+		<y>505077</y>
+		<z>0</z>
+		<showtitle>1</showtitle>
+		<showhistogram>0</showhistogram>
+		<showlineprofile>0</showlineprofile>
+		<annotation type="pin" displayname="AnnotatePin" color="#ff0000">
+			<x>8028379</x>
+			<y>505077</y>
+			<icon>flagred</icon>
+			<stricon>iconflagred</stricon>
+		</annotation>
+	</ndpviewstate>
+	<ndpviewstate id="27">
+		<title>Q2 wrong: Eccrine sweat gland</title>
+		<details/>
+		<coordformat>nanometers</coordformat>
+		<lens>10.0</lens>
+		<x>8028379</x>
+		<y>505077</y>
+		<z>0</z>
+		<showtitle>1</showtitle>
+		<showhistogram>0</showhistogram>
+		<showlineprofile>0</showlineprofile>
+		<annotation type="pin" displayname="AnnotatePin" color="#ff0000">
+			<x>8028379</x>
+			<y>505077</y>
+			<icon>flagred</icon>
+			<stricon>iconflagred</stricon>
+		</annotation>
+	</ndpviewstate>
+	<ndpviewstate id="28">
+		<title>Q2</title>
+		<details/>
+		<coordformat>nanometers</coordformat>
+		<lens>10.0</lens>
+		<x>9303516</x>
+		<y>-1389047</y>
+		<z>0</z>
+		<showtitle>1</showtitle>
+		<showhistogram>0</showhistogram>
+		<showlineprofile>0</showlineprofile>
+		<annotation type="pin" displayname="AnnotatePin" color="#00ff00">
+			<x>9303516</x>
+			<y>-1389047</y>
+			<icon>flagred</icon>
+			<stricon>iconflagred</stricon>
+		</annotation>
+	</ndpviewstate>
+	<ndpviewstate id="29">
+		<title>Q2</title>
+		<details/>
+		<coordformat>nanometers</coordformat>
+		<lens>10.0</lens>
+		<x>8659776</x>
+		<y>-891031</y>
+		<z>0</z>
+		<showtitle>1</showtitle>
+		<showhistogram>0</showhistogram>
+		<showlineprofile>0</showlineprofile>
+		<annotation type="pin" displayname="AnnotatePin" color="#00ff00">
+			<x>8659776</x>
+			<y>-891031</y>
+			<icon>flagred</icon>
+			<stricon>iconflagred</stricon>
+		</annotation>
+	</ndpviewstate>
+	<ndpviewstate id="30">
+		<title>Q2</title>
+		<details/>
+		<coordformat>nanometers</coordformat>
+		<lens>10.0</lens>
+		<x>8084685</x>
+		<y>-1554564</y>
+		<z>0</z>
+		<showtitle>1</showtitle>
+		<showhistogram>0</showhistogram>
+		<showlineprofile>0</showlineprofile>
+		<annotation type="pin" displayname="AnnotatePin" color="#00ff00">
+			<x>8084685</x>
+			<y>-1554564</y>
+			<icon>flagred</icon>
+			<stricon>iconflagred</stricon>
+		</annotation>
+	</ndpviewstate>
+	<ndpviewstate id="31">
+		<title>Q2</title>
+		<details/>
+		<coordformat>nanometers</coordformat>
+		<lens>10.0</lens>
+		<x>8212975</x>
+		<y>-957384</y>
+		<z>0</z>
+		<showtitle>1</showtitle>
+		<showhistogram>0</showhistogram>
+		<showlineprofile>0</showlineprofile>
+		<annotation type="pin" displayname="AnnotatePin" color="#00ff00">
+			<x>8212975</x>
+			<y>-957384</y>
+			<icon>flagred</icon>
+			<stricon>iconflagred</stricon>
+		</annotation>
+	</ndpviewstate>
+	<ndpviewstate id="32">
+		<title>Q2</title>
+		<details/>
+		<coordformat>nanometers</coordformat>
+		<lens>10.0</lens>
+		<x>8239518</x>
+		<y>-112485</y>
+		<z>0</z>
+		<showtitle>1</showtitle>
+		<showhistogram>0</showhistogram>
+		<showlineprofile>0</showlineprofile>
+		<annotation type="pin" displayname="AnnotatePin" color="#00ff00">
+			<x>8239518</x>
+			<y>-112485</y>
+			<icon>flagred</icon>
+			<stricon>iconflagred</stricon>
+		</annotation>
+	</ndpviewstate>
+	<ndpviewstate id="33">
+		<title>Q2</title>
+		<details/>
+		<coordformat>nanometers</coordformat>
+		<lens>10.0</lens>
+		<x>10424853</x>
+		<y>-1678425</y>
+		<z>0</z>
+		<showtitle>1</showtitle>
+		<showhistogram>0</showhistogram>
+		<showlineprofile>0</showlineprofile>
+		<annotation type="pin" displayname="AnnotatePin" color="#00ff00">
+			<x>10424853</x>
+			<y>-1678425</y>
+			<icon>flagred</icon>
+			<stricon>iconflagred</stricon>
+		</annotation>
+	</ndpviewstate>
+	<ndpviewstate id="34">
+		<title>Q2</title>
+		<details/>
+		<coordformat>nanometers</coordformat>
+		<lens>10.0</lens>
+		<x>9770136</x>
+		<y>-1682848</y>
+		<z>0</z>
+		<showtitle>1</showtitle>
+		<showhistogram>0</showhistogram>
+		<showlineprofile>0</showlineprofile>
+		<annotation type="pin" displayname="AnnotatePin" color="#00ff00">
+			<x>9770136</x>
+			<y>-1682848</y>
+			<icon>flagred</icon>
+			<stricon>iconflagred</stricon>
+		</annotation>
+	</ndpviewstate>
+	<ndpviewstate id="35">
+		<title>Q2</title>
+		<details/>
+		<coordformat>nanometers</coordformat>
+		<lens>10.0</lens>
+		<x>11402503</x>
+		<y>-1704967</y>
+		<z>0</z>
+		<showtitle>1</showtitle>
+		<showhistogram>0</showhistogram>
+		<showlineprofile>0</showlineprofile>
+		<annotation type="pin" displayname="AnnotatePin" color="#00ff00">
+			<x>11402503</x>
+			<y>-1704967</y>
+			<icon>flagred</icon>
+			<stricon>iconflagred</stricon>
+		</annotation>
+	</ndpviewstate>
+	<ndpviewstate id="36">
+		<title>Q2</title>
+		<details/>
+		<coordformat>nanometers</coordformat>
+		<lens>10.0</lens>
+		<x>12224046</x>
+		<y>-1651457</y>
+		<z>0</z>
+		<showtitle>1</showtitle>
+		<showhistogram>0</showhistogram>
+		<showlineprofile>0</showlineprofile>
+		<annotation type="pin" displayname="AnnotatePin" color="#00ff00">
+			<x>12224046</x>
+			<y>-1651457</y>
+			<icon>flagred</icon>
+			<stricon>iconflagred</stricon>
+		</annotation>
+	</ndpviewstate>
+	<ndpviewstate id="37">
+		<title>Q2</title>
+		<details/>
+		<coordformat>nanometers</coordformat>
+		<lens>10.0</lens>
+		<x>11755135</x>
+		<y>-1784160</y>
+		<z>0</z>
+		<showtitle>1</showtitle>
+		<showhistogram>0</showhistogram>
+		<showlineprofile>0</showlineprofile>
+		<annotation type="pin" displayname="AnnotatePin" color="#00ff00">
+			<x>11755135</x>
+			<y>-1784160</y>
+			<icon>flagred</icon>
+			<stricon>iconflagred</stricon>
+		</annotation>
+	</ndpviewstate>
+	<ndpviewstate id="38">
+		<title>Q2</title>
+		<details/>
+		<coordformat>nanometers</coordformat>
+		<lens>10.0</lens>
+		<x>12679682</x>
+		<y>-1558560</y>
+		<z>0</z>
+		<showtitle>1</showtitle>
+		<showhistogram>0</showhistogram>
+		<showlineprofile>0</showlineprofile>
+		<annotation type="pin" displayname="AnnotatePin" color="#00ff00">
+			<x>12679682</x>
+			<y>-1558560</y>
+			<icon>flagred</icon>
+			<stricon>iconflagred</stricon>
+		</annotation>
+	</ndpviewstate>
+	<ndpviewstate id="39">
+		<title>Q2</title>
+		<details/>
+		<coordformat>nanometers</coordformat>
+		<lens>10.0</lens>
+		<x>9633486</x>
+		<y>-547336</y>
+		<z>0</z>
+		<showtitle>1</showtitle>
+		<showhistogram>0</showhistogram>
+		<showlineprofile>0</showlineprofile>
+		<annotation type="pin" displayname="AnnotatePin" color="#00ff00">
+			<x>9633486</x>
+			<y>-547336</y>
+			<icon>flagred</icon>
+			<stricon>iconflagred</stricon>
+		</annotation>
+	</ndpviewstate>
+	<ndpviewstate id="40">
+		<title>Q2</title>
+		<details/>
+		<coordformat>nanometers</coordformat>
+		<lens>10.0</lens>
+		<x>8585055</x>
+		<y>-383664</y>
+		<z>0</z>
+		<showtitle>1</showtitle>
+		<showhistogram>0</showhistogram>
+		<showlineprofile>0</showlineprofile>
+		<annotation type="pin" displayname="AnnotatePin" color="#00ff00">
+			<x>8585055</x>
+			<y>-383664</y>
+			<icon>flagred</icon>
+			<stricon>iconflagred</stricon>
+		</annotation>
+	</ndpviewstate>
+	<ndpviewstate id="41">
+		<title>Q2 wrong: Skeletal muscle</title>
+		<details/>
+		<coordformat>nanometers</coordformat>
+		<lens>10.0</lens>
+		<x>4704348</x>
+		<y>-695513</y>
+		<z>0</z>
+		<showtitle>1</showtitle>
+		<showhistogram>0</showhistogram>
+		<showlineprofile>0</showlineprofile>
+		<annotation type="pin" displayname="AnnotatePin" color="#ff0000">
+			<x>4704348</x>
+			<y>-695513</y>
+			<icon>flagred</icon>
+			<stricon>iconflagred</stricon>
+		</annotation>
+	</ndpviewstate>
+	<ndpviewstate id="42">
+		<title>Q2 wrong: Epidermis</title>
+		<details/>
+		<coordformat>nanometers</coordformat>
+		<lens>10.0</lens>
+		<x>4058500</x>
+		<y>1370286</y>
+		<z>0</z>
+		<showtitle>1</showtitle>
+		<showhistogram>0</showhistogram>
+		<showlineprofile>0</showlineprofile>
+		<annotation type="pin" displayname="AnnotatePin" color="#ff0000">
+			<x>4058500</x>
+			<y>1370286</y>
+			<icon>flagred</icon>
+			<stricon>iconflagred</stricon>
+		</annotation>
+	</ndpviewstate>
+	<ndpviewstate id="43">
+		<title>Q2 wrong: Epidermis</title>
+		<details/>
+		<coordformat>nanometers</coordformat>
+		<lens>10.0</lens>
+		<x>3386082</x>
+		<y>1157957</y>
+		<z>0</z>
+		<showtitle>1</showtitle>
+		<showhistogram>0</showhistogram>
+		<showlineprofile>0</showlineprofile>
+		<annotation type="pin" displayname="AnnotatePin" color="#ff0000">
+			<x>3386082</x>
+			<y>1157957</y>
+			<icon>flagred</icon>
+			<stricon>iconflagred</stricon>
+		</annotation>
+	</ndpviewstate>
+	<ndpviewstate id="44">
+		<title>Q2 wrong: Skeletal muscle</title>
+		<details/>
+		<coordformat>nanometers</coordformat>
+		<lens>10.0</lens>
+		<x>4226605</x>
+		<y>-1124598</y>
+		<z>0</z>
+		<showtitle>1</showtitle>
+		<showhistogram>0</showhistogram>
+		<showlineprofile>0</showlineprofile>
+		<annotation type="pin" displayname="AnnotatePin" color="#ff0000">
+			<x>4226605</x>
+			<y>-1124598</y>
+			<icon>flagred</icon>
+			<stricon>iconflagred</stricon>
+		</annotation>
+	</ndpviewstate>
+	<ndpviewstate id="45">
+		<title>Q2 wrong: Skeletal muscle</title>
+		<details/>
+		<coordformat>nanometers</coordformat>
+		<lens>10.0</lens>
+		<x>5430523</x>
+		<y>-1889674</y>
+		<z>0</z>
+		<showtitle>1</showtitle>
+		<showhistogram>0</showhistogram>
+		<showlineprofile>0</showlineprofile>
+		<annotation type="pin" displayname="AnnotatePin" color="#ff0000">
+			<x>5430523</x>
+			<y>-1889674</y>
+			<icon>flagred</icon>
+			<stricon>iconflagred</stricon>
+		</annotation>
+	</ndpviewstate>
+	<ndpviewstate id="46">
+		<title>Q2 wrong: Eccrine sweat gland</title>
+		<details/>
+		<coordformat>nanometers</coordformat>
+		<lens>10.0</lens>
+		<x>7673817</x>
+		<y>524871</y>
+		<z>0</z>
+		<showtitle>1</showtitle>
+		<showhistogram>0</showhistogram>
+		<showlineprofile>0</showlineprofile>
+		<annotation type="pin" displayname="AnnotatePin" color="#ff0000">
+			<x>7673817</x>
+			<y>524871</y>
+			<icon>flagred</icon>
+			<stricon>iconflagred</stricon>
+		</annotation>
+	</ndpviewstate>
+	<ndpviewstate id="47">
+		<title>Q2 wrong: Eccrine sweat gland</title>
+		<details/>
+		<coordformat>nanometers</coordformat>
+		<lens>10.0</lens>
+		<x>7219585</x>
+		<y>625105</y>
+		<z>0</z>
+		<showtitle>1</showtitle>
+		<showhistogram>0</showhistogram>
+		<showlineprofile>0</showlineprofile>
+		<annotation type="pin" displayname="AnnotatePin" color="#ff0000">
+			<x>7219585</x>
+			<y>625105</y>
+			<icon>flagred</icon>
+			<stricon>iconflagred</stricon>
+		</annotation>
+	</ndpviewstate>
+	<ndpviewstate id="48">
+		<title>Q2 wrong: Eccrine sweat gland</title>
+		<details/>
+		<coordformat>nanometers</coordformat>
+		<lens>10.0</lens>
+		<x>7240355</x>
+		<y>545640</y>
+		<z>0</z>
+		<showtitle>1</showtitle>
+		<showhistogram>0</showhistogram>
+		<showlineprofile>0</showlineprofile>
+		<annotation type="pin" displayname="AnnotatePin" color="#ff0000">
+			<x>7240355</x>
+			<y>545640</y>
+			<icon>flagred</icon>
+			<stricon>iconflagred</stricon>
+		</annotation>
+	</ndpviewstate>
+	<ndpviewstate id="49">
+		<title>Q2 wrong: Dense connective tissue</title>
+		<details/>
+		<coordformat>nanometers</coordformat>
+		<lens>10.0</lens>
+		<x>10647394</x>
+		<y>-870125</y>
+		<z>0</z>
+		<showtitle>1</showtitle>
+		<showhistogram>0</showhistogram>
+		<showlineprofile>0</showlineprofile>
+		<annotation type="pin" displayname="AnnotatePin" color="#ff0000">
+			<x>10647394</x>
+			<y>-870125</y>
+			<icon>flagred</icon>
+			<stricon>iconflagred</stricon>
+		</annotation>
+	</ndpviewstate>
+	<ndpviewstate id="50">
+		<title>Q2 wrong: Dense connective tissue</title>
+		<details/>
+		<coordformat>nanometers</coordformat>
+		<lens>10.0</lens>
+		<x>10207849</x>
+		<y>-748556</y>
+		<z>0</z>
+		<showtitle>1</showtitle>
+		<showhistogram>0</showhistogram>
+		<showlineprofile>0</showlineprofile>
+		<annotation type="pin" displayname="AnnotatePin" color="#ff0000">
+			<x>10207849</x>
+			<y>-748556</y>
+			<icon>flagred</icon>
+			<stricon>iconflagred</stricon>
+		</annotation>
+	</ndpviewstate>
+	<ndpviewstate id="51">
+		<title>Q2 wrong: Pacinian corpuscle</title>
+		<details/>
+		<coordformat>nanometers</coordformat>
+		<lens>10.0</lens>
+		<x>10387408</x>
+		<y>-533472</y>
+		<z>0</z>
+		<showtitle>1</showtitle>
+		<showhistogram>0</showhistogram>
+		<showlineprofile>0</showlineprofile>
+		<annotation type="pin" displayname="AnnotatePin" color="#ff0000">
+			<x>10387408</x>
+			<y>-533472</y>
+			<icon>flagred</icon>
+			<stricon>iconflagred</stricon>
+		</annotation>
+	</ndpviewstate>
+	<ndpviewstate id="52">
+		<title>Q2 wrong: Pacinian corpuscle</title>
+		<details/>
+		<coordformat>nanometers</coordformat>
+		<lens>10.0</lens>
+		<x>9676659</x>
+		<y>33228</y>
+		<z>0</z>
+		<showtitle>1</showtitle>
+		<showhistogram>0</showhistogram>
+		<showlineprofile>0</showlineprofile>
+		<annotation type="pin" displayname="AnnotatePin" color="#ff0000">
+			<x>9676659</x>
+			<y>33228</y>
+			<icon>flagred</icon>
+			<stricon>iconflagred</stricon>
+		</annotation>
+	</ndpviewstate>
+	<ndpviewstate id="53">
+		<title>Q2 wrong: Dense connective tissue</title>
+		<details/>
+		<coordformat>nanometers</coordformat>
+		<lens>10.0</lens>
+		<x>11823652</x>
+		<y>-1105650</y>
+		<z>0</z>
+		<showtitle>1</showtitle>
+		<showhistogram>0</showhistogram>
+		<showlineprofile>0</showlineprofile>
+		<annotation type="pin" displayname="AnnotatePin" color="#ff0000">
+			<x>11823652</x>
+			<y>-1105650</y>
+			<icon>flagred</icon>
+			<stricon>iconflagred</stricon>
+		</annotation>
+	</ndpviewstate>
+	<ndpviewstate id="54">
+		<title>Q1</title>
+		<details/>
+		<coordformat>nanometers</coordformat>
+		<lens>10.0</lens>
+		<x>10726198</x>
+		<y>-1128317</y>
+		<z>0</z>
+		<showtitle>1</showtitle>
+		<showhistogram>0</showhistogram>
+		<showlineprofile>0</showlineprofile>
+		<annotation type="pin" displayname="AnnotatePin" color="#00ff00">
+			<x>10726198</x>
+			<y>-1128317</y>
+			<icon>flagred</icon>
+			<stricon>iconflagred</stricon>
+		</annotation>
+	</ndpviewstate>
+	<ndpviewstate id="55">
+		<title>Q1</title>
+		<details/>
+		<coordformat>nanometers</coordformat>
+		<lens>10.0</lens>
+		<x>10822553</x>
+		<y>-1142308</y>
+		<z>0</z>
+		<showtitle>1</showtitle>
+		<showhistogram>0</showhistogram>
+		<showlineprofile>0</showlineprofile>
+		<annotation type="pin" displayname="AnnotatePin" color="#00ff00">
+			<x>10822553</x>
+			<y>-1142308</y>
+			<icon>flagred</icon>
+			<stricon>iconflagred</stricon>
+		</annotation>
+	</ndpviewstate>
+	<ndpviewstate id="56">
+		<title>Q1</title>
+		<details/>
+		<coordformat>nanometers</coordformat>
+		<lens>10.0</lens>
+		<x>10737524</x>
+		<y>-1124213</y>
+		<z>0</z>
+		<showtitle>1</showtitle>
+		<showhistogram>0</showhistogram>
+		<showlineprofile>0</showlineprofile>
+		<annotation type="pin" displayname="AnnotatePin" color="#00ff00">
+			<x>10737524</x>
+			<y>-1124213</y>
+			<icon>flagred</icon>
+			<stricon>iconflagred</stricon>
+		</annotation>
+	</ndpviewstate>
+	<ndpviewstate id="57">
+		<title>Q1</title>
+		<details/>
+		<coordformat>nanometers</coordformat>
+		<lens>10.0</lens>
+		<x>10671526</x>
+		<y>-1135432</y>
+		<z>0</z>
+		<showtitle>1</showtitle>
+		<showhistogram>0</showhistogram>
+		<showlineprofile>0</showlineprofile>
+		<annotation type="pin" displayname="AnnotatePin" color="#00ff00">
+			<x>10671526</x>
+			<y>-1135432</y>
+			<icon>flagred</icon>
+			<stricon>iconflagred</stricon>
+		</annotation>
+	</ndpviewstate>
+	<ndpviewstate id="58">
+		<title>Q1</title>
+		<details/>
+		<coordformat>nanometers</coordformat>
+		<lens>10.0</lens>
+		<x>10762447</x>
+		<y>-1093652</y>
+		<z>0</z>
+		<showtitle>1</showtitle>
+		<showhistogram>0</showhistogram>
+		<showlineprofile>0</showlineprofile>
+		<annotation type="pin" displayname="AnnotatePin" color="#00ff00">
+			<x>10762447</x>
+			<y>-1093652</y>
+			<icon>flagred</icon>
+			<stricon>iconflagred</stricon>
+		</annotation>
+	</ndpviewstate>
+	<ndpviewstate id="59">
+		<title>Q1</title>
+		<details/>
+		<coordformat>nanometers</coordformat>
+		<lens>10.0</lens>
+		<x>10653038</x>
+		<y>-1166426</y>
+		<z>0</z>
+		<showtitle>1</showtitle>
+		<showhistogram>0</showhistogram>
+		<showlineprofile>0</showlineprofile>
+		<annotation type="pin" displayname="AnnotatePin" color="#00ff00">
+			<x>10653038</x>
+			<y>-1166426</y>
+			<icon>flagred</icon>
+			<stricon>iconflagred</stricon>
+		</annotation>
+	</ndpviewstate>
+	<ndpviewstate id="60">
+		<title>Q1</title>
+		<details/>
+		<coordformat>nanometers</coordformat>
+		<lens>10.0</lens>
+		<x>10775426</x>
+		<y>-1205301</y>
+		<z>0</z>
+		<showtitle>1</showtitle>
+		<showhistogram>0</showhistogram>
+		<showlineprofile>0</showlineprofile>
+		<annotation type="pin" displayname="AnnotatePin" color="#00ff00">
+			<x>10775426</x>
+			<y>-1205301</y>
+			<icon>flagred</icon>
+			<stricon>iconflagred</stricon>
+		</annotation>
+	</ndpviewstate>
+	<ndpviewstate id="61">
+		<title>Q1</title>
+		<details/>
+		<coordformat>nanometers</coordformat>
+		<lens>10.0</lens>
+		<x>10767356</x>
+		<y>-1120024</y>
+		<z>0</z>
+		<showtitle>1</showtitle>
+		<showhistogram>0</showhistogram>
+		<showlineprofile>0</showlineprofile>
+		<annotation type="pin" displayname="AnnotatePin" color="#00ff00">
+			<x>10767356</x>
+			<y>-1120024</y>
+			<icon>flagred</icon>
+			<stricon>iconflagred</stricon>
+		</annotation>
+	</ndpviewstate>
+	<ndpviewstate id="62">
+		<title>Q1</title>
+		<details/>
+		<coordformat>nanometers</coordformat>
+		<lens>10.0</lens>
+		<x>11033010</x>
+		<y>-1342361</y>
+		<z>0</z>
+		<showtitle>1</showtitle>
+		<showhistogram>0</showhistogram>
+		<showlineprofile>0</showlineprofile>
+		<annotation type="pin" displayname="AnnotatePin" color="#00ff00">
+			<x>11033010</x>
+			<y>-1342361</y>
+			<icon>flagred</icon>
+			<stricon>iconflagred</stricon>
+		</annotation>
+	</ndpviewstate>
+	<ndpviewstate id="63">
+		<title>Q1</title>
+		<details/>
+		<coordformat>nanometers</coordformat>
+		<lens>10.0</lens>
+		<x>10975122</x>
+		<y>-1322643</y>
+		<z>0</z>
+		<showtitle>1</showtitle>
+		<showhistogram>0</showhistogram>
+		<showlineprofile>0</showlineprofile>
+		<annotation type="pin" displayname="AnnotatePin" color="#00ff00">
+			<x>10975122</x>
+			<y>-1322643</y>
+			<icon>flagred</icon>
+			<stricon>iconflagred</stricon>
+		</annotation>
+	</ndpviewstate>
+	<ndpviewstate id="64">
+		<title>Q1</title>
+		<details/>
+		<coordformat>nanometers</coordformat>
+		<lens>10.0</lens>
+		<x>10947712</x>
+		<y>-1298643</y>
+		<z>0</z>
+		<showtitle>1</showtitle>
+		<showhistogram>0</showhistogram>
+		<showlineprofile>0</showlineprofile>
+		<annotation type="pin" displayname="AnnotatePin" color="#00ff00">
+			<x>10947712</x>
+			<y>-1298643</y>
+			<icon>flagred</icon>
+			<stricon>iconflagred</stricon>
+		</annotation>
+	</ndpviewstate>
+	<ndpviewstate id="65">
+		<title>Q1</title>
+		<details/>
+		<coordformat>nanometers</coordformat>
+		<lens>10.0</lens>
+		<x>11017972</x>
+		<y>-1257725</y>
+		<z>0</z>
+		<showtitle>1</showtitle>
+		<showhistogram>0</showhistogram>
+		<showlineprofile>0</showlineprofile>
+		<annotation type="pin" displayname="AnnotatePin" color="#00ff00">
+			<x>11017972</x>
+			<y>-1257725</y>
+			<icon>flagred</icon>
+			<stricon>iconflagred</stricon>
+		</annotation>
+	</ndpviewstate>
+	<ndpviewstate id="66">
+		<title>Q1</title>
+		<details/>
+		<coordformat>nanometers</coordformat>
+		<lens>10.0</lens>
+		<x>11031426</x>
+		<y>-1279578</y>
+		<z>0</z>
+		<showtitle>1</showtitle>
+		<showhistogram>0</showhistogram>
+		<showlineprofile>0</showlineprofile>
+		<annotation type="pin" displayname="AnnotatePin" color="#00ff00">
+			<x>11031426</x>
+			<y>-1279578</y>
+			<icon>flagred</icon>
+			<stricon>iconflagred</stricon>
+		</annotation>
+	</ndpviewstate>
+	<ndpviewstate id="67">
+		<title>Q1</title>
+		<details/>
+		<coordformat>nanometers</coordformat>
+		<lens>10.0</lens>
+		<x>11028113</x>
+		<y>-1277182</y>
+		<z>0</z>
+		<showtitle>1</showtitle>
+		<showhistogram>0</showhistogram>
+		<showlineprofile>0</showlineprofile>
+		<annotation type="pin" displayname="AnnotatePin" color="#00ff00">
+			<x>11028113</x>
+			<y>-1277182</y>
+			<icon>flagred</icon>
+			<stricon>iconflagred</stricon>
+		</annotation>
+	</ndpviewstate>
+	<ndpviewstate id="68">
+		<title>Q1</title>
+		<details/>
+		<coordformat>nanometers</coordformat>
+		<lens>10.0</lens>
+		<x>10433122</x>
+		<y>-594494</y>
+		<z>0</z>
+		<showtitle>1</showtitle>
+		<showhistogram>0</showhistogram>
+		<showlineprofile>0</showlineprofile>
+		<annotation type="pin" displayname="AnnotatePin" color="#00ff00">
+			<x>10433122</x>
+			<y>-594494</y>
+			<icon>flagred</icon>
+			<stricon>iconflagred</stricon>
+		</annotation>
+	</ndpviewstate>
+	<ndpviewstate id="69">
+		<title>Q1</title>
+		<details/>
+		<coordformat>nanometers</coordformat>
+		<lens>10.0</lens>
+		<x>10527986</x>
+		<y>-523531</y>
+		<z>0</z>
+		<showtitle>1</showtitle>
+		<showhistogram>0</showhistogram>
+		<showlineprofile>0</showlineprofile>
+		<annotation type="pin" displayname="AnnotatePin" color="#00ff00">
+			<x>10527986</x>
+			<y>-523531</y>
+			<icon>flagred</icon>
+			<stricon>iconflagred</stricon>
+		</annotation>
+	</ndpviewstate>
+	<ndpviewstate id="70">
+		<title>Q1</title>
+		<details/>
+		<coordformat>nanometers</coordformat>
+		<lens>10.0</lens>
+		<x>10397928</x>
+		<y>-602504</y>
+		<z>0</z>
+		<showtitle>1</showtitle>
+		<showhistogram>0</showhistogram>
+		<showlineprofile>0</showlineprofile>
+		<annotation type="pin" displayname="AnnotatePin" color="#00ff00">
+			<x>10397928</x>
+			<y>-602504</y>
+			<icon>flagred</icon>
+			<stricon>iconflagred</stricon>
+		</annotation>
+	</ndpviewstate>
+	<ndpviewstate id="71">
+		<title>Q1</title>
+		<details/>
+		<coordformat>nanometers</coordformat>
+		<lens>10.0</lens>
+		<x>10391427</x>
+		<y>-628838</y>
+		<z>0</z>
+		<showtitle>1</showtitle>
+		<showhistogram>0</showhistogram>
+		<showlineprofile>0</showlineprofile>
+		<annotation type="pin" displayname="AnnotatePin" color="#00ff00">
+			<x>10391427</x>
+			<y>-628838</y>
+			<icon>flagred</icon>
+			<stricon>iconflagred</stricon>
+		</annotation>
+	</ndpviewstate>
+	<ndpviewstate id="72">
+		<title>Q1</title>
+		<details/>
+		<coordformat>nanometers</coordformat>
+		<lens>10.0</lens>
+		<x>10509670</x>
+		<y>-574304</y>
+		<z>0</z>
+		<showtitle>1</showtitle>
+		<showhistogram>0</showhistogram>
+		<showlineprofile>0</showlineprofile>
+		<annotation type="pin" displayname="AnnotatePin" color="#00ff00">
+			<x>10509670</x>
+			<y>-574304</y>
+			<icon>flagred</icon>
+			<stricon>iconflagred</stricon>
+		</annotation>
+	</ndpviewstate>
+	<ndpviewstate id="73">
+		<title>Q1</title>
+		<details/>
+		<coordformat>nanometers</coordformat>
+		<lens>10.0</lens>
+		<x>10529564</x>
+		<y>-576598</y>
+		<z>0</z>
+		<showtitle>1</showtitle>
+		<showhistogram>0</showhistogram>
+		<showlineprofile>0</showlineprofile>
+		<annotation type="pin" displayname="AnnotatePin" color="#00ff00">
+			<x>10529564</x>
+			<y>-576598</y>
+			<icon>flagred</icon>
+			<stricon>iconflagred</stricon>
+		</annotation>
+	</ndpviewstate>
+	<ndpviewstate id="74">
+		<title>Q1</title>
+		<details/>
+		<coordformat>nanometers</coordformat>
+		<lens>10.0</lens>
+		<x>10545343</x>
+		<y>-562811</y>
+		<z>0</z>
+		<showtitle>1</showtitle>
+		<showhistogram>0</showhistogram>
+		<showlineprofile>0</showlineprofile>
+		<annotation type="pin" displayname="AnnotatePin" color="#00ff00">
+			<x>10545343</x>
+			<y>-562811</y>
+			<icon>flagred</icon>
+			<stricon>iconflagred</stricon>
+		</annotation>
+	</ndpviewstate>
+	<ndpviewstate id="75">
+		<title>Q1</title>
+		<details/>
+		<coordformat>nanometers</coordformat>
+		<lens>10.0</lens>
+		<x>10562708</x>
+		<y>-574796</y>
+		<z>0</z>
+		<showtitle>1</showtitle>
+		<showhistogram>0</showhistogram>
+		<showlineprofile>0</showlineprofile>
+		<annotation type="pin" displayname="AnnotatePin" color="#00ff00">
+			<x>10562708</x>
+			<y>-574796</y>
+			<icon>flagred</icon>
+			<stricon>iconflagred</stricon>
+		</annotation>
+	</ndpviewstate>
+	<ndpviewstate id="76">
+		<title>Q1</title>
+		<details/>
+		<coordformat>nanometers</coordformat>
+		<lens>10.0</lens>
+		<x>10337911</x>
+		<y>-536472</y>
+		<z>0</z>
+		<showtitle>1</showtitle>
+		<showhistogram>0</showhistogram>
+		<showlineprofile>0</showlineprofile>
+		<annotation type="pin" displayname="AnnotatePin" color="#00ff00">
+			<x>10337911</x>
+			<y>-536472</y>
+			<icon>flagred</icon>
+			<stricon>iconflagred</stricon>
+		</annotation>
+	</ndpviewstate>
+	<ndpviewstate id="77">
+		<title>Q1</title>
+		<details/>
+		<coordformat>nanometers</coordformat>
+		<lens>10.0</lens>
+		<x>7821521</x>
+		<y>-22856</y>
+		<z>0</z>
+		<showtitle>1</showtitle>
+		<showhistogram>0</showhistogram>
+		<showlineprofile>0</showlineprofile>
+		<annotation type="pin" displayname="AnnotatePin" color="#00ff00">
+			<x>7821521</x>
+			<y>-22856</y>
+			<icon>flagred</icon>
+			<stricon>iconflagred</stricon>
+		</annotation>
+	</ndpviewstate>
+	<ndpviewstate id="78">
+		<title>Q1</title>
+		<details/>
+		<coordformat>nanometers</coordformat>
+		<lens>10.0</lens>
+		<x>7707326</x>
+		<y>-9370</y>
+		<z>0</z>
+		<showtitle>1</showtitle>
+		<showhistogram>0</showhistogram>
+		<showlineprofile>0</showlineprofile>
+		<annotation type="pin" displayname="AnnotatePin" color="#00ff00">
+			<x>7707326</x>
+			<y>-9370</y>
+			<icon>flagred</icon>
+			<stricon>iconflagred</stricon>
+		</annotation>
+	</ndpviewstate>
+	<ndpviewstate id="79">
+		<title>Q1</title>
+		<details/>
+		<coordformat>nanometers</coordformat>
+		<lens>10.0</lens>
+		<x>7712421</x>
+		<y>-27877</y>
+		<z>0</z>
+		<showtitle>1</showtitle>
+		<showhistogram>0</showhistogram>
+		<showlineprofile>0</showlineprofile>
+		<annotation type="pin" displayname="AnnotatePin" color="#00ff00">
+			<x>7712421</x>
+			<y>-27877</y>
+			<icon>flagred</icon>
+			<stricon>iconflagred</stricon>
+		</annotation>
+	</ndpviewstate>
+	<ndpviewstate id="80">
+		<title>Q1</title>
+		<details/>
+		<coordformat>nanometers</coordformat>
+		<lens>10.0</lens>
+		<x>7824578</x>
+		<y>-42630</y>
+		<z>0</z>
+		<showtitle>1</showtitle>
+		<showhistogram>0</showhistogram>
+		<showlineprofile>0</showlineprofile>
+		<annotation type="pin" displayname="AnnotatePin" color="#00ff00">
+			<x>7824578</x>
+			<y>-42630</y>
+			<icon>flagred</icon>
+			<stricon>iconflagred</stricon>
+		</annotation>
+	</ndpviewstate>
+	<ndpviewstate id="81">
+		<title>Q1</title>
+		<details/>
+		<coordformat>nanometers</coordformat>
+		<lens>10.0</lens>
+		<x>7785312</x>
+		<y>15288</y>
+		<z>0</z>
+		<showtitle>1</showtitle>
+		<showhistogram>0</showhistogram>
+		<showlineprofile>0</showlineprofile>
+		<annotation type="pin" displayname="AnnotatePin" color="#00ff00">
+			<x>7785312</x>
+			<y>15288</y>
+			<icon>flagred</icon>
+			<stricon>iconflagred</stricon>
+		</annotation>
+	</ndpviewstate>
+	<ndpviewstate id="82">
+		<title>Q1</title>
+		<details/>
+		<coordformat>nanometers</coordformat>
+		<lens>10.0</lens>
+		<x>7724428</x>
+		<y>76368</y>
+		<z>0</z>
+		<showtitle>1</showtitle>
+		<showhistogram>0</showhistogram>
+		<showlineprofile>0</showlineprofile>
+		<annotation type="pin" displayname="AnnotatePin" color="#00ff00">
+			<x>7724428</x>
+			<y>76368</y>
+			<icon>flagred</icon>
+			<stricon>iconflagred</stricon>
+		</annotation>
+	</ndpviewstate>
+	<ndpviewstate id="83">
+		<title>Q1</title>
+		<details/>
+		<coordformat>nanometers</coordformat>
+		<lens>10.0</lens>
+		<x>7714564</x>
+		<y>57435</y>
+		<z>0</z>
+		<showtitle>1</showtitle>
+		<showhistogram>0</showhistogram>
+		<showlineprofile>0</showlineprofile>
+		<annotation type="pin" displayname="AnnotatePin" color="#00ff00">
+			<x>7714564</x>
+			<y>57435</y>
+			<icon>flagred</icon>
+			<stricon>iconflagred</stricon>
+		</annotation>
+	</ndpviewstate>
+	<ndpviewstate id="84">
+		<title>Q1</title>
+		<details/>
+		<coordformat>nanometers</coordformat>
+		<lens>10.0</lens>
+		<x>9586456</x>
+		<y>31905</y>
+		<z>0</z>
+		<showtitle>1</showtitle>
+		<showhistogram>0</showhistogram>
+		<showlineprofile>0</showlineprofile>
+		<annotation type="pin" displayname="AnnotatePin" color="#00ff00">
+			<x>9586456</x>
+			<y>31905</y>
+			<icon>flagred</icon>
+			<stricon>iconflagred</stricon>
+		</annotation>
+	</ndpviewstate>
+	<ndpviewstate id="85">
+		<title>Q1</title>
+		<details/>
+		<coordformat>nanometers</coordformat>
+		<lens>10.0</lens>
+		<x>9619879</x>
+		<y>17851</y>
+		<z>0</z>
+		<showtitle>1</showtitle>
+		<showhistogram>0</showhistogram>
+		<showlineprofile>0</showlineprofile>
+		<annotation type="pin" displayname="AnnotatePin" color="#00ff00">
+			<x>9619879</x>
+			<y>17851</y>
+			<icon>flagred</icon>
+			<stricon>iconflagred</stricon>
+		</annotation>
+	</ndpviewstate>
+	<ndpviewstate id="86">
+		<title>Q1</title>
+		<details/>
+		<coordformat>nanometers</coordformat>
+		<lens>10.0</lens>
+		<x>9651540</x>
+		<y>75110</y>
+		<z>0</z>
+		<showtitle>1</showtitle>
+		<showhistogram>0</showhistogram>
+		<showlineprofile>0</showlineprofile>
+		<annotation type="pin" displayname="AnnotatePin" color="#00ff00">
+			<x>9651540</x>
+			<y>75110</y>
+			<icon>flagred</icon>
+			<stricon>iconflagred</stricon>
+		</annotation>
+	</ndpviewstate>
+	<ndpviewstate id="87">
+		<title>Q1</title>
+		<details/>
+		<coordformat>nanometers</coordformat>
+		<lens>10.0</lens>
+		<x>9619131</x>
+		<y>29440</y>
+		<z>0</z>
+		<showtitle>1</showtitle>
+		<showhistogram>0</showhistogram>
+		<showlineprofile>0</showlineprofile>
+		<annotation type="pin" displayname="AnnotatePin" color="#00ff00">
+			<x>9619131</x>
+			<y>29440</y>
+			<icon>flagred</icon>
+			<stricon>iconflagred</stricon>
+		</annotation>
+	</ndpviewstate>
+	<ndpviewstate id="88">
+		<title>Q1</title>
+		<details/>
+		<coordformat>nanometers</coordformat>
+		<lens>10.0</lens>
+		<x>9842395</x>
+		<y>52486</y>
+		<z>0</z>
+		<showtitle>1</showtitle>
+		<showhistogram>0</showhistogram>
+		<showlineprofile>0</showlineprofile>
+		<annotation type="pin" displayname="AnnotatePin" color="#00ff00">
+			<x>9842395</x>
+			<y>52486</y>
+			<icon>flagred</icon>
+			<stricon>iconflagred</stricon>
+		</annotation>
+	</ndpviewstate>
+	<ndpviewstate id="89">
+		<title>Q1</title>
+		<details/>
+		<coordformat>nanometers</coordformat>
+		<lens>10.0</lens>
+		<x>9620010</x>
+		<y>16779</y>
+		<z>0</z>
+		<showtitle>1</showtitle>
+		<showhistogram>0</showhistogram>
+		<showlineprofile>0</showlineprofile>
+		<annotation type="pin" displayname="AnnotatePin" color="#00ff00">
+			<x>9620010</x>
+			<y>16779</y>
+			<icon>flagred</icon>
+			<stricon>iconflagred</stricon>
+		</annotation>
+	</ndpviewstate>
+	<ndpviewstate id="90">
+		<title>Q1</title>
+		<details/>
+		<coordformat>nanometers</coordformat>
+		<lens>10.0</lens>
+		<x>9814061</x>
+		<y>23359</y>
+		<z>0</z>
+		<showtitle>1</showtitle>
+		<showhistogram>0</showhistogram>
+		<showlineprofile>0</showlineprofile>
+		<annotation type="pin" displayname="AnnotatePin" color="#00ff00">
+			<x>9814061</x>
+			<y>23359</y>
+			<icon>flagred</icon>
+			<stricon>iconflagred</stricon>
+		</annotation>
+	</ndpviewstate>
+	<ndpviewstate id="91">
+		<title>Q1</title>
+		<details/>
+		<coordformat>nanometers</coordformat>
+		<lens>10.0</lens>
+		<x>9648828</x>
+		<y>-432</y>
+		<z>0</z>
+		<showtitle>1</showtitle>
+		<showhistogram>0</showhistogram>
+		<showlineprofile>0</showlineprofile>
+		<annotation type="pin" displayname="AnnotatePin" color="#00ff00">
+			<x>9648828</x>
+			<y>-432</y>
+			<icon>flagred</icon>
+			<stricon>iconflagred</stricon>
+		</annotation>
+	</ndpviewstate>
+	<ndpviewstate id="92">
+		<title>Q1</title>
+		<details/>
+		<coordformat>nanometers</coordformat>
+		<lens>10.0</lens>
+		<x>10931228</x>
+		<y>-870137</y>
+		<z>0</z>
+		<showtitle>1</showtitle>
+		<showhistogram>0</showhistogram>
+		<showlineprofile>0</showlineprofile>
+		<annotation type="pin" displayname="AnnotatePin" color="#00ff00">
+			<x>10931228</x>
+			<y>-870137</y>
+			<icon>flagred</icon>
+			<stricon>iconflagred</stricon>
+		</annotation>
+	</ndpviewstate>
+	<ndpviewstate id="93">
+		<title>Q1</title>
+		<details/>
+		<coordformat>nanometers</coordformat>
+		<lens>10.0</lens>
+		<x>10941101</x>
+		<y>-868940</y>
+		<z>0</z>
+		<showtitle>1</showtitle>
+		<showhistogram>0</showhistogram>
+		<showlineprofile>0</showlineprofile>
+		<annotation type="pin" displayname="AnnotatePin" color="#00ff00">
+			<x>10941101</x>
+			<y>-868940</y>
+			<icon>flagred</icon>
+			<stricon>iconflagred</stricon>
+		</annotation>
+	</ndpviewstate>
+	<ndpviewstate id="94">
+		<title>Q1</title>
+		<details/>
+		<coordformat>nanometers</coordformat>
+		<lens>10.0</lens>
+		<x>10949410</x>
+		<y>-878500</y>
+		<z>0</z>
+		<showtitle>1</showtitle>
+		<showhistogram>0</showhistogram>
+		<showlineprofile>0</showlineprofile>
+		<annotation type="pin" displayname="AnnotatePin" color="#00ff00">
+			<x>10949410</x>
+			<y>-878500</y>
+			<icon>flagred</icon>
+			<stricon>iconflagred</stricon>
+		</annotation>
+	</ndpviewstate>
+	<ndpviewstate id="95">
+		<title>Q1 wrong: Arteriole</title>
+		<details/>
+		<coordformat>nanometers</coordformat>
+		<lens>10.0</lens>
+		<x>11104385</x>
+		<y>-1027939</y>
+		<z>0</z>
+		<showtitle>1</showtitle>
+		<showhistogram>0</showhistogram>
+		<showlineprofile>0</showlineprofile>
+		<annotation type="pin" displayname="AnnotatePin" color="#ff0000">
+			<x>11104385</x>
+			<y>-1027939</y>
+			<icon>flagred</icon>
+			<stricon>iconflagred</stricon>
+		</annotation>
+	</ndpviewstate>
+	<ndpviewstate id="96">
+		<title>Q1 wrong: Arteriole</title>
+		<details/>
+		<coordformat>nanometers</coordformat>
+		<lens>10.0</lens>
+		<x>11803193</x>
+		<y>-1421795</y>
+		<z>0</z>
+		<showtitle>1</showtitle>
+		<showhistogram>0</showhistogram>
+		<showlineprofile>0</showlineprofile>
+		<annotation type="pin" displayname="AnnotatePin" color="#ff0000">
+			<x>11803193</x>
+			<y>-1421795</y>
+			<icon>flagred</icon>
+			<stricon>iconflagred</stricon>
+		</annotation>
+	</ndpviewstate>
+	<ndpviewstate id="97">
+		<title>Q1 wrong: Nerve</title>
+		<details/>
+		<coordformat>nanometers</coordformat>
+		<lens>10.0</lens>
+		<x>10151465</x>
+		<y>-125883</y>
+		<z>0</z>
+		<showtitle>1</showtitle>
+		<showhistogram>0</showhistogram>
+		<showlineprofile>0</showlineprofile>
+		<annotation type="pin" displayname="AnnotatePin" color="#ff0000">
+			<x>10151465</x>
+			<y>-125883</y>
+			<icon>flagred</icon>
+			<stricon>iconflagred</stricon>
+		</annotation>
+	</ndpviewstate>
+	<ndpviewstate id="98">
+		<title>Q1 wrong: Vein</title>
+		<details/>
+		<coordformat>nanometers</coordformat>
+		<lens>10.0</lens>
+		<x>11358497</x>
+		<y>-1116874</y>
+		<z>0</z>
+		<showtitle>1</showtitle>
+		<showhistogram>0</showhistogram>
+		<showlineprofile>0</showlineprofile>
+		<annotation type="pin" displayname="AnnotatePin" color="#ff0000">
+			<x>11358497</x>
+			<y>-1116874</y>
+			<icon>flagred</icon>
+			<stricon>iconflagred</stricon>
+		</annotation>
+	</ndpviewstate>
+</annotations>

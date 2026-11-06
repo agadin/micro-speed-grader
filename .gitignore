@@ -1,0 +1,14 @@
+# slides (tens of GB) and generated demo class
+images/
+demo/
+# course material: exam PDFs and practice answer keys
+reference/
+sample-data/
+# build / test output
+node_modules/
+app/dist/
+app/src-tauri/target/
+app/tests/.out/
+*.msgrade
+*.msgrade.bak
+.DS_Store

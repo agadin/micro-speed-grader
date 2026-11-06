@@ -1,0 +1,66 @@
+{
+  "name": "Demo exam",
+  "students": 238,
+  "doubleRate": 0.01,
+  "questions": [
+    {
+      "num": 1,
+      "slides": [
+        "VMS109"
+      ],
+      "prompt": "Using VMS109, annotate with a pin a Pacinian corpuscle",
+      "profile": {
+        "sigmaUm": 8,
+        "spread": true
+      }
+    },
+    {
+      "num": 2,
+      "slides": [
+        "VMS109"
+      ],
+      "prompt": "Using VMS109, annotate with a pin white adipose tissue",
+      "profile": {
+        "sigmaUm": 14,
+        "wrong": 0.12
+      }
+    },
+    {
+      "num": 3,
+      "slides": [
+        "VMS133"
+      ],
+      "prompt": "Using VMS133, annotate with a pin brown adipose tissue",
+      "profile": {
+        "sigmaUm": 22,
+        "spread": true,
+        "wrong": 0.25,
+        "random": 0.07,
+        "wrongMain": "White adipose"
+      }
+    },
+    {
+      "num": 4,
+      "slides": [
+        "VMS133"
+      ],
+      "prompt": "Using VMS133, annotate with a pin a plasma cell",
+      "profile": {
+        "sigmaUm": 3
+      }
+    },
+    {
+      "num": 5,
+      "slides": [
+        "VMS133"
+      ],
+      "prompt": "Using VMS133, annotate with a pin a structure that would stain strongly with toluidine blue",
+      "profile": {
+        "sigmaUm": 6,
+        "wrong": 0.12,
+        "bigShare": 0.3,
+        "spotSigmaUm": 2
+      }
+    }
+  ]
+}
