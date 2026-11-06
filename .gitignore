@@ -12,3 +12,4 @@ app/tests/.out/
 *.msgrade
 *.msgrade.bak
 .DS_Store
+app/src-tauri/frameworks/

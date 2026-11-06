@@ -17,10 +17,10 @@ const harness = await import("./harness.mjs");
 const tiles = await startTileServer();
 const W = 1280, H = 800;
 const browser = await chromium.launch();
-const context = await browser.newContext({ viewport: { width: W, height: H }, recordVideo: { dir: WORK, size: { width: W, height: H } } });
+// frames come from Chrome's screencast (lossless PNG) instead of Playwright's low-bitrate video
+const context = await browser.newContext({ viewport: { width: W, height: H } });
 await harness.installShim(context);
 const page = await context.newPage();
-const t0 = Date.now();
 const wait = (ms) => page.waitForTimeout(ms);
 const dialog = (...a) => page.evaluate((x) => window.__dialogQueue.push(...x), a);
 
@@ -42,7 +42,13 @@ await page.locator(".step").nth(3).getByRole("button").click();
 await page.getByText("Start grading →").click();
 await page.locator(".topbar").waitFor();
 await wait(2500); // tiles settle
-const start = (Date.now() - t0) / 1000;
+const frames = [];
+const cdp = await page.context().newCDPSession(page);
+cdp.on("Page.screencastFrame", (f) => {
+  frames.push({ t: f.metadata.timestamp, data: f.data });
+  cdp.send("Page.screencastFrameAck", { sessionId: f.sessionId }).catch(() => {});
+});
+await cdp.send("Page.startScreencast", { format: "png", maxWidth: W, maxHeight: H, everyNthFrame: 1 });
 
 // --- the part that ends up in the GIF ---
 await wait(900);
@@ -82,15 +88,25 @@ await page.keyboard.press("h"); // whole slide
 await wait(1800);
 await page.keyboard.press("Meta+ArrowRight"); // next image
 await wait(2600);
-const end = (Date.now() - t0) / 1000;
+await cdp.send("Page.stopScreencast");
 
 await context.close();
 await browser.close();
 tiles.stop();
 
-const webm = fs.readdirSync(WORK).find((f) => f.endsWith(".webm"));
+// write the frames with their real on-screen durations, then build the GIF
+const list = [];
+frames.forEach((f, i) => {
+  const file = path.join(WORK, `f${String(i).padStart(5, "0")}.png`);
+  fs.writeFileSync(file, Buffer.from(f.data, "base64"));
+  const dur = i + 1 < frames.length ? frames[i + 1].t - f.t : 1.5;
+  list.push(`file '${file}'`, `duration ${dur.toFixed(3)}`);
+});
+list.push(list[list.length - 2]); // concat demuxer needs the last file repeated
+fs.writeFileSync(path.join(WORK, "frames.txt"), list.join("\n"));
 const gif = path.join(OUT, "demo.gif");
-// 720 px / 8 fps / 96 colours keeps the README GIF around 6 MB
-const vf = "fps=8,scale=720:-1:flags=lanczos,split[a][b];[a]palettegen=max_colors=96:stats_mode=diff[p];[b][p]paletteuse=dither=none:diff_mode=rectangle";
-execFileSync("ffmpeg", ["-y", "-ss", String(start), "-to", String(end), "-i", path.join(WORK, webm), "-vf", vf, "-loop", "0", gif], { stdio: "ignore" });
-console.log(`${gif} ${(fs.statSync(gif).size / 1e6).toFixed(1)} MB, ${(end - start).toFixed(1)} s`);
+const WIDTH = process.env.GIF_WIDTH ?? "1000", FPS = process.env.GIF_FPS ?? "12";
+const vf = `fps=${FPS},scale=${WIDTH}:-1:flags=lanczos,split[a][b];[a]palettegen=max_colors=256:stats_mode=full[p];[b][p]paletteuse=dither=bayer:bayer_scale=5:diff_mode=rectangle`;
+execFileSync("ffmpeg", ["-y", "-f", "concat", "-safe", "0", "-i", path.join(WORK, "frames.txt"), "-vf", vf, "-loop", "0", gif], { stdio: "ignore" });
+const secs = frames.length ? frames[frames.length - 1].t - frames[0].t : 0;
+console.log(`${gif} ${(fs.statSync(gif).size / 1e6).toFixed(1)} MB, ${frames.length} frames, ${secs.toFixed(1)} s`);

@@ -4,7 +4,16 @@ Grade histology practical exams **one question at a time**. Every student's pin 
 question is shown on the whole-slide image at once, grouped into clusters, and graded in bulk.
 Export goes to a D2L-ready CSV plus per-student feedback.
 
-![Grading a question](docs/demo.gif)
+<p align="center">
+  <img src="docs/demo.gif" alt="Grading a question" width="960">
+</p>
+
+## Download
+
+**macOS (Apple Silicon):** grab the `.dmg` from [Releases](../../releases), open it and drag the app to
+Applications. OpenSlide is bundled, so nothing else needs installing. The build is signed but not yet
+notarized: the first time, right-click the app → **Open** (or System Settings → Privacy & Security →
+**Open Anyway**).
 
 ## Features
 
@@ -27,6 +36,9 @@ npm install
 npm run tauri dev      # run the app
 npm run tauri build    # build an installer
 ```
+
+On macOS, run `tools/bundle-openslide-mac.sh` once before `tauri build`: it copies OpenSlide and its
+libraries out of Homebrew into the app bundle.
 
 ## Demo class
 
