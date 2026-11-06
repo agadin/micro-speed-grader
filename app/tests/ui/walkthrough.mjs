@@ -64,12 +64,12 @@ async function waitTiles() {
   await page.waitForLoadState("networkidle").catch(() => {});
   await page.waitForTimeout(600);
 }
-async function rightDrag(points, mods = []) {
+async function rightDrag(points, mods = [], button = "right") {
   for (const m of mods) await page.keyboard.down(m);
   await page.mouse.move(points[0][0], points[0][1]);
-  await page.mouse.down({ button: "right" });
+  await page.mouse.down({ button });
   for (const [x, y] of points.slice(1)) await page.mouse.move(x, y, { steps: 4 });
-  await page.mouse.up({ button: "right" });
+  await page.mouse.up({ button });
   for (const m of mods) await page.keyboard.up(m);
 }
 
@@ -115,7 +115,7 @@ await step("start grading → Q1 on VMS109", async () => {
 });
 
 await step("C grades the highlighted cluster correct", async () => {
-  const sel = parseInt(await page.locator(".selline .big").innerText());
+  const sel = parseInt(await page.locator(".selcount b").innerText());
   expect(sel > 0, "nothing selected for cluster A");
   await page.keyboard.press("c");
   await page.waitForTimeout(1200); // autosave debounce
@@ -202,7 +202,7 @@ await step("lasso (right-drag) opens menu; X inverts; Esc closes", async () => {
 await step("⌘ + lasso adds to the selection (no menu)", async () => {
   await page.keyboard.press("]");
   await page.waitForTimeout(800);
-  const before = parseInt(await page.locator(".selline .big").innerText());
+  const before = parseInt(await page.locator(".selcount b").innerText());
   const top = (await page.locator(".topbar").boundingBox()).height;
   const rp = await page.locator(".right").boundingBox();
   const tb = await page.locator(".vtool").boundingBox();
@@ -211,7 +211,7 @@ await step("⌘ + lasso adds to the selection (no menu)", async () => {
   await rightDrag([[x0, y0], [x1, y0], [x1, y1], [x0, y1], [x0, y0 + 2]], ["Meta"]);
   await page.waitForTimeout(300);
   const menu = await page.locator(".ctx-title").isVisible();
-  const after = parseInt(await page.locator(".selline .big").innerText());
+  const after = parseInt(await page.locator(".selcount b").innerText());
   expect(!menu, "menu opened");
   expect(after > before, `selection did not grow ${before} → ${after}`);
   return `selected ${before} → ${after}`;
@@ -234,19 +234,56 @@ await step("brush (B) paints a selection and opens menu", async () => {
   return title.replace(/\n/g, " ");
 });
 
+await step("swapped buttons: left-drag lassos, right-drag pans", async () => {
+  await emit("menu", "preferences");
+  await page.getByRole("button", { name: "Mouse & keys" }).click();
+  await page.getByRole("button", { name: "Left selects · Right pans" }).click();
+  await page.getByRole("button", { name: "Done" }).click();
+  await page.keyboard.press("h");
+  await waitTiles();
+  const top = (await page.locator(".topbar").boundingBox()).height;
+  const rp = await page.locator(".right").boundingBox();
+  const tb = await page.locator(".vtool").boundingBox();
+  const cx = rp.x / 2, cy = (top + tb.y) / 2, r = Math.min(rp.x, tb.y - top) * 0.4;
+  const ring = Array.from({ length: 24 }, (_, i) => [cx + r * Math.cos((i / 24) * 2 * Math.PI), cy + r * Math.sin((i / 24) * 2 * Math.PI)]);
+  // right-drag: the slide moves, nothing gets selected
+  const navBox = () => page.evaluate(() => {
+    const d = document.querySelector(".displayregion");
+    return d ? d.getAttribute("style") : "";
+  });
+  const before = await navBox();
+  await rightDrag([[cx, cy], [cx + 120, cy + 60]], [], "right");
+  await page.waitForTimeout(400);
+  const panned = (await navBox()) !== before;
+  const menuAfterPan = await page.locator(".ctx-title").isVisible();
+  // left-drag: lasso + menu
+  await rightDrag(ring, [], "left");
+  await page.waitForTimeout(300);
+  const title = await page.locator(".ctx-title").innerText({ timeout: 3000 });
+  await page.keyboard.press("Escape");
+  // back to the standard layout for the rest of the run
+  await emit("menu", "preferences");
+  await page.getByRole("button", { name: "Mouse & keys" }).click();
+  await page.getByRole("button", { name: "Left pans · Right selects" }).click();
+  await page.getByRole("button", { name: "Done" }).click();
+  expect(panned, "right-drag did not pan");
+  expect(!menuAfterPan, "right-drag opened a menu");
+  return `right-drag panned; left-drag: ${title.replace(/\n/g, " ")}`;
+});
+
 await step("drag cluster label moves it; drag knob resizes (reselects pins)", async () => {
   await page.keyboard.press("]");
   await page.waitForTimeout(900);
   const v = await viewer();
   const attr = async (n) => (await page.locator(".viewer-overlay").getAttribute(n)).split(",").map(Number);
-  const before = parseInt(await page.locator(".selline .big").innerText());
+  const before = parseInt(await page.locator(".selcount b").innerText());
   const [kx, ky] = await attr("data-cluster-knob");
   await page.mouse.move(v.x + kx, v.y + ky);
   await page.mouse.down();
   await page.mouse.move(v.x + kx + 60, v.y + ky + 60, { steps: 8 });
   await page.mouse.up();
   await page.waitForTimeout(300);
-  const afterResize = parseInt(await page.locator(".selline .big").innerText());
+  const afterResize = parseInt(await page.locator(".selcount b").innerText());
   const [tx, ty] = await attr("data-cluster-tag");
   const [cx0] = await attr("data-cluster-ring");
   await page.mouse.move(v.x + tx, v.y + ty);
@@ -254,7 +291,7 @@ await step("drag cluster label moves it; drag knob resizes (reselects pins)", as
   await page.mouse.move(v.x + tx + 120, v.y + ty + 40, { steps: 8 });
   await page.mouse.up();
   await page.waitForTimeout(300);
-  const afterMove = parseInt(await page.locator(".selline .big").innerText());
+  const afterMove = parseInt(await page.locator(".selcount b").innerText());
   const [cx1] = await attr("data-cluster-ring");
   // grabbing the ring between handles (45°) moves it too
   const [rx, ry, rr] = await attr("data-cluster-ring");

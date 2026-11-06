@@ -143,6 +143,7 @@ fn build_menu<R: tauri::Runtime>(app: &tauri::AppHandle<R>) -> tauri::Result<Men
     let open_s = MenuItem::with_id(app, "open_session", "Open Session…", true, Some("CmdOrCtrl+O"))?;
     let export = MenuItem::with_id(app, "export", "Export Grades…", true, Some("CmdOrCtrl+E"))?;
     let close_s = MenuItem::with_id(app, "close_session", "Close Session", true, Some("CmdOrCtrl+W"))?;
+    let updates = MenuItem::with_id(app, "check_updates", "Check for Updates…", true, None::<&str>)?;
 
     #[cfg(target_os = "macos")]
     let app_menu = Submenu::with_items(
@@ -151,6 +152,7 @@ fn build_menu<R: tauri::Runtime>(app: &tauri::AppHandle<R>) -> tauri::Result<Men
         true,
         &[
             &PredefinedMenuItem::about(app, Some("About Micro Speed Grader"), None)?,
+            &updates,
             &PredefinedMenuItem::separator(app)?,
             &prefs,
             &PredefinedMenuItem::separator(app)?,
@@ -175,7 +177,7 @@ fn build_menu<R: tauri::Runtime>(app: &tauri::AppHandle<R>) -> tauri::Result<Men
                 app,
                 "File",
                 true,
-                &[&new_s, &open_s, &PredefinedMenuItem::separator(app)?, &export, &prefs, &PredefinedMenuItem::separator(app)?, &close_s, &PredefinedMenuItem::quit(app, None)?],
+                &[&new_s, &open_s, &PredefinedMenuItem::separator(app)?, &export, &prefs, &updates, &PredefinedMenuItem::separator(app)?, &close_s, &PredefinedMenuItem::quit(app, None)?],
             )?
         }
     };
@@ -212,6 +214,8 @@ pub fn run() {
     tauri::Builder::default()
         .plugin(tauri_plugin_opener::init())
         .plugin(tauri_plugin_dialog::init())
+        .plugin(tauri_plugin_updater::Builder::new().build())
+        .plugin(tauri_plugin_process::init())
         .manage(registry)
         .register_asynchronous_uri_scheme_protocol("slide", move |_ctx, request, responder| {
             let reg = reg_for_protocol.clone();

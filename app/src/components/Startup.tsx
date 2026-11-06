@@ -20,6 +20,15 @@ export async function openSessionFile(path: string): Promise<Session> {
   }
 }
 
+/** "~/…/demo/Demo exam.msgrade": home folder abbreviated, middle folders dropped when long */
+function shortPath(p: string): string {
+  const home = p.replace(/^\/Users\/[^/]+|^[A-Za-z]:\\Users\\[^\\]+/, "~");
+  if (home.length <= 48) return home;
+  const sep = home.includes("\\") && !home.includes("/") ? "\\" : "/";
+  const parts = home.split(sep);
+  return parts.length > 3 ? [parts[0], "…", ...parts.slice(-2)].join(sep) : home;
+}
+
 /** Size the (title-bar-less) window snugly around the start-up card. */
 function useFitWindow() {
   const ref = useRef<HTMLDivElement>(null);
@@ -34,8 +43,9 @@ function useFitWindow() {
     }
     let last = "";
     const fit = () => {
-      const W = Math.ceil(el.offsetWidth) + 2 * 18;
-      const H = Math.min(Math.round(screen.availHeight * 0.9), Math.ceil(el.offsetHeight) + 44 + 18);
+      // the card fills the window: only the traffic-light strip is added on top
+      const W = Math.ceil(el.offsetWidth);
+      const H = Math.min(Math.round(screen.availHeight * 0.9), Math.ceil(el.offsetHeight) + 28);
       const key = `${W}x${H}`;
       if (key === last) return;
       last = key;
@@ -112,7 +122,9 @@ export function Startup() {
                 <li key={r.path}>
                   <button className="link" onClick={() => resume(r.path)}>
                     <b>{r.name}</b>
-                    <span className="muted small">{r.path}</span>
+                    <span className="muted small path" title={r.path}>
+                      {shortPath(r.path)}
+                    </span>
                     <span className="muted small">last saved {new Date(r.at).toLocaleString()}</span>
                   </button>
                   <button

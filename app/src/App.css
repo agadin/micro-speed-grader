@@ -125,8 +125,7 @@ svg {
 .keysheet,
 .ctx-menu,
 .done-banner,
-.modal,
-.startup-card {
+.modal {
   background: var(--glass-sheen), var(--glass);
   -webkit-backdrop-filter: var(--glass-blur);
   backdrop-filter: var(--glass-blur);
@@ -568,7 +567,7 @@ input[type="color"]::-webkit-color-swatch {
   border-radius: 999px;
   background: transparent;
   box-shadow: none;
-  padding: 0 7px;
+  padding: 0 6px;
   color: var(--tx-2);
   gap: 5px;
 }
@@ -578,11 +577,12 @@ input[type="color"]::-webkit-color-swatch {
 .cnav .cur {
   display: flex;
   align-items: center;
-  gap: 8px;
-  padding: 0 10px;
-  min-width: 250px;
+  gap: 6px;
+  padding: 0 4px;
+  min-width: 0;
   justify-content: center;
   white-space: nowrap;
+  font-variant-numeric: tabular-nums;
 }
 .ctag {
   font: 700 11px/1 var(--mono);
@@ -1517,15 +1517,14 @@ button.phead:hover:not(:disabled) {
   height: 100vh;
   overflow: auto;
   display: grid;
-  place-items: center;
-  /* room for the traffic lights above the card */
-  padding: 44px 18px 18px;
+  place-items: start center;
+  /* room for the traffic lights; the window edge is the card's edge */
+  padding: 28px 0 0;
   background: #1c1c1f;
 }
 .startup-card {
   width: 460px;
-  padding: 24px 26px;
-  border-radius: 20px;
+  padding: 14px 28px 24px;
   display: flex;
   flex-direction: column;
   gap: 12px;
@@ -1564,16 +1563,24 @@ button.big {
 }
 .recent .link {
   flex: 1;
+  min-width: 0;
   height: auto;
   padding: 8px 10px;
   display: grid;
   justify-items: start;
+  justify-content: stretch;
   gap: 2px;
   background: transparent;
   border: 0;
   box-shadow: none;
   text-align: left;
   border-radius: 8px;
+}
+.recent .link > * {
+  max-width: 100%;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
 }
 .recent .link:hover {
   background: var(--fill-1);
@@ -1690,4 +1697,85 @@ button.big {
 }
 .seg button.on .count {
   color: var(--tx-2);
+}
+
+/* selection count + Correct / Wrong in the bottom toolbar */
+.vgrade {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  flex: none;
+}
+.vgrade .selcount {
+  color: var(--tx-2);
+  white-space: nowrap;
+  padding: 0 4px 0 2px;
+}
+.vgrade .selcount b {
+  font: 600 17px/1 var(--sans);
+  color: var(--sel);
+  margin-right: 3px;
+}
+.vgrade .btn {
+  height: 30px;
+  gap: 8px;
+}
+
+/* the bottom toolbar sheds labels as the window narrows */
+.vtool {
+  container-type: inline-size;
+}
+@container (max-width: 1050px) {
+  .vtool .lbl,
+  .vtool .seg .kbd,
+  .vtool .vgrade .kbd {
+    display: none;
+  }
+  .cnav .cur {
+    min-width: 0;
+  }
+}
+@container (max-width: 860px) {
+  .cnav .step .kbd,
+  .cnav .of {
+    display: none;
+  }
+  .vtool {
+    gap: 6px;
+  }
+}
+
+/* cluster nav | selection + Correct / Wrong (centred) | view + shortcuts */
+.vtool {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) auto minmax(0, 1fr);
+}
+.vside {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  min-width: 0;
+}
+.vside.end {
+  justify-content: flex-end;
+}
+
+/* update available / up to date notice */
+.update-toast {
+  position: fixed;
+  z-index: 50;
+  left: 50%;
+  bottom: 18px;
+  transform: translateX(-50%);
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 8px 8px 8px 16px;
+  border-radius: 999px;
+  white-space: nowrap;
+  background: var(--glass-sheen), var(--glass-strong);
+  -webkit-backdrop-filter: var(--glass-blur);
+  backdrop-filter: var(--glass-blur);
+  border: 1px solid var(--glass-edge);
+  box-shadow: var(--glass-rim), var(--glass-shadow);
 }

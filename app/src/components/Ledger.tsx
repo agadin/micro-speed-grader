@@ -94,7 +94,7 @@ export function Ledger({ session, task, tasks, doubles, settings, studentName }:
         )}
         {groups.length === 0 && autoDoubles.length === 0 && (
           <div className="empty">
-            Nothing graded yet. Right-drag to lasso pins, or press <span className="kbd">↵</span> to grade the highlighted
+            Nothing graded yet. {settings.swapMouse ? "Left" : "Right"}-drag to lasso pins, or press <span className="kbd">↵</span> to grade the highlighted
             cluster.
           </div>
         )}

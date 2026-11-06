@@ -1,4 +1,5 @@
 import { useEffect, useState } from "react";
+import { UpdateBanner } from "./components/UpdateBanner";
 import { openPreferencesWindow } from "./lib/backend";
 import { getCurrentWindow, LogicalSize } from "@tauri-apps/api/window";
 import { listen } from "@tauri-apps/api/event";
@@ -68,6 +69,7 @@ export default function App() {
   return (
     <>
       {session ? <Grader session={session} /> : <Startup />}
+      <UpdateBanner />
       {settingsOpen && prefsFallback && <SettingsDialog onClose={() => set({ settingsOpen: false })} />}
     </>
   );

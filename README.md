@@ -1,3 +1,5 @@
+<p align="center"><img src="docs/icon.png" alt="" width="128"></p>
+
 # Micro Speed Grader
 
 Grade histology practical exams **one question at a time**. Every student's pin for a
@@ -11,7 +13,8 @@ Export goes to a D2L-ready CSV plus per-student feedback.
 ## Download
 
 **macOS (Apple Silicon):** grab the `.dmg` from [Releases](../../releases), open it and drag the app to
-Applications. OpenSlide is bundled, so nothing else needs installing. The build is signed and notarized.
+Applications. OpenSlide is bundled, so nothing else needs installing. The build is signed and notarized,
+and the app updates itself from new releases (**Micro Speed Grader → Check for Updates…**).
 
 ## Features
 
@@ -56,6 +59,17 @@ cd app
 npm run test:logic     # parsing, clustering, grading rules
 npm run test:ui        # clicks through the real UI in a headless browser (dev server must be running)
 ```
+
+## Releasing (macOS)
+
+```
+tools/release-mac.sh 0.3.0 "What changed"
+```
+
+Builds, signs, notarizes and publishes a GitHub release with the DMG and the updater files
+(`latest.json`, signed `.app.tar.gz`). Needs the Developer ID certificate, a `notarytool` keychain
+profile named `notary`, and the updater key at `~/.tauri/micro-speed-grader.key` (keep it backed up:
+without it, installed copies can't be updated).
 
 ## License
 

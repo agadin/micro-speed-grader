@@ -76,6 +76,7 @@ export function SlideViewer(props: ViewerProps) {
   } | null>(null);
   const hoverRef = useRef<Pt | null>(null);
   /** left-drag on the cluster label (move) or its edge/knob (resize) */
+  const panRef = useRef<{ last: Pt; start: Pt; far: number } | null>(null);
   const dragRef = useRef<{ mode: "move" | "resize"; start: Pt; cx: number; cy: number; r: number; c0: { cx: number; cy: number; r: number } } | null>(null);
   const rafRef = useRef(0);
   const pendingFocus = useRef<string[] | null>(null);
@@ -513,12 +514,17 @@ export function SlideViewer(props: ViewerProps) {
       navigatorAutoFade: false,
       drawer: "canvas",
       crossOriginPolicy: "Anonymous",
-      animationTime: 0.35,
+      animationTime: propsRef.current.settings.animate ? 0.35 : 0,
       springStiffness: 9,
       maxZoomPixelRatio: 2.5,
       visibilityRatio: 0.2,
       imageLoaderLimit: 12,
-      gestureSettingsMouse: { clickToZoom: false, dblClickToZoom: true, scrollToZoom: true },
+      gestureSettingsMouse: {
+        clickToZoom: false,
+        dblClickToZoom: propsRef.current.settings.dblClickZoom,
+        scrollToZoom: true,
+      },
+      zoomPerScroll: propsRef.current.settings.zoomPerScroll,
       tileSources: {
         width: info.width,
         height: info.height,
@@ -575,12 +581,16 @@ export function SlideViewer(props: ViewerProps) {
       const r = host.getBoundingClientRect();
       return { x: e.clientX - r.left, y: e.clientY - r.top };
     };
+    // which button selects (lasso / brush) and which pans; swappable in Preferences
+    const selBtn = () => (propsRef.current.settings.swapMouse ? 0 : 2);
     const down = (e: PointerEvent) => {
       if (e.button === 0) {
         const pt = rel(e);
         const mode = clusterHit(pt);
         const c = propsRef.current.cluster;
-        if (!mode || !c) return;
+        if (!mode || !c) {
+          if (selBtn() !== 0) return;
+        } else {
         e.stopPropagation();
         e.preventDefault();
         const c0 = { cx: c.cx, cy: c.cy, r: c.radiusNm };
@@ -588,8 +598,18 @@ export function SlideViewer(props: ViewerProps) {
         host.setPointerCapture(e.pointerId);
         requestDraw();
         return;
+        }
       }
-      if (e.button !== 2) return;
+      if (e.button === 2 && selBtn() === 0) {
+        // swapped buttons: right-drag pans
+        e.stopPropagation();
+        e.preventDefault();
+        const p = rel(e);
+        panRef.current = { last: p, start: p, far: 0 };
+        host.setPointerCapture(e.pointerId);
+        return;
+      }
+      if (e.button !== selBtn()) return;
       e.stopPropagation();
       e.preventDefault();
       const p = rel(e);
@@ -611,6 +631,14 @@ export function SlideViewer(props: ViewerProps) {
     const move = (e: PointerEvent) => {
       const p = rel(e);
       hoverRef.current = p;
+      const pan = panRef.current;
+      if (pan) {
+        e.stopPropagation();
+        v.viewport.panBy(v.viewport.deltaPointsFromPixels(new OpenSeadragon.Point(pan.last.x - p.x, pan.last.y - p.y)), true);
+        pan.last = p;
+        pan.far = Math.max(pan.far, Math.hypot(p.x - pan.start.x, p.y - pan.start.y));
+        return;
+      }
       const d = dragRef.current;
       if (d) {
         e.stopPropagation();
@@ -648,6 +676,24 @@ export function SlideViewer(props: ViewerProps) {
       requestDraw();
     };
     const up = (e: PointerEvent) => {
+      const pan = panRef.current;
+      if (pan && e.button === 2) {
+        e.stopPropagation();
+        panRef.current = null;
+        try {
+          host.releasePointerCapture(e.pointerId);
+        } catch {
+          /* ignore */
+        }
+        v.viewport.applyConstraints();
+        if (pan.far < 6) {
+          // a right click without dragging acts like a plain click
+          const hit = hitTest(pan.start.x, pan.start.y);
+          if (hit) propsRef.current.onPinClick(hit.id, e.clientX, e.clientY);
+          else if (propsRef.current.selection.size) propsRef.current.onEmptyRightClick(e.clientX, e.clientY);
+        }
+        return;
+      }
       const d = dragRef.current;
       if (d && e.button === 0) {
         e.stopPropagation();
@@ -663,7 +709,7 @@ export function SlideViewer(props: ViewerProps) {
         return;
       }
       const L = lassoRef.current;
-      if (!L || e.button !== 2) return;
+      if (!L || e.button !== selBtn()) return;
       e.stopPropagation();
       lassoRef.current = null;
       try {
@@ -684,7 +730,14 @@ export function SlideViewer(props: ViewerProps) {
       }
       if (travelled < 6) {
         const hit = hitTest(p.x, p.y);
-        if (hit) propsRef.current.onPinClick(hit.id, e.clientX, e.clientY);
+        if (hit && L.add) {
+          // ⌘/Ctrl-click toggles the pin in the current selection
+          const sel = new Set(propsRef.current.selection);
+          if (sel.has(hit.id)) sel.delete(hit.id);
+          else sel.add(hit.id);
+          propsRef.current.onSelect([...sel]);
+        } else if (hit) propsRef.current.onPinClick(hit.id, e.clientX, e.clientY);
+        else if (selBtn() === 0) propsRef.current.onEmptyClick();
         else propsRef.current.onEmptyRightClick(e.clientX, e.clientY);
         requestDraw();
         return;
@@ -767,6 +820,18 @@ export function SlideViewer(props: ViewerProps) {
     const el = (v.navigator as unknown as { element: HTMLElement }).element;
     el.style.display = props.minimapVisible ? "block" : "none";
   }, [props.minimapVisible]);
+
+  // mouse / zoom preferences apply to the open viewer without reloading the slide
+  const { zoomPerScroll, dblClickZoom, animate } = props.settings;
+  useEffect(() => {
+    const v = viewerRef.current as (OpenSeadragon.Viewer & { zoomPerScroll: number; gestureSettingsMouse: { dblClickToZoom: boolean } }) | null;
+    if (!v) return;
+    v.zoomPerScroll = zoomPerScroll;
+    v.gestureSettingsMouse.dblClickToZoom = dblClickZoom;
+    const t = animate ? 0.35 : 0;
+    const vp = v.viewport as unknown as Record<string, { animationTime: number }>;
+    for (const k of ["centerSpringX", "centerSpringY", "zoomSpring"]) if (vp[k]) vp[k].animationTime = t;
+  }, [zoomPerScroll, dblClickZoom, animate, props.info?.id]);
 
   useEffect(() => {
     if (props.focus) fitPins(props.focus.pinIds);

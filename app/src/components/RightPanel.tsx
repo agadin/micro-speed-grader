@@ -3,7 +3,7 @@ import type { Cluster } from "../lib/cluster";
 import type { Question, Task } from "../lib/types";
 import { keyLabel, useSettings } from "../lib/settings";
 import { useStore } from "../lib/store";
-import { IconBrush, IconCheck, IconChevL, IconChevR, IconCross, IconLasso, IconTri } from "./icons";
+import { IconBrush, IconChevL, IconChevR, IconLasso, IconTri } from "./icons";
 
 export interface Progress {
   taskTotal: number;
@@ -27,14 +27,14 @@ interface Props {
   onPickReason: (text: string) => void;
   onPrevCluster: () => void;
   onNextCluster: () => void;
-  /** correct: grade straight away (⇧ = add a note); wrong: ask for a reason */
-  onGradeSelection: (mode: "correct" | "wrong", withNote?: boolean) => void;
+  /** clusters that are real groups (the rest are single pins) */
+  realClusters: number;
+  onSingles: boolean;
+  onJumpKind: (kind: "clusters" | "singles") => void;
   onNextImage: () => void;
   onPrevImage: () => void;
   hasPrev: boolean;
   hasNext: boolean;
-  /** briefly highlight the Correct / Wrong button when its key is pressed */
-  flash: { kind: "correct" | "wrong"; n: number } | null;
 }
 
 const pct = (a: number, b: number) => (b ? Math.round((a / b) * 100) : 100);
@@ -137,39 +137,21 @@ export function RightPanel(p: Props) {
         {s.selectTool === "brush" && (
           <SliderRow label="Brush" value={s.brushPx} min={6} max={200} unit="px" onChange={(v) => set({ brushPx: v })} />
         )}
-        <div className="selbox">
-          <div className="selline">
-            <span className="big">
-              {sel}
-              <small>pin{sel === 1 ? "" : "s"} selected</small>
-            </span>
-            <span className="hint">⇧ Correct = add note</span>
-          </div>
-          <div className="grade">
-            <button
-              key={p.flash?.kind === "correct" ? `c${p.flash.n}` : "c"}
-              className={`btn ok ${p.flash?.kind === "correct" ? "flash" : ""}`}
-              disabled={!sel}
-              title="Mark all selected pins correct · ⇧-click to add a note"
-              onClick={(e) => p.onGradeSelection("correct", e.shiftKey)}
-            >
-              <span className="l">
-                <IconCheck /> Correct
-              </span>
-              <span className="kbd">C</span>
+        <div className="prow tool" title="Switch between grouped clusters and individual pins (S)">
+          <span className="plabel">Show</span>
+          <div className="seg wide">
+            <button className={!p.onSingles ? "on acc" : ""} disabled={!p.realClusters} onClick={() => p.onJumpKind("clusters")}>
+              Clusters <span className="count">{p.realClusters}</span>
             </button>
             <button
-              key={p.flash?.kind === "wrong" ? `w${p.flash.n}` : "w"}
-              className={`btn bad ${p.flash?.kind === "wrong" ? "flash" : ""}`}
-              disabled={!sel}
-              onClick={() => p.onGradeSelection("wrong")}
+              className={p.onSingles ? "on acc" : ""}
+              disabled={p.realClusters === p.clusters.length}
+              onClick={() => p.onJumpKind("singles")}
             >
-              <span className="l">
-                <IconCross /> Wrong…
-              </span>
-              <span className="kbd">W</span>
+              Singles <span className="count">{p.clusters.length - p.realClusters}</span>
             </button>
           </div>
+          <span className="kbd">S</span>
         </div>
       </Panel>
 

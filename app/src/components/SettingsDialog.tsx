@@ -8,7 +8,7 @@ import { IconCircleDash, IconKeyboard, IconPin, IconText } from "./icons";
 type Pane = "pins" | "input" | "clusters" | "text";
 const PANES: { id: Pane; label: string; icon: ReactNode; lede: string }[] = [
   { id: "pins", label: "Pins", icon: <IconPin />, lede: "How student pins are drawn on the slide." },
-  { id: "input", label: "Selection & keys", icon: <IconKeyboard />, lede: "Right-drag tool and the keys you can rebind." },
+  { id: "input", label: "Mouse & keys", icon: <IconKeyboard />, lede: "Which button pans and which selects, zooming, and the keys you can rebind." },
   { id: "clusters", label: "Clusters & zoom", icon: <IconCircleDash />, lede: "How pins are grouped and how far the view zooms in." },
   { id: "text", label: "Grading text", icon: <IconText />, lede: "What students read in their feedback." },
 ];
@@ -173,9 +173,39 @@ export function SettingsDialog({ onClose, asWindow = false }: { onClose: () => v
         {pane === "input" && (
           <>
             <div className="group">
+              <div className="gt">Mouse</div>
+              {row(
+                "Buttons",
+                seg(s.swapMouse ? "swap" : "std", [
+                  ["std", "Left pans · Right selects"],
+                  ["swap", "Left selects · Right pans"],
+                ], (v) => set({ swapMouse: v === "swap" })),
+                s.swapMouse ? "click a pin with either button to grade it" : "like NDP.view: drag the slide with the left button",
+              )}
+              {row(
+                "Scroll zoom speed",
+                <SliderRow
+                  label=""
+                  value={Math.round((s.zoomPerScroll - 1) * 100)}
+                  min={5}
+                  max={60}
+                  unit="%"
+                  onChange={(v) => set({ zoomPerScroll: 1 + v / 100 })}
+                />,
+                "how far one scroll-wheel step zooms",
+              )}
+              {row(
+                "Double-click",
+                <label className="check">
+                  <input type="checkbox" checked={s.dblClickZoom} onChange={(e) => set({ dblClickZoom: e.target.checked })} />
+                  zooms in
+                </label>,
+              )}
+            </div>
+            <div className="group">
               <div className="gt">Selection</div>
               {row(
-                "Right-drag tool",
+                s.swapMouse ? "Left-drag tool" : "Right-drag tool",
                 seg(s.selectTool, [
                   ["lasso", "Lasso"],
                   ["brush", "Paint brush"],
@@ -205,6 +235,22 @@ export function SettingsDialog({ onClose, asWindow = false }: { onClose: () => v
             {row("Min pins per cluster", numField("minClusterSize", 2, 50, "pins"), "smaller groups are listed as single pins")}
             {row("Single-pin field", numField("singleFieldUm", 20, 5000, "µm"), "view width when zooming to one pin")}
             {row("Padding", numField("clusterPaddingUm", 0, 1000, "µm"), "margin around a cluster when zooming")}
+            {row(
+              "Next cluster",
+              <label className="check">
+                <input type="checkbox" checked={s.autoZoomCluster} onChange={(e) => set({ autoZoomCluster: e.target.checked })} />
+                zoom to it automatically
+              </label>,
+              "off: the view stays put; press F to zoom",
+            )}
+            {row(
+              "Animation",
+              <label className="check">
+                <input type="checkbox" checked={s.animate} onChange={(e) => set({ animate: e.target.checked })} />
+                smooth zoom and pan
+              </label>,
+              "off: jumps instantly",
+            )}
           </div>
         )}
 

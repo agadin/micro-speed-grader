@@ -28,6 +28,15 @@ export interface Settings {
   showKeyHints: boolean;
   /** opacity of faded pins from other questions (0–1) */
   otherOpacity: number;
+  /** true: left-drag selects (lasso / brush), right-drag pans */
+  swapMouse: boolean;
+  /** zoom factor per scroll-wheel step */
+  zoomPerScroll: number;
+  dblClickZoom: boolean;
+  /** zoom to each cluster when it becomes current */
+  autoZoomCluster: boolean;
+  /** smooth zoom / pan animation */
+  animate: boolean;
   /** collapsed side panels (by id) */
   collapsedPanels: string[];
   /** bumped when default panel layout changes, so new defaults reach saved settings once */
@@ -61,6 +70,11 @@ export const defaultSettings: Settings = {
   brushPx: 28,
   showKeyHints: false,
   otherOpacity: 0.35,
+  swapMouse: false,
+  zoomPerScroll: 1.2,
+  dblClickZoom: true,
+  autoZoomCluster: true,
+  animate: true,
   collapsedPanels: ["reasons"],
   panelsVersion: 1,
   colors: {

@@ -1,4 +1,4 @@
-import { useEffect, useLayoutEffect, useMemo, useRef, useState, type ReactNode } from "react";
+import { useLayoutEffect, useMemo, useRef, useState, type ReactNode } from "react";
 import { IconCheck, IconCross, IconEraser, IconHalf, IconTarget } from "./icons";
 import type { MenuState } from "../lib/store";
 import type { GradeState } from "../lib/types";
@@ -35,10 +35,11 @@ export function ContextMenu({ menu, grades, q, settings, anyGraded, onGrade, onI
     [grades, q, status, text, menu.mode],
   );
 
-  useEffect(() => {
+  // focus before the browser paints, so keys typed right after W land in the reason box
+  useLayoutEffect(() => {
     setText("");
     setHi(-1);
-    if (menu.mode !== "root") setTimeout(() => inputRef.current?.focus(), 0);
+    if (menu.mode !== "root") inputRef.current?.focus();
     else ref.current?.focus();
   }, [menu.mode]);
 
@@ -157,6 +158,7 @@ export function ContextMenu({ menu, grades, q, settings, anyGraded, onGrade, onI
             </div>
             <input
               ref={inputRef}
+              autoFocus
               value={text}
               onChange={(e) => {
                 setText(e.target.value);
