@@ -29,6 +29,9 @@ function shortPath(p: string): string {
   return parts.length > 3 ? [parts[0], "…", ...parts.slice(-2)].join(sep) : home;
 }
 
+/** window resizes from the start-up screens, applied strictly in order */
+let resizeQueue: Promise<void> = Promise.resolve();
+
 /** Size the (title-bar-less) window snugly around the start-up card. */
 function useFitWindow() {
   const ref = useRef<HTMLDivElement>(null);
@@ -42,22 +45,33 @@ function useFitWindow() {
       return; // not inside Tauri (UI tests)
     }
     let last = "";
+    let alive = true;
     const fit = () => {
+      // a card that is being unmounted measures 0 × 0: never size the window from that
+      if (!alive || !el.isConnected || el.offsetWidth < 100) return;
       // the card fills the window: only the traffic-light strip is added on top
-      const W = Math.ceil(el.offsetWidth);
-      const H = Math.min(Math.round(screen.availHeight * 0.9), Math.ceil(el.offsetHeight) + 28);
+      const W = Math.max(360, Math.ceil(el.offsetWidth));
+      const H = Math.max(200, Math.min(Math.round(screen.availHeight * 0.9), Math.ceil(el.offsetHeight) + 28));
       const key = `${W}x${H}`;
       if (key === last) return;
       last = key;
-      w.setMinSize(new LogicalSize(320, 200))
-        .then(() => w.setSize(new LogicalSize(W, H)))
-        .then(() => w.center())
+      // resizes run one after another, and a screen that has gone away skips its pending one
+      resizeQueue = resizeQueue
+        .then(async () => {
+          if (!alive) return;
+          await w.setMinSize(new LogicalSize(320, 200));
+          await w.setSize(new LogicalSize(W, H));
+          await w.center();
+        })
         .catch(() => {});
     };
     fit();
     const ro = new ResizeObserver(fit);
     ro.observe(el);
-    return () => ro.disconnect();
+    return () => {
+      alive = false;
+      ro.disconnect();
+    };
   }, []);
   return ref;
 }
