@@ -1,6 +1,7 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { useStore } from "../lib/store";
-import { useSettings } from "../lib/settings";
+import { activeTool, keyLabel, SELECT_TOOLS, useSettings, type SelectTool } from "../lib/settings";
+import { pinsInPaint, type PaintOp } from "../lib/paint";
 import {
   buildTasks,
   doublePinIds,
@@ -38,8 +39,9 @@ const GAP = 10;
 const TOOL_H = 40;
 
 type KeyRow = [string[], string];
-function KeySheet({ brush, swap, onClose }: { brush: boolean; swap: boolean; onClose: () => void }) {
+function KeySheet({ tool, swap, pinByPin, onClose }: { tool: SelectTool; swap: boolean; pinByPin: boolean; onClose: () => void }) {
   const drag = swap ? "L-drag" : "R-drag";
+  const click = swap ? "L-click" : "R-click";
   const cols: [string, KeyRow[]][] = [
     [
       "Navigate",
@@ -50,27 +52,42 @@ function KeySheet({ brush, swap, onClose }: { brush: boolean; swap: boolean; onC
         [["H"], "whole slide"],
         [["S"], "clusters ⇄ single pins"],
         [["⌘", "←/→"], "prev / next image"],
+        ...(pinByPin
+          ? ([
+              [["O"], "pin-by-pin mode"],
+              [["←/→"], "prev / next pin"],
+            ] as KeyRow[])
+          : []),
       ],
     ],
     [
       "Select",
-      brush
+      tool === "brush"
         ? [
             [[drag], "paint"],
             [["⇧", "paint"], "add"],
             [["⌥", "paint"], "remove"],
             [["−", "="], "brush size"],
-            [["B"], "lasso tool"],
+            [["B"], "next tool"],
           ]
-        : [
-            [[drag], "lasso"],
-            [["⌘", "drag"], "add to selection"],
-            [["⌘", "click"], "add / remove pin"],
-            [["⇧", "drag"], "inverse"],
-            [["⌥", "drag"], "rectangle"],
-            [["X"], "invert selection"],
-            [["B"], "brush tool"],
-          ],
+        : tool === "polygon"
+          ? [
+              [[click], "add corner"],
+              [["↵"], "close (or click 1st)"],
+              [["⌫"], "undo corner"],
+              [["⌘", click], "start: add to sel."],
+              [["⇧", click], "inverse"],
+              [["B"], "next tool"],
+            ]
+          : [
+              [[drag], "lasso"],
+              [["⌘", "drag"], "add to selection"],
+              [["⌘", "click"], "add / remove pin"],
+              [["⇧", "drag"], "inverse"],
+              [["⌥", "drag"], "rectangle"],
+              [["X"], "invert selection"],
+              [["B"], "next tool"],
+            ],
     ],
     [
       "Grade",
@@ -202,8 +219,38 @@ export function Grader({ session }: { session: Session }) {
     key: string;
     cluster: Cluster;
   } | null>(null);
-  const cluster =
+  const liveCluster =
     adjusted && adjusted.key === baseKey ? adjusted.cluster : baseCluster;
+
+  // ---------- pin-by-pin mode ----------
+  // A snapshot of the cluster being stepped through, so grading a pin doesn't reshuffle it.
+  const pinModeOn = settings.pinByPin && st.pinMode;
+  const [queue, setQueue] = useState<{ key: string; cluster: Cluster; cursor: number } | null>(null);
+  const queueValid =
+    pinModeOn &&
+    !!queue &&
+    queue.key === task?.id &&
+    queue.cluster.pinIds.some((id) => states.get(id) === "ungraded");
+  const cluster = queueValid ? queue!.cluster : liveCluster;
+  /** index (in the queue) of the pin being graded: first ungraded at or after the cursor */
+  const pinAt = (from: number, dir: 1 | -1) => {
+    if (!queueValid) return -1;
+    const ids = queue!.cluster.pinIds;
+    const n = ids.length;
+    for (let i = 0; i < n; i++) {
+      const j = (((from + dir * i) % n) + n) % n;
+      if (states.get(ids[j]) === "ungraded") return j;
+    }
+    return -1;
+  };
+  const curIdx = queueValid ? pinAt(queue!.cursor, 1) : -1;
+  const curPin = curIdx >= 0 ? queue!.cluster.pinIds[curIdx] : null;
+  const queueLeft = queueValid ? queue!.cluster.pinIds.filter((id) => states.get(id) === "ungraded").length : 0;
+  const stepPin = (dir: 1 | -1) => {
+    if (curIdx < 0) return;
+    const j = pinAt(curIdx + dir, dir);
+    if (j >= 0) setQueue({ ...queue!, cursor: j });
+  };
 
   const progress: Progress = useMemo(() => {
     const allDoubles = new Set<string>();
@@ -259,10 +306,70 @@ export function Grader({ session }: { session: Session }) {
   const clusterKey = cluster
     ? `${task?.id}:${cluster.pinIds.join(",")}`
     : `${task?.id}:none`;
+  // area painted with pins hidden; cleared on a new cluster / image or after grading
+  const [paint, setPaint] = useState<PaintOp[]>([]);
   useEffect(() => {
-    st.set({ selection: cluster ? cluster.pinIds : [] });
+    setPaint([]);
+    if (!pinModeOn) st.set({ selection: cluster ? cluster.pinIds : [] });
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [clusterKey]);
+
+  useEffect(() => setQueue(null), [pinModeOn]);
+  // pin-by-pin: (re)start the queue from the current cluster when needed; select the current pin
+  useEffect(() => {
+    if (!pinModeOn || queueValid) return;
+    setQueue(liveCluster && task ? { key: task.id, cluster: liveCluster, cursor: 0 } : null);
+    if (liveCluster && settings.autoZoomCluster) setFocus({ pinIds: liveCluster.pinIds, nonce: Date.now() });
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [pinModeOn, queueValid, clusterKey]);
+  useEffect(() => {
+    if (pinModeOn) st.set({ selection: curPin ? [curPin] : [] });
+    else if (cluster) st.set({ selection: cluster.pinIds });
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [curPin, pinModeOn]);
+
+  // unhiding pins after painting: the ungraded pins in the painted area become the selection
+  const paintedIds = useMemo(() => pinsInPaint(ungraded, paint), [ungraded, paint]);
+  const prevVisible = useRef(st.flagsVisible);
+  useEffect(() => {
+    if (st.flagsVisible && !prevVisible.current && paint.length) st.set({ selection: paintedIds });
+    prevVisible.current = st.flagsVisible;
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [st.flagsVisible]);
+  const paintActive = paint.length > 0;
+  /** what "painted ✓ / rest ✗" would grade */
+  const paintSplit = useMemo(() => {
+    if (!paintActive) return null;
+    const ok = st.flagsVisible ? st.selection : paintedIds;
+    const okSet = new Set(ok);
+    const rest = (cluster?.pinIds ?? []).filter((id) => states.get(id) === "ungraded" && !okSet.has(id));
+    return { ok, rest };
+  }, [paintActive, st.flagsVisible, st.selection, paintedIds, cluster, states]);
+  const pinOnly = useMemo(
+    () => (pinModeOn && curPin && !paintActive ? new Set([curPin]) : null),
+    [pinModeOn, curPin, paintActive],
+  );
+  const pendingWrong = useMemo(() => (paintSplit ? new Set(paintSplit.rest) : undefined), [paintSplit]);
+  /** painted pins ✓; the rest of the cluster ✗ once a reason is given (the reason box opens beside them) */
+  const gradePainted = () => {
+    if (!paintSplit || !task) return;
+    if (!paintSplit.rest.length) {
+      st.grade(paintSplit.ok, "correct", "", task.id, task.q);
+      return setPaint([]);
+    }
+    const c = menuAnchor(paintSplit.rest);
+    // the selection stays on the painted pins, so both groups stay visible while typing
+    st.set({
+      menu: {
+        x: c.x,
+        y: c.y,
+        pinIds: paintSplit.rest,
+        mode: "wrong",
+        title: `Rest of cluster · ${paintSplit.ok.length} painted marked correct`,
+        paintOk: paintSplit.ok,
+      },
+    });
+  };
 
   // auto-zoom when navigating clusters / after grading / on new image
   const [focus, setFocus] = useState<{
@@ -270,6 +377,7 @@ export function Grader({ session }: { session: Session }) {
     nonce: number;
   } | null>(null);
   useEffect(() => {
+    if (pinModeOn) return; // the queue zooms once per cluster
     if (cluster && settings.autoZoomCluster) setFocus({ pinIds: cluster.pinIds, nonce: Date.now() });
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [task?.id, clusterIndex, ungraded.length, info?.id]);
@@ -362,6 +470,17 @@ export function Grader({ session }: { session: Session }) {
 
   const gradeSelection = (status: "correct" | "wrong", text: string) => {
     if (!task || !st.menu) return;
+    if (st.menu.paintOk) {
+      st.gradeMany(
+        [
+          { pinIds: st.menu.paintOk, status: "correct", text: "" },
+          { pinIds: st.menu.pinIds, status, text },
+        ],
+        task.id,
+        task.q,
+      );
+      return setPaint([]);
+    }
     st.grade(st.menu.pinIds, status, text, task.id, task.q);
   };
 
@@ -372,6 +491,8 @@ export function Grader({ session }: { session: Session }) {
     m: "correct" | "wrong",
     withNote = false,
   ) => {
+    if (m === "correct" && !withNote && paintSplit && (paintSplit.ok.length || paintSplit.rest.length))
+      return gradePainted();
     if (!st.selection.length) return;
     if (m === "correct" && !withNote)
       return st.grade(st.selection, "correct", "", task.id, task.q);
@@ -382,16 +503,18 @@ export function Grader({ session }: { session: Session }) {
     const i = clusters.findIndex((c) =>
       kind === "singles" ? c.single : !c.single,
     );
-    if (i >= 0) st.set({ clusterIndex: i });
+    if (i >= 0) (setQueue(null), st.set({ clusterIndex: i }));
   };
   const nextCluster = () =>
     clusters.length &&
-    st.set({ clusterIndex: (clusterIndex + 1) % clusters.length });
+    (setQueue(null),
+    st.set({ clusterIndex: (clusterIndex + 1) % clusters.length }));
   const prevCluster = () =>
     clusters.length &&
+    (setQueue(null),
     st.set({
       clusterIndex: (clusterIndex - 1 + clusters.length) % clusters.length,
-    });
+    }));
   const nextImage = () =>
     taskIndex < tasks.length - 1 && st.setTask(taskIndex + 1);
   const prevImage = () => taskIndex > 0 && st.setTask(taskIndex - 1);
@@ -468,10 +591,15 @@ export function Grader({ session }: { session: Session }) {
       });
     if (k === "h") return (setView("slide"), setHomeNonce(Date.now()));
     if (k === "i") return st.set({ isolate: !st.isolate });
-    if (k === "b")
-      return setSettings({
-        selectTool: settings.selectTool === "brush" ? "lasso" : "brush",
-      });
+    if (k === "b") {
+      const on = SELECT_TOOLS.filter((t) => settings.tools[t]);
+      const i = on.indexOf(activeTool(settings));
+      return on.length > 1 && setSettings({ selectTool: on[(i + 1) % on.length] });
+    }
+    if (k === "o" && settings.pinByPin)
+      return (setQueue(null), st.set({ pinMode: !st.pinMode }));
+    if (pinModeOn && k === "ArrowRight") return (e.preventDefault(), stepPin(1));
+    if (pinModeOn && k === "ArrowLeft") return (e.preventDefault(), stepPin(-1));
     if (k === "-" || k === "_")
       return setSettings({ brushPx: Math.max(6, settings.brushPx - 4) });
     if (k === "=" || k === "+")
@@ -479,15 +607,24 @@ export function Grader({ session }: { session: Session }) {
     if (k === "x") return invertSelection();
     if (k === "s") return jumpKind(onSingles ? "clusters" : "singles");
     if (k === "?") return setSettings({ showKeyHints: !settings.showKeyHints });
-    if (k === "Escape") return st.set({ isolate: false });
+    if (k === "Escape") return (setPaint([]), st.set({ isolate: false }));
     const c = menuAnchor(st.selection);
     if (k === "Enter") return openMenu(st.selection, c.x, c.y);
+    if (k === "c" && paintSplit && (paintSplit.ok.length || paintSplit.rest.length) && task) {
+      e.preventDefault(); // the reason box takes focus: keep the "c" out of it
+      flashBtn("correct");
+      return gradePainted();
+    }
     if (k === "c" && st.selection.length && task) {
       flashBtn("correct");
       return st.grade(st.selection, "correct", "", task.id, task.q);
     }
     if (k === "C")
       return (flashBtn("correct"), openMenu(st.selection, c.x, c.y, "correct"));
+    if (k === "w" && pinModeOn && curPin && !settings.wrongNeedsReason && task) {
+      flashBtn("wrong");
+      return st.grade([curPin], "wrong", settings.wrongDefaultText, task.id, task.q);
+    }
     if (k.toLowerCase() === "w") {
       e.preventDefault();
       flashBtn("wrong");
@@ -621,9 +758,17 @@ export function Grader({ session }: { session: Session }) {
               studentName={studentName}
               focus={focus}
               homeNonce={homeNonce}
-              onLasso={(ids, _inv, x, y) =>
-                ids.length ? openMenu(ids, x, y) : st.set({ selection: [] })
-              }
+              onLasso={(ids, _inv, x, y) => {
+                setPaint([]);
+                if (!ids.length) return st.set({ selection: [] });
+                // beside the selected pins (so they stay visible), else where the drag ended
+                const a = viewerApi.current?.clientBounds(ids) ? menuAnchor(ids) : { x, y };
+                openMenu(ids, a.x, a.y);
+              }}
+              onlyPinIds={pinOnly}
+              paint={paint}
+              onPaint={(op) => setPaint((ops) => [...ops, op])}
+              pendingWrong={pendingWrong}
               onSelect={(ids) => st.set({ selection: ids })}
               onPinClick={(id, x, y) => openMenu([id], x, y)}
               onEmptyRightClick={(x, y) =>
@@ -645,9 +790,28 @@ export function Grader({ session }: { session: Session }) {
                 })
               }
             />
+            {(paintActive || (!st.flagsVisible && settings.hiddenPaint)) && (
+              <div className="paint-hint">
+                {!st.flagsVisible ? (
+                  <>
+                    Pins hidden · paint the structure
+                    {paintActive ? "" : " (brush, lasso or polygon)"}, then{" "}
+                    <span className="kbd">{keyLabel(settings.toggleFlagsKey)}</span> to show pins
+                  </>
+                ) : (
+                  <>
+                    <b>{paintSplit?.ok.length ?? 0}</b> painted ·{" "}
+                    <b className="bad">{paintSplit?.rest.length ?? 0}</b> rest of cluster →{" "}
+                    <span className="kbd">C</span> painted ✓, rest ✗ + reason ·{" "}
+                    <span className="kbd">Esc</span> clear
+                  </>
+                )}
+              </div>
+            )}
             {settings.showKeyHints && (
               <KeySheet
-                brush={settings.selectTool === "brush"}
+                tool={activeTool(settings)}
+                pinByPin={settings.pinByPin}
                 swap={settings.swapMouse}
                 onClose={() => setSettings({ showKeyHints: false })}
               />
@@ -676,7 +840,18 @@ export function Grader({ session }: { session: Session }) {
                   <IconChevL />
                 </button>
                 <div className="cur">
-                  {cluster ? (
+                  {pinModeOn && curPin && cluster ? (
+                    <>
+                      <span>
+                        Pin {curIdx + 1} of {cluster.pinIds.length} ·{" "}
+                        {cluster.single ? "single" : `cluster ${cluster.label}`}
+                      </span>
+                      <span className="of">
+                        {queueLeft} left · <span className="kbd">←</span>
+                        <span className="kbd">→</span>
+                      </span>
+                    </>
+                  ) : cluster ? (
                     <>
                       <span>
                         {cluster.single && cluster.pinIds.length === 1
@@ -821,6 +996,8 @@ export function Grader({ session }: { session: Session }) {
           }}
           onMode={(mode) => st.set({ menu: { ...st.menu!, mode } })}
           onClose={() => st.set({ menu: null })}
+          paintRest={paintSplit?.rest.length ?? 0}
+          onPaintGrade={gradePainted}
         />
       )}
       {st.exportOpen && (

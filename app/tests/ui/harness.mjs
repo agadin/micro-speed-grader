@@ -8,7 +8,7 @@ import { webkit, chromium } from "playwright";
 
 export const APP = path.resolve(import.meta.dirname, "../..");
 export const ROOT = path.resolve(APP, "..");
-const TILE_PORT = 8787;
+const TILE_PORT = Number(process.env.MSG_TILE_PORT ?? 8787);
 const TILE = `http://127.0.0.1:${TILE_PORT}`;
 
 async function waitFor(url, ms = 120000) {

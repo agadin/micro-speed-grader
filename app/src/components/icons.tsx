@@ -41,3 +41,4 @@ export const IconPin = () => <S d="M8 6m-2.5 0a2.5 2.5 0 1 0 5 0a2.5 2.5 0 1 0-5
 export const IconKeyboard = () => <S d="M2 4.5h12v7H2zM4.5 7h1M7.5 7h1M10.5 7h1M5 9.5h6" />;
 export const IconCircleDash = () => <S d="M8 2.5a5.5 5.5 0 0 1 5.5 5.5M13.5 8A5.5 5.5 0 0 1 8 13.5M8 13.5A5.5 5.5 0 0 1 2.5 8M2.5 8A5.5 5.5 0 0 1 8 2.5" />;
 export const IconText = () => <S d="M3 4h10M3 7.5h10M3 11h6M11 10.5l1.5 1.5 2-2.5" />;
+export const IconPolygon = () => <S d="M3 12.5 2.5 5 8 2.5l5.5 4-2 6Z" />;

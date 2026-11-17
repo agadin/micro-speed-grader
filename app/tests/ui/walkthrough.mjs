@@ -230,7 +230,7 @@ await step("brush (B) paints a selection and opens menu", async () => {
   const title = ok ? await page.locator(".ctx-title").innerText() : "(no menu — brush found no pins on that stroke)";
   await snap("brush-menu");
   await page.keyboard.press("Escape");
-  await page.keyboard.press("b");
+  await page.locator(".right .seg button", { hasText: "Lasso" }).click(); // B cycles lasso → brush → polygon
   return title.replace(/\n/g, " ");
 });
 
@@ -320,6 +320,113 @@ await step("S switches between clusters and single pins", async () => {
   const c = await page.locator(".cnav .cur").innerText();
   expect(/Single pin/.test(b) && /Cluster/.test(c), `${a} → ${b} → ${c}`);
   return `${a.replace(/\n/g, " ")} → ${b.replace(/\n/g, " ")} → ${c.replace(/\n/g, " ")}`;
+});
+
+const ring = async () => {
+  const v = await viewer();
+  const r = (await page.locator(".viewer-overlay").getAttribute("data-cluster-ring")).split(",").map(Number);
+  return { x: v.x + r[0], y: v.y + r[1], r: r[2] };
+};
+const tool = (name) => page.locator(".right .seg button", { hasText: name }).click();
+
+await step("polygon: right-click corners, Enter closes → grade menu", async () => {
+  await page.keyboard.press("f");
+  await page.waitForTimeout(900);
+  await tool("Polygon");
+  const c = await ring();
+  const d = c.r * 1.3;
+  for (const [dx, dy] of [[-d, -d], [d, -d], [d, d], [-d, d]]) {
+    await page.mouse.click(c.x + dx, c.y + dy, { button: "right" });
+    await page.waitForTimeout(80);
+  }
+  await snap("polygon-open");
+  await page.keyboard.press("Enter");
+  await page.waitForTimeout(300);
+  const title = await page.locator(".ctx-title").innerText({ timeout: 3000 });
+  await snap("polygon-menu");
+  await page.keyboard.press("Escape");
+  await tool("Lasso");
+  return title.replace(/\n/g, " ");
+});
+
+await step("paint with pins hidden: Space, brush, Space → C grades painted ✓ / rest ✗ (one undo)", async () => {
+  const cur0 = await page.locator(".cnav .cur").innerText();
+  await tool("Brush");
+  const c = await ring(); // the ring isn't drawn while pins are hidden
+  await page.keyboard.press(" ");
+  await page.waitForTimeout(150);
+  const hiddenHint = await page.locator(".paint-hint").innerText();
+  // paint across the left half of the cluster
+  await rightDrag(Array.from({ length: 8 }, (_, i) => [c.x - c.r + (i * c.r) / 7, c.y]));
+  await page.waitForTimeout(150);
+  await snap("paint-hidden");
+  await page.keyboard.press(" ");
+  await page.waitForTimeout(200);
+  const hint = await page.locator(".paint-hint").innerText();
+  const [painted, rest] = (hint.match(/\d+/g) ?? []).map(Number);
+  await snap("paint-shown");
+  await page.keyboard.press("c");
+  await page.waitForTimeout(300);
+  const reasonBox = await page.locator(".ctx-entry input").isVisible();
+  const leaked = await page.locator(".ctx-entry input").inputValue();
+  await snap("paint-reason");
+  await page.keyboard.type("Dermal collagen");
+  await page.keyboard.press("Enter");
+  await page.waitForTimeout(400);
+  const hintGone = !(await page.locator(".paint-hint").isVisible());
+  const cur1 = await page.locator(".cnav .cur").innerText();
+  await page.keyboard.press("Meta+z");
+  await page.waitForTimeout(400);
+  const cur2 = await page.locator(".cnav .cur").innerText();
+  await tool("Lasso");
+  expect(/paint the structure/.test(hiddenHint), `hidden hint: ${hiddenHint}`);
+  expect(painted + rest > 0, `hint after showing: ${hint}`);
+  expect(reasonBox, "C should open a reason box for the rest of the cluster");
+  expect(leaked === "", `reason box starts with "${leaked}"`);
+    expect(hintGone && cur1 !== cur0, `C did not grade (${cur0} → ${cur1})`);
+  expect(cur2 === cur0, `one undo should restore the cluster: ${cur0} vs ${cur2}`);
+  return `${painted} painted ✓, ${rest} rest ✗; undo restored "${cur0.replace(/\n/g, " ")}"`;
+});
+
+await step("pin by pin: O shows one pin; C grades it and advances", async () => {
+  await page.keyboard.press("o");
+  await page.waitForTimeout(500);
+  const a = await page.locator(".cnav .cur").innerText();
+  const sel = await page.locator(".selcount b").innerText();
+  await snap("pin-by-pin");
+  await page.keyboard.press("c");
+  await page.waitForTimeout(400);
+  const b = await page.locator(".cnav .cur").innerText();
+  await page.keyboard.press("ArrowRight");
+  await page.waitForTimeout(200);
+  const c = await page.locator(".cnav .cur").innerText();
+  await page.keyboard.press("Meta+z");
+  await page.keyboard.press("o");
+  await page.waitForTimeout(400);
+  const n = (t) => Number(t.match(/(\d+) left/)?.[1]);
+  expect(/^Pin \d+ of \d+/.test(a) && sel === "1", `pin mode: ${a} / ${sel} selected`);
+  expect(n(b) === n(a) - 1, `C should advance: ${a} → ${b}`);
+  expect(c !== b, `→ should step: ${b} → ${c}`);
+  return [a, b, c].map((t) => t.replace(/\n/g, " ")).join(" → ");
+});
+
+await step("Preferences → Selection: list switches toggle tools", async () => {
+  await emit("menu", "preferences");
+  await page.getByRole("button", { name: "Selection" }).click();
+  const cards = await page.locator(".sel-row").count();
+  await page.waitForTimeout(600); // let the demos load
+  await snap("prefs-selection");
+  await page.locator(".sel-row", { hasText: "Polygon" }).click();
+  await page.locator(".sel-row", { hasText: "Polygon" }).locator("input.switch").uncheck();
+  await page.getByRole("button", { name: "Done" }).click();
+  const hasPoly = await page.locator(".right .seg button", { hasText: "Polygon" }).count();
+  await emit("menu", "preferences");
+  await page.getByRole("button", { name: "Selection" }).click();
+  await page.locator(".sel-row", { hasText: "Polygon" }).locator("input.switch").check();
+  await page.getByRole("button", { name: "Done" }).click();
+  expect(cards === 8, `${cards} method rows`);
+  expect(hasPoly === 0, "disabled Polygon still in the tool switcher");
+  return `${cards} rows; polygon toggled off and on`;
 });
 
 await step("key hints collapsed by default; ? expands", async () => {

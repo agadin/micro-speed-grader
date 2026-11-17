@@ -3,7 +3,8 @@ import { create } from "zustand";
 /** flag / pushpin mirror NDP.view's annotation icons */
 export type PinStyle = "flag" | "pushpin" | "dot" | "cross";
 export type LabelMode = "none" | "title" | "student";
-export type SelectTool = "lasso" | "brush";
+export type SelectTool = "lasso" | "brush" | "polygon";
+export const SELECT_TOOLS: SelectTool[] = ["lasso", "brush", "polygon"];
 
 export interface Settings {
   pinStyle: PinStyle;
@@ -22,6 +23,21 @@ export interface Settings {
   noAnswerMessage: string;
   showOtherQuestions: boolean;
   selectTool: SelectTool;
+  /** which selection tools appear in the tool switcher (B cycles through them) */
+  tools: Record<SelectTool, boolean>;
+  /** plain click on a pin adds/removes it from the selection (⌘-click opens the grade menu) */
+  clickToggle: boolean;
+  /** with pins hidden, brush / lasso / polygon strokes paint an area; unhide to grade by it */
+  hiddenPaint: boolean;
+  /** offer the pin-by-pin mode (O): step through a cluster showing one pin at a time */
+  pinByPin: boolean;
+  /** hovering a pin hides every other pin */
+  spotlight: boolean;
+  /** draw pins as small dots once zoomed in past shrinkUmPerPx */
+  shrinkPins: boolean;
+  shrinkUmPerPx: number;
+  /** marker used once zoomed past shrinkUmPerPx */
+  shrinkStyle: PinStyle;
   /** brush radius in screen pixels */
   brushPx: number;
   /** keyboard-shortcut panel over the image expanded */
@@ -37,6 +53,8 @@ export interface Settings {
   autoZoomCluster: boolean;
   /** smooth zoom / pan animation */
   animate: boolean;
+  /** background of the marker preview in Preferences (he / toluidine / ihc / reticulin) */
+  previewStain: string;
   /** collapsed side panels (by id) */
   collapsedPanels: string[];
   /** bumped when default panel layout changes, so new defaults reach saved settings once */
@@ -48,6 +66,7 @@ export interface Settings {
     double: string;
     selected: string;
     cluster: string;
+    paint: string;
   };
 }
 
@@ -67,6 +86,14 @@ export const defaultSettings: Settings = {
   noAnswerMessage: "No answer",
   showOtherQuestions: false,
   selectTool: "lasso",
+  tools: { lasso: true, brush: true, polygon: true },
+  clickToggle: false,
+  hiddenPaint: true,
+  pinByPin: true,
+  spotlight: false,
+  shrinkPins: false,
+  shrinkUmPerPx: 0.5,
+  shrinkStyle: "dot",
   brushPx: 28,
   showKeyHints: false,
   otherOpacity: 0.35,
@@ -75,6 +102,7 @@ export const defaultSettings: Settings = {
   dblClickZoom: true,
   autoZoomCluster: true,
   animate: true,
+  previewStain: "he",
   collapsedPanels: ["reasons"],
   panelsVersion: 1,
   colors: {
@@ -84,8 +112,15 @@ export const defaultSettings: Settings = {
     double: "#4fd6c8",
     selected: "#f4c04e",
     cluster: "#f6f1e7",
+    paint: "#5ec8f2",
   },
 };
+
+/** the tool actually in use: the chosen one if enabled, else the first enabled one */
+export function activeTool(s: Settings): SelectTool {
+  if (s.tools[s.selectTool]) return s.selectTool;
+  return SELECT_TOOLS.find((t) => s.tools[t]) ?? "lasso";
+}
 
 const KEY = "msg.settings.v2";
 /** v1 stored the old colour scheme; carry everything else over, take the new default colours */
@@ -97,7 +132,13 @@ function load(): Settings {
     if (raw) {
       const s = JSON.parse(raw);
       const pinStyle = ["flag", "pushpin", "dot", "cross"].includes(s.pinStyle) ? s.pinStyle : "flag";
-      const out = { ...defaultSettings, ...s, pinStyle, colors: { ...defaultSettings.colors, ...(s.colors ?? {}) } };
+      const out = {
+        ...defaultSettings,
+        ...s,
+        pinStyle,
+        tools: { ...defaultSettings.tools, ...(s.tools ?? {}) },
+        colors: { ...defaultSettings.colors, ...(s.colors ?? {}) },
+      };
       if ((s.panelsVersion ?? 0) < 1) {
         out.collapsedPanels = [...new Set([...(s.collapsedPanels ?? []), "reasons"])];
         out.panelsVersion = 1;

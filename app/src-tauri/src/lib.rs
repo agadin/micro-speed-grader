@@ -89,8 +89,8 @@ fn open_preferences<R: tauri::Runtime>(app: tauri::AppHandle<R>) -> Result<(), S
     }
     tauri::WebviewWindowBuilder::new(&app, "preferences", tauri::WebviewUrl::App("index.html?window=preferences".into()))
         .title("Preferences")
-        .inner_size(680.0, 560.0)
-        .min_inner_size(560.0, 420.0)
+        .inner_size(900.0, 680.0)
+        .min_inner_size(760.0, 480.0)
         .build()
         .map(|_| ())
         .map_err(|e| e.to_string())

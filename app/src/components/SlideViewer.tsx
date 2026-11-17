@@ -3,7 +3,8 @@ import OpenSeadragon from "openseadragon";
 import type { Pin, SlideInfo } from "../lib/types";
 import type { Cluster } from "../lib/cluster";
 import type { PinState } from "../lib/grading";
-import type { Settings } from "../lib/settings";
+import { activeTool, type Settings } from "../lib/settings";
+import { pointInPolygon, type PaintOp } from "../lib/paint";
 import { tileBase } from "../lib/backend";
 import { drawMarker } from "../lib/markers";
 
@@ -41,10 +42,23 @@ export interface ViewerProps {
   /** the user dragged/resized the cluster circle; ids = ungraded pins now inside it */
   onClusterAdjust: (cx: number, cy: number, radiusNm: number, pinIds: string[]) => void;
   homeNonce: number;
+  /** pin-by-pin mode: draw (and hit-test) only these pins */
+  onlyPinIds?: Set<string> | null;
+  /** area painted while pins were hidden (slide coordinates) */
+  paint?: PaintOp[];
+  /** a stroke made while pins are hidden (and painting is on) */
+  onPaint?: (op: PaintOp) => void;
+  /** pins that "painted ✓ / rest ✗" would mark wrong: drawn with a dashed red ring */
+  pendingWrong?: Set<string>;
 }
 
 type Pt = { x: number; y: number };
 const MONO = 'ui-monospace, "SF Mono", Menlo, Consolas, monospace';
+/** "#rrggbb" → rgba() with the given alpha */
+function hexA(hex: string, a: number) {
+  const n = parseInt(hex.slice(1, 7), 16);
+  return `rgba(${(n >> 16) & 255},${(n >> 8) & 255},${n & 255},${a})`;
+}
 function roundRect(ctx: CanvasRenderingContext2D, x: number, y: number, w: number, h: number, r: number) {
   ctx.beginPath();
   ctx.moveTo(x + r, y);
@@ -75,6 +89,11 @@ export function SlideViewer(props: ViewerProps) {
     painted: Set<string>;
   } | null>(null);
   const hoverRef = useRef<Pt | null>(null);
+  /** polygon in progress: vertices in slide nm (so panning / zooming between clicks is fine) */
+  const polyRef = useRef<{ pts: { x: number; y: number }[]; add: boolean; inverse: boolean } | null>(null);
+  /** spotlight: the pin under the cursor (others are hidden while it is) */
+  const spotRef = useRef<string | null>(null);
+  const paintCanvas = useRef<HTMLCanvasElement | null>(null);
   /** left-drag on the cluster label (move) or its edge/knob (resize) */
   const panRef = useRef<{ last: Pt; start: Pt; far: number } | null>(null);
   const dragRef = useRef<{ mode: "move" | "resize"; start: Pt; cx: number; cy: number; r: number; c0: { cx: number; cy: number; r: number } } | null>(null);
@@ -100,6 +119,12 @@ export function SlideViewer(props: ViewerProps) {
     const p = v.viewport.imageToViewerElementCoordinates(new OpenSeadragon.Point(ip.x, ip.y));
     return { x: p.x, y: p.y };
   };
+  const screenToNm = (pt: Pt) => {
+    const v = viewerRef.current!;
+    const i = propsRef.current.info!;
+    const ip = v.viewport.viewerElementToImageCoordinates(new OpenSeadragon.Point(pt.x, pt.y));
+    return { x: (ip.x - i.width / 2) * i.mppX * 1000 + i.xOffsetNm, y: (ip.y - i.height / 2) * i.mppY * 1000 + i.yOffsetNm };
+  };
   /** screen pixels per nanometre at the current zoom */
   const pxPerNm = () => {
     const v = viewerRef.current!;
@@ -112,20 +137,33 @@ export function SlideViewer(props: ViewerProps) {
   const visiblePins = () => {
     const p = propsRef.current;
     if (!p.flagsVisible) return [] as Pin[];
-    return p.isolate ? p.pins.filter((x) => p.selection.has(x.id)) : p.pins;
+    let pins = p.isolate ? p.pins.filter((x) => p.selection.has(x.id)) : p.pins;
+    if (p.onlyPinIds) pins = pins.filter((x) => p.onlyPinIds!.has(x.id));
+    return pins;
+  };
+  /** pins are hidden but strokes paint an area to grade by */
+  const paintMode = () => !propsRef.current.flagsVisible && propsRef.current.settings.hiddenPaint;
+
+  /** marker style / size in effect: small dots once zoomed past the shrink threshold */
+  const markerLook = (): { style: Settings["pinStyle"]; size: number } => {
+    const s = propsRef.current.settings;
+    if (s.shrinkPins && viewerRef.current && propsRef.current.info) {
+      const umPerPx = 1 / (pxPerNm() * 1000);
+      if (umPerPx < s.shrinkUmPerPx) return { style: s.shrinkStyle, size: s.shrinkStyle === "dot" ? 9 : Math.min(s.pinSize, 10) };
+    }
+    return { style: s.pinStyle, size: s.pinSize };
   };
 
   /** centre of a marker's visible head (flag cloth / pin head), relative to its point */
   const headPos = (x: number, y: number): Pt => {
-    const { pinStyle, pinSize: z } = propsRef.current.settings;
-    if (pinStyle === "flag") return { x: x + z * 0.45, y: y - z * 1.15 };
-    if (pinStyle === "pushpin") return { x: x + z * 0.62, y: y - z * 0.62 };
+    const { style, size: z } = markerLook();
+    if (style === "flag") return { x: x + z * 0.45, y: y - z * 1.15 };
+    if (style === "pushpin") return { x: x + z * 0.62, y: y - z * 0.62 };
     return { x, y };
   };
 
   const hitTest = (sx: number, sy: number): Pin | null => {
-    const p = propsRef.current;
-    const size = p.settings.pinSize;
+    const size = markerLook().size;
     let best: Pin | null = null;
     let bestD = Infinity;
     for (const pin of visiblePins()) {
@@ -207,6 +245,40 @@ export function SlideViewer(props: ViewerProps) {
     return out;
   };
 
+  /** a plain click on a pin: grade menu, or (click-toggle) add / remove it from the selection; ⌘ swaps the two */
+  const clickPin = (hit: Pin, mod: boolean, clientX: number, clientY: number) => {
+    const p = propsRef.current;
+    if (mod !== p.settings.clickToggle) {
+      const sel = new Set(p.selection);
+      if (sel.has(hit.id)) sel.delete(hit.id);
+      else sel.add(hit.id);
+      p.onSelect([...sel]);
+    } else p.onPinClick(hit.id, clientX, clientY);
+  };
+
+  /** pins inside a screen-space polygon → selection (or paint, while pins are hidden) */
+  const finishPolygon = (poly: Pt[], o: { add: boolean; inverse: boolean }, clientX: number, clientY: number) => {
+    const p = propsRef.current;
+    if (paintMode()) {
+      if (poly.length >= 3) p.onPaint?.({ kind: "poly", mode: o.inverse ? "remove" : "add", pts: poly.map(screenToNm) });
+      return;
+    }
+    const ids = visiblePins()
+      .filter((pin) => {
+        const s = nmToScreen(pin.xNm, pin.yNm);
+        return pointInPolygon(s.x, s.y, poly) !== o.inverse;
+      })
+      .map((pin) => pin.id);
+    if (o.add) p.onSelect([...new Set([...p.selection, ...ids])]);
+    else p.onLasso(ids, o.inverse, clientX, clientY);
+  };
+  const closePolygon = (clientX = 0, clientY = 0) => {
+    const PG = polyRef.current;
+    polyRef.current = null;
+    if (PG && PG.pts.length >= 3) finishPolygon(PG.pts.map((q) => nmToScreen(q.x, q.y)), PG, clientX, clientY);
+    requestDraw();
+  };
+
   // --- drawing ---
   function draw() {
     const canvas = canvasRef.current;
@@ -226,7 +298,10 @@ export function SlideViewer(props: ViewerProps) {
     const ctx = canvas.getContext("2d")!;
     ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
     ctx.clearRect(0, 0, w, h);
-    const { colors, pinSize, pinStyle, labelMode } = p.settings;
+    const { colors, labelMode } = p.settings;
+    const { style: pinStyle, size: pinSize } = markerLook();
+
+    drawPaint(ctx, w, h, dpr);
 
     // current cluster circle
     const G = clusterGeom();
@@ -300,14 +375,19 @@ export function SlideViewer(props: ViewerProps) {
       ctx.globalAlpha = 1;
     }
 
-    const pins = visiblePins();
+    let pins = visiblePins();
+    // spotlight: while the cursor is on a pin, only that pin is drawn
+    const spot = p.settings.spotlight && !lassoRef.current && !dragRef.current && !polyRef.current ? spotRef.current : null;
+    if (spot && pins.some((x) => x.id === spot)) pins = pins.filter((x) => x.id === spot);
     const sel = liveSelection();
     // draw ungraded/selected last so they sit on top
     const order = [...pins].sort((a, b) => Number(sel.has(a.id)) - Number(sel.has(b.id)));
     ctx.font = `11px ${MONO}`;
+    const onScreen: string[] = [];
     for (const pin of order) {
       const s = nmToScreen(pin.xNm, pin.yNm);
       if (s.x < -40 || s.y < -40 || s.x > w + 40 || s.y > h + 40) continue;
+      onScreen.push(`${Math.round(s.x)},${Math.round(s.y)}`);
       const st = p.states.get(pin.id) ?? "ungraded";
       const selected = sel.has(pin.id);
       const color = selected ? colors.selected : colors[st];
@@ -319,6 +399,18 @@ export function SlideViewer(props: ViewerProps) {
         const hp = headPos(s.x, s.y);
         ctx.arc(hp.x, hp.y, pinSize * 0.62, 0, Math.PI * 2);
         ctx.stroke();
+      }
+      if (p.pendingWrong?.has(pin.id)) {
+        // will be marked wrong by "painted ✓ / rest ✗"
+        const hp = headPos(s.x, s.y);
+        ctx.save();
+        ctx.beginPath();
+        ctx.setLineDash([3, 2.5]);
+        ctx.lineWidth = 2;
+        ctx.strokeStyle = colors.wrong;
+        ctx.arc(hp.x, hp.y, pinSize * 0.7, 0, Math.PI * 2);
+        ctx.stroke();
+        ctx.restore();
       }
       drawMarker(ctx, s.x, s.y, selected && st !== "ungraded" ? colors[st] : color, pinSize, pinStyle);
       if (st === "double" || pin.q === null) {
@@ -345,6 +437,9 @@ export function SlideViewer(props: ViewerProps) {
       }
     }
 
+    // exposed for UI tests (tests/ui): where the drawn pins' points are
+    canvas.dataset.pins = onScreen.join(";");
+
     // brush stroke + cursor
     const L = lassoRef.current;
     const brushColor = L?.brushMode === "remove" ? "#f97316" : "#facc15";
@@ -353,7 +448,7 @@ export function SlideViewer(props: ViewerProps) {
       ctx.lineCap = "round";
       ctx.lineJoin = "round";
       ctx.lineWidth = p.settings.brushPx * 2;
-      ctx.strokeStyle = L.brushMode === "remove" ? "rgba(249,115,22,0.22)" : "rgba(250,204,21,0.22)";
+      ctx.strokeStyle = L.brushMode === "remove" ? "rgba(249,115,22,0.22)" : paintMode() ? hexA(p.settings.colors.paint, 0.3) : "rgba(250,204,21,0.22)";
       ctx.beginPath();
       L.pts.forEach((pt, i) => (i ? ctx.lineTo(pt.x, pt.y) : ctx.moveTo(pt.x, pt.y)));
       if (L.pts.length === 1) ctx.lineTo(L.pts[0].x + 0.1, L.pts[0].y);
@@ -361,7 +456,7 @@ export function SlideViewer(props: ViewerProps) {
       ctx.restore();
     }
     const hv = hoverRef.current;
-    if (hv && p.settings.selectTool === "brush") {
+    if (hv && activeTool(p.settings) === "brush") {
       ctx.save();
       ctx.lineWidth = 1.5;
       ctx.strokeStyle = L?.brush ? brushColor : "rgba(255,255,255,0.9)";
@@ -380,8 +475,9 @@ export function SlideViewer(props: ViewerProps) {
       ctx.save();
       ctx.lineWidth = 1.5;
       ctx.setLineDash([5, 4]);
-      ctx.strokeStyle = L.inverse ? "#f97316" : "#facc15";
-      ctx.fillStyle = L.inverse ? "rgba(249,115,22,0.12)" : "rgba(250,204,21,0.12)";
+      const pc = paintMode() && !L.inverse;
+      ctx.strokeStyle = L.inverse ? "#f97316" : pc ? p.settings.colors.paint : "#facc15";
+      ctx.fillStyle = L.inverse ? "rgba(249,115,22,0.12)" : pc ? hexA(p.settings.colors.paint, 0.18) : "rgba(250,204,21,0.12)";
       ctx.beginPath();
       lassoPolygon(L).forEach((pt, i) => (i ? ctx.lineTo(pt.x, pt.y) : ctx.moveTo(pt.x, pt.y)));
       ctx.closePath();
@@ -390,8 +486,85 @@ export function SlideViewer(props: ViewerProps) {
       ctx.restore();
     }
 
+    // polygon in progress
+    const PG = polyRef.current;
+    if (PG && PG.pts.length) {
+      const pts = PG.pts.map((q) => nmToScreen(q.x, q.y));
+      const pc = paintMode() && !PG.inverse;
+      const stroke = PG.inverse ? "#f97316" : pc ? p.settings.colors.paint : "#facc15";
+      ctx.save();
+      ctx.beginPath();
+      pts.forEach((pt, i) => (i ? ctx.lineTo(pt.x, pt.y) : ctx.moveTo(pt.x, pt.y)));
+      if (hv) ctx.lineTo(hv.x, hv.y);
+      ctx.closePath();
+      ctx.fillStyle = PG.inverse ? "rgba(249,115,22,0.10)" : pc ? hexA(p.settings.colors.paint, 0.18) : "rgba(250,204,21,0.10)";
+      ctx.fill();
+      ctx.beginPath();
+      pts.forEach((pt, i) => (i ? ctx.lineTo(pt.x, pt.y) : ctx.moveTo(pt.x, pt.y)));
+      if (hv) ctx.lineTo(hv.x, hv.y);
+      ctx.lineWidth = 3;
+      ctx.strokeStyle = "rgba(10,10,10,0.5)";
+      ctx.stroke();
+      ctx.lineWidth = 1.5;
+      ctx.strokeStyle = stroke;
+      ctx.stroke();
+      const nearFirst = hv && pts.length >= 3 && Math.hypot(hv.x - pts[0].x, hv.y - pts[0].y) <= 9;
+      pts.forEach((pt, i) => {
+        const r = i === 0 && nearFirst ? 6 : 3.5;
+        ctx.fillStyle = i === 0 && nearFirst ? "#ffffff" : stroke;
+        ctx.fillRect(pt.x - r, pt.y - r, r * 2, r * 2);
+        ctx.lineWidth = 1;
+        ctx.strokeStyle = "rgba(10,10,10,0.9)";
+        ctx.strokeRect(pt.x - r, pt.y - r, r * 2, r * 2);
+      });
+      ctx.restore();
+    }
+
     drawHud(ctx, w, h);
     drawNavigator();
+  }
+
+  /** the area painted while pins were hidden: one translucent layer, erasures cut out */
+  function drawPaint(ctx: CanvasRenderingContext2D, w: number, h: number, dpr: number) {
+    const ops = propsRef.current.paint;
+    if (!ops?.length) return;
+    let pc = paintCanvas.current;
+    if (!pc) pc = paintCanvas.current = document.createElement("canvas");
+    if (pc.width !== Math.round(w * dpr) || pc.height !== Math.round(h * dpr)) {
+      pc.width = Math.round(w * dpr);
+      pc.height = Math.round(h * dpr);
+    }
+    const g = pc.getContext("2d")!;
+    g.setTransform(dpr, 0, 0, dpr, 0, 0);
+    g.clearRect(0, 0, w, h);
+    const k = pxPerNm();
+    g.lineCap = "round";
+    g.lineJoin = "round";
+    for (const op of ops) {
+      g.globalCompositeOperation = op.mode === "remove" ? "destination-out" : "source-over";
+      g.fillStyle = g.strokeStyle = "#000";
+      const pts = op.pts.map((q) => nmToScreen(q.x, q.y));
+      g.beginPath();
+      pts.forEach((pt, i) => (i ? g.lineTo(pt.x, pt.y) : g.moveTo(pt.x, pt.y)));
+      if (op.kind === "poly") {
+        g.closePath();
+        g.fill();
+      } else {
+        if (pts.length === 1) g.lineTo(pts[0].x + 0.01, pts[0].y);
+        g.lineWidth = op.rNm * k * 2;
+        g.stroke();
+      }
+    }
+    // tint the mask with the paint colour
+    g.globalCompositeOperation = "source-in";
+    g.fillStyle = propsRef.current.settings.colors.paint;
+    g.fillRect(0, 0, w, h);
+    g.globalCompositeOperation = "source-over";
+    ctx.save();
+    ctx.setTransform(1, 0, 0, 1, 0, 0);
+    ctx.globalAlpha = propsRef.current.flagsVisible ? 0.26 : 0.38;
+    ctx.drawImage(pc, 0, 0);
+    ctx.restore();
   }
 
   /** slide readout (top-left) and a scale bar (bottom-right) */
@@ -566,13 +739,7 @@ export function SlideViewer(props: ViewerProps) {
       const oe = e.originalEvent as MouseEvent;
       if (hit) {
         e.preventDefaultAction = true;
-        if (oe.metaKey || oe.ctrlKey) {
-          // ⌘/Ctrl-click toggles the pin in the current selection
-          const sel = new Set(propsRef.current.selection);
-          if (sel.has(hit.id)) sel.delete(hit.id);
-          else sel.add(hit.id);
-          propsRef.current.onSelect([...sel]);
-        } else propsRef.current.onPinClick(hit.id, oe.clientX, oe.clientY);
+        clickPin(hit, oe.metaKey || oe.ctrlKey, oe.clientX, oe.clientY);
       } else propsRef.current.onEmptyClick();
     });
 
@@ -613,7 +780,14 @@ export function SlideViewer(props: ViewerProps) {
       e.stopPropagation();
       e.preventDefault();
       const p = rel(e);
-      const brush = propsRef.current.settings.selectTool === "brush";
+      const tool = activeTool(propsRef.current.settings);
+      if (tool === "polygon") {
+        // corners are placed on release (see up)
+        polyDown = p;
+        host.setPointerCapture(e.pointerId);
+        return;
+      }
+      const brush = tool === "brush";
       lassoRef.current = {
         pts: [p],
         rect: !brush && e.altKey,
@@ -628,9 +802,18 @@ export function SlideViewer(props: ViewerProps) {
       host.setPointerCapture(e.pointerId);
       requestDraw();
     };
+    let polyDown: Pt | null = null;
     const move = (e: PointerEvent) => {
       const p = rel(e);
       hoverRef.current = p;
+      if (polyRef.current) requestDraw();
+      if (propsRef.current.settings.spotlight && !lassoRef.current && !dragRef.current) {
+        const id = hitTest(p.x, p.y)?.id ?? null;
+        if (id !== spotRef.current) {
+          spotRef.current = id;
+          requestDraw();
+        }
+      }
       const pan = panRef.current;
       if (pan) {
         e.stopPropagation();
@@ -659,7 +842,7 @@ export function SlideViewer(props: ViewerProps) {
       }
       const L = lassoRef.current;
       if (!L) {
-        if (propsRef.current.settings.selectTool === "brush") requestDraw();
+        if (activeTool(propsRef.current.settings) === "brush") requestDraw();
         return;
       }
       e.stopPropagation();
@@ -673,6 +856,7 @@ export function SlideViewer(props: ViewerProps) {
     };
     const leave = () => {
       hoverRef.current = null;
+      spotRef.current = null;
       requestDraw();
     };
     const up = (e: PointerEvent) => {
@@ -689,7 +873,7 @@ export function SlideViewer(props: ViewerProps) {
         if (pan.far < 6) {
           // a right click without dragging acts like a plain click
           const hit = hitTest(pan.start.x, pan.start.y);
-          if (hit) propsRef.current.onPinClick(hit.id, e.clientX, e.clientY);
+          if (hit) clickPin(hit, e.metaKey || e.ctrlKey, e.clientX, e.clientY);
           else if (propsRef.current.selection.size) propsRef.current.onEmptyRightClick(e.clientX, e.clientY);
         }
         return;
@@ -708,6 +892,31 @@ export function SlideViewer(props: ViewerProps) {
         requestDraw();
         return;
       }
+      if (polyDown && e.button === selBtn()) {
+        e.stopPropagation();
+        polyDown = null;
+        try {
+          host.releasePointerCapture(e.pointerId);
+        } catch {
+          /* ignore */
+        }
+        const p = rel(e);
+        const PG = polyRef.current;
+        // corners go where you click, pins or not (the other button still clicks pins)
+        if (!PG) {
+          polyRef.current = { pts: [screenToNm(p)], add: e.metaKey || e.ctrlKey, inverse: e.shiftKey };
+        } else {
+          const scr = PG.pts.map((q) => nmToScreen(q.x, q.y));
+          const last = scr[scr.length - 1];
+          PG.inverse = e.shiftKey;
+          // click the first vertex, or double-click, to close
+          if (PG.pts.length >= 3 && (Math.hypot(p.x - scr[0].x, p.y - scr[0].y) <= 9 || Math.hypot(p.x - last.x, p.y - last.y) <= 4))
+            return closePolygon(e.clientX, e.clientY);
+          if (Math.hypot(p.x - last.x, p.y - last.y) > 4) PG.pts.push(screenToNm(p));
+        }
+        requestDraw();
+        return;
+      }
       const L = lassoRef.current;
       if (!L || e.button !== selBtn()) return;
       e.stopPropagation();
@@ -719,6 +928,18 @@ export function SlideViewer(props: ViewerProps) {
       }
       const p = rel(e);
       const travelled = Math.max(...L.pts.map((q) => Math.hypot(q.x - L.start.x, q.y - L.start.y)), 0);
+      if (paintMode()) {
+        if (L.brush)
+          propsRef.current.onPaint?.({
+            kind: "brush",
+            mode: L.brushMode === "remove" ? "remove" : "add",
+            pts: L.pts.map(screenToNm),
+            rNm: propsRef.current.settings.brushPx / pxPerNm(),
+          });
+        else if (travelled >= 6) finishPolygon(lassoPolygon(L), L, e.clientX, e.clientY);
+        requestDraw();
+        return;
+      }
       const brushStroke =
         L.brush && (travelled >= 6 || L.painted.size > 1 || (L.brushMode !== "replace" && L.painted.size > 0));
       if (brushStroke) {
@@ -730,34 +951,30 @@ export function SlideViewer(props: ViewerProps) {
       }
       if (travelled < 6) {
         const hit = hitTest(p.x, p.y);
-        if (hit && L.add) {
-          // ⌘/Ctrl-click toggles the pin in the current selection
-          const sel = new Set(propsRef.current.selection);
-          if (sel.has(hit.id)) sel.delete(hit.id);
-          else sel.add(hit.id);
-          propsRef.current.onSelect([...sel]);
-        } else if (hit) propsRef.current.onPinClick(hit.id, e.clientX, e.clientY);
+        if (hit) clickPin(hit, L.add, e.clientX, e.clientY);
         else if (selBtn() === 0) propsRef.current.onEmptyClick();
         else propsRef.current.onEmptyRightClick(e.clientX, e.clientY);
         requestDraw();
         return;
       }
-      const poly = lassoPolygon(L);
-      const inside = (pt: Pt) => {
-        let c = false;
-        for (let i = 0, j = poly.length - 1; i < poly.length; j = i++) {
-          const a = poly[i], b = poly[j];
-          if (a.y > pt.y !== b.y > pt.y && pt.x < ((b.x - a.x) * (pt.y - a.y)) / (b.y - a.y) + a.x) c = !c;
-        }
-        return c;
-      };
-      const ids = visiblePins()
-        .filter((pin) => inside(nmToScreen(pin.xNm, pin.yNm)) !== L.inverse)
-        .map((pin) => pin.id);
-      if (L.add) propsRef.current.onSelect([...new Set([...propsRef.current.selection, ...ids])]);
-      else propsRef.current.onLasso(ids, L.inverse, e.clientX, e.clientY);
+      finishPolygon(lassoPolygon(L), L, e.clientX, e.clientY);
       requestDraw();
     };
+    // polygon keys: ↵ closes, Esc cancels, ⌫ removes the last vertex (captured before the grader sees them)
+    const key = (e: KeyboardEvent) => {
+      const PG = polyRef.current;
+      if (!PG) return;
+      if (e.key === "Enter") closePolygon();
+      else if (e.key === "Escape") polyRef.current = null;
+      else if (e.key === "Backspace" || e.key === "Delete") {
+        PG.pts.pop();
+        if (!PG.pts.length) polyRef.current = null;
+      } else return;
+      e.preventDefault();
+      e.stopImmediatePropagation();
+      requestDraw();
+    };
+    window.addEventListener("keydown", key, true);
     const ctxmenu = (e: Event) => e.preventDefault();
     host.addEventListener("pointerdown", down, true);
     host.addEventListener("pointermove", move, true);
@@ -769,6 +986,7 @@ export function SlideViewer(props: ViewerProps) {
 
     return () => {
       ro.disconnect();
+      window.removeEventListener("keydown", key, true);
       host.removeEventListener("pointerdown", down, true);
       host.removeEventListener("pointermove", move, true);
       host.removeEventListener("pointerup", up, true);
@@ -813,6 +1031,12 @@ export function SlideViewer(props: ViewerProps) {
 
   // redraw whenever anything visual changes
   useEffect(requestDraw);
+
+  // switching tool or slide abandons a half-drawn polygon
+  const tool = activeTool(props.settings);
+  useEffect(() => {
+    polyRef.current = null;
+  }, [tool, props.info?.id]);
 
   useEffect(() => {
     const v = viewerRef.current;

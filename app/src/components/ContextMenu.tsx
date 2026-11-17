@@ -17,11 +17,16 @@ interface Props {
   onUngrade: () => void;
   onMode: (mode: MenuState["mode"]) => void;
   onClose: () => void;
+  /** painted area active: how many other ungraded pins in the cluster C would mark wrong */
+  paintRest?: number;
+  /** painted ✓ + the rest of the cluster ✗ (one undo step) */
+  onPaintGrade?: () => void;
 }
 
 const mod = navigator.userAgent.includes("Mac") ? "⌘" : "Ctrl+";
 
-export function ContextMenu({ menu, grades, q, settings, anyGraded, onGrade, onInvert, onIsolate, onUngrade, onMode, onClose }: Props) {
+export function ContextMenu({ menu, grades, q, settings, anyGraded, onGrade, onInvert, onIsolate, onUngrade, onMode, onClose, paintRest = 0, onPaintGrade }: Props) {
+  const painted = paintRest > 0 && !!onPaintGrade;
   const ref = useRef<HTMLDivElement>(null);
   const inputRef = useRef<HTMLInputElement>(null);
   const [text, setText] = useState("");
@@ -76,6 +81,8 @@ export function ContextMenu({ menu, grades, q, settings, anyGraded, onGrade, onI
       e.preventDefault();
       return onMode("correct");
     }
+    if (painted && (k === "c" || k === "enter")) return (e.preventDefault(), onPaintGrade!());
+    if (painted && k === "o") return onGrade("correct", "");
     if (k === "c" || k === "enter") return onGrade("correct", "");
     if (k === "w") {
       e.preventDefault();
@@ -88,7 +95,7 @@ export function ContextMenu({ menu, grades, q, settings, anyGraded, onGrade, onI
 
   const onInputKey = (e: React.KeyboardEvent) => {
     e.stopPropagation();
-    if (e.key === "Escape") return onMode("root");
+    if (e.key === "Escape") return menu.paintOk ? onClose() : onMode("root");
     if (e.key === "Enter") {
       e.preventDefault();
       return submit();
@@ -134,7 +141,20 @@ export function ContextMenu({ menu, grades, q, settings, anyGraded, onGrade, onI
               </span>
               <span>{menu.title.replace(/ · \d+ pins$/, "").replace(/^\d+ pins selected$/, "")}</span>
             </div>
-            <Item k={["C"]} icon={<IconCheck />} label="Mark correct" cls="ok" onClick={() => onGrade("correct", "")} />
+            {painted ? (
+              <>
+                <Item
+                  k={["C"]}
+                  icon={<IconCheck />}
+                  label={`Correct · other ${paintRest} in cluster wrong…`}
+                  cls="ok"
+                  onClick={onPaintGrade!}
+                />
+                <Item k={["O"]} icon={<IconCheck />} label="Only these correct" cls="ok" onClick={() => onGrade("correct", "")} />
+              </>
+            ) : (
+              <Item k={["C"]} icon={<IconCheck />} label="Mark correct" cls="ok" onClick={() => onGrade("correct", "")} />
+            )}
             <Item k={["⇧", "C"]} icon={<IconCheck />} label="Correct with note…" cls="ok" onClick={() => onMode("correct")} />
             <Item k={["W"]} icon={<IconCross />} label="Mark wrong…" cls="bad" onClick={() => onMode("wrong")} />
             <div className="ctx-sep" />
@@ -152,10 +172,11 @@ export function ContextMenu({ menu, grades, q, settings, anyGraded, onGrade, onI
                 Mark <b>{menu.pinIds.length}</b> pin{menu.pinIds.length === 1 ? "" : "s"} {status}
                 {status === "wrong" ? (settings.wrongNeedsReason ? "" : ` (blank = “${settings.wrongDefaultText}”)`) : " · optional note"}
               </span>
-              <button className="back" onClick={() => onMode("root")}>
-                back <span className="kbd">Esc</span>
+              <button className="back" onClick={() => (menu.paintOk ? onClose() : onMode("root"))}>
+                {menu.paintOk ? "cancel" : "back"} <span className="kbd">Esc</span>
               </button>
             </div>
+            {menu.paintOk && <div className="ctx-sub">{menu.title}</div>}
             <input
               ref={inputRef}
               autoFocus

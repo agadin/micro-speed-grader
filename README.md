@@ -22,6 +22,9 @@ and the app updates itself from new releases (**Micro Speed Grader → Check for
 - Clusters answers by distance (µm), largest first; jump between clusters and single pins
 - Grade with the keyboard: **C** correct, **W** wrong + reason (recent reasons are one key away)
 - Lasso, paint-brush and ⌘-click selection; drag or resize the cluster ring
+- Crowded clusters: hide the pins and paint the true structure (painted ✓, rest of cluster ✗ in one
+  key), or step through a cluster pin by pin; also polygon outlining, spotlight-on-hover and small
+  pins when zoomed in. Each is toggled in Preferences → Selection, which shows a short demo of each
 - Auto-flags students who submit more than one pin per question
 - Ledger of every grading decision with undo/redo, editable afterwards
 - Autosave with crash recovery; CSV + feedback export

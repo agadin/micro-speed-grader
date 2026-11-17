@@ -1,9 +1,10 @@
 import type { ReactNode } from "react";
 import type { Cluster } from "../lib/cluster";
 import type { Question, Task } from "../lib/types";
-import { keyLabel, useSettings } from "../lib/settings";
+import { activeTool, keyLabel, SELECT_TOOLS, useSettings, type SelectTool } from "../lib/settings";
+const TOOL_LABEL: Record<SelectTool, string> = { lasso: "Lasso", brush: "Brush", polygon: "Polygon" };
 import { useStore } from "../lib/store";
-import { IconBrush, IconChevL, IconChevR, IconLasso, IconTri } from "./icons";
+import { IconBrush, IconChevL, IconChevR, IconLasso, IconPolygon, IconTri } from "./icons";
 
 export interface Progress {
   taskTotal: number;
@@ -105,6 +106,8 @@ export function RightPanel(p: Props) {
   const { s, set } = useSettings();
   const ui = useStore();
   const sel = p.selectionCount;
+  const tool = activeTool(s);
+  const enabledTools = SELECT_TOOLS.filter((t) => s.tools[t]);
 
   return (
     <aside className="right">
@@ -122,21 +125,6 @@ export function RightPanel(p: Props) {
       <Panel id="clusters" title="Clusters" meta={`${p.clusters.length} groups`}>
         <SliderRow label="Radius" value={s.clusterRadiusUm} min={2} max={300} unit="µm" onChange={(v) => set({ clusterRadiusUm: v })} />
         <SliderRow label="Min size" value={s.minClusterSize} min={2} max={20} unit="pins" onChange={(v) => set({ minClusterSize: v })} />
-        <div className="prow tool">
-          <span className="plabel">Tool</span>
-          <div className="seg wide">
-            <button className={s.selectTool === "lasso" ? "on acc" : ""} onClick={() => set({ selectTool: "lasso" })}>
-              <IconLasso /> Lasso
-            </button>
-            <button className={s.selectTool === "brush" ? "on acc" : ""} onClick={() => set({ selectTool: "brush" })}>
-              <IconBrush /> Brush
-            </button>
-          </div>
-          <span className="kbd">B</span>
-        </div>
-        {s.selectTool === "brush" && (
-          <SliderRow label="Brush" value={s.brushPx} min={6} max={200} unit="px" onChange={(v) => set({ brushPx: v })} />
-        )}
         <div className="prow tool" title="Switch between grouped clusters and individual pins (S)">
           <span className="plabel">Show</span>
           <div className="seg wide">
@@ -153,6 +141,30 @@ export function RightPanel(p: Props) {
           </div>
           <span className="kbd">S</span>
         </div>
+      </Panel>
+
+      <Panel id="select" title="Select" meta={enabledTools.length > 1 ? <span className="kbd" title="B cycles tools">B</span> : undefined}>
+        {enabledTools.length > 1 && (
+          <div className="seg full" role="radiogroup" aria-label="Selection tool">
+            {enabledTools.map((t) => (
+              <button key={t} className={tool === t ? "on acc" : ""} onClick={() => set({ selectTool: t })} title={`${TOOL_LABEL[t]} (B cycles tools)`}>
+                {t === "lasso" ? <IconLasso /> : t === "brush" ? <IconBrush /> : <IconPolygon />} {TOOL_LABEL[t]}
+              </button>
+            ))}
+          </div>
+        )}
+        {tool === "brush" && (
+          <SliderRow label="Brush" value={s.brushPx} min={6} max={200} unit="px" onChange={(v) => set({ brushPx: v })} />
+        )}
+        {s.pinByPin && (
+          <label className="drow" title="Grade one pin at a time; only that pin is shown (O)">
+            <span className="check">
+              <input type="checkbox" checked={ui.pinMode} onChange={(e) => ui.set({ pinMode: e.target.checked })} />
+              Pin by pin
+            </span>
+            <span className="kbd">O</span>
+          </label>
+        )}
       </Panel>
 
       <Panel id="display" title="Display">

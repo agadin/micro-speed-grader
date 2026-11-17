@@ -10,6 +10,8 @@ export interface MenuState {
   pinIds: string[];
   mode: "root" | "correct" | "wrong";
   title: string;
+  /** "painted ✓ / rest ✗": these (painted) pins are marked correct along with the wrong reason for menu.pinIds */
+  paintOk?: string[];
 }
 
 interface Store {
@@ -25,6 +27,8 @@ interface Store {
   isolate: boolean;
   clusterIndex: number;
   flagsVisible: boolean;
+  /** pin-by-pin mode: show and grade one pin of the cluster at a time */
+  pinMode: boolean;
   minimapVisible: boolean;
   ledgerAllTasks: boolean;
   menu: MenuState | null;
@@ -37,6 +41,8 @@ interface Store {
   close: () => void;
   setTask: (i: number) => void;
   grade: (pinIds: string[], status: GradeStatus, text: string, taskId: string, assignQ: number) => void;
+  /** several grades as one undo step (e.g. painted pins correct + the rest wrong) */
+  gradeMany: (batches: { pinIds: string[]; status: GradeStatus; text: string }[], taskId: string, assignQ: number) => void;
   ungrade: (pinIds: string[]) => void;
   editGroup: (groupId: string, patch: Partial<Pick<Group, "status" | "text">>) => void;
   undo: () => void;
@@ -101,6 +107,7 @@ export const useStore = create<Store>((set, get) => {
     isolate: false,
     clusterIndex: 0,
     flagsVisible: true,
+    pinMode: false,
     minimapVisible: true,
     ledgerAllTasks: false,
     menu: null,
@@ -120,17 +127,22 @@ export const useStore = create<Store>((set, get) => {
       scheduleSave();
     },
 
-    grade: (pinIds, status, text, tId, assignQ) => {
+    grade: (pinIds, status, text, tId, assignQ) => get().gradeMany([{ pinIds, status, text }], tId, assignQ),
+
+    gradeMany: (batches, tId, assignQ) => {
       const s = get().session;
-      if (!s || !pinIds.length) return;
+      batches = batches.filter((b) => b.pinIds.length);
+      if (!s || !batches.length) return;
       const g = cloneGrades(s.grades);
-      detach(g, pinIds);
-      const id = uid();
-      g.groups[id] = { id, taskId: tId, status, text: text.trim(), pinIds: [...pinIds], createdAt: Date.now() };
-      for (const p of pinIds) {
-        g.pinGroup[p] = id;
-        const pin = s.pins.find((x) => x.id === p);
-        if (pin && pin.q === null) g.assign[p] = assignQ;
+      for (const { pinIds, status, text } of batches) {
+        detach(g, pinIds);
+        const id = uid();
+        g.groups[id] = { id, taskId: tId, status, text: text.trim(), pinIds: [...pinIds], createdAt: Date.now() };
+        for (const p of pinIds) {
+          g.pinGroup[p] = id;
+          const pin = s.pins.find((x) => x.id === p);
+          if (pin && pin.q === null) g.assign[p] = assignQ;
+        }
       }
       commit(g);
       set({ selection: [], menu: null, isolate: false });

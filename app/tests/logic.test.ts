@@ -7,6 +7,7 @@ import { parseQuestionsFromText } from "../src/lib/examParse";
 import { computeClusters } from "../src/lib/cluster";
 import { buildTasks, pinsForTask, doublePinIds, studentResults, feedbackText } from "../src/lib/grading";
 import { defaultSettings } from "../src/lib/settings";
+import { isPainted, pinsInPaint, type PaintOp } from "../src/lib/paint";
 import type { Pin, Session } from "../src/lib/types";
 import { emptyGrades } from "../src/lib/types";
 
@@ -74,4 +75,20 @@ console.log(fb.text.split("\n").map((l) => "    " + l).join("\n"));
 ok(fb.text.includes(`Q${q1}: Correct`) && fb.total === questions.length, "feedback reflects grade");
 const dbl = students.find((s) => doublePinIds(pins, q1, g).has(pins.find((p) => p.studentId === s.id && p.q === q1)?.id ?? ""))!;
 ok(!!dbl && studentResults(session, dbl, defaultSettings)[0].text === defaultSettings.doubleMessage, "double-pin student auto-wrong");
+// hidden-pin paint: strokes / polygons in nm, erasing with "remove"
+{
+  const brush: PaintOp = { kind: "brush", mode: "add", pts: [{ x: 0, y: 0 }, { x: 10000, y: 0 }], rNm: 2000 };
+  const poly: PaintOp = { kind: "poly", mode: "add", pts: [{ x: 20000, y: -5000 }, { x: 30000, y: -5000 }, { x: 30000, y: 5000 }, { x: 20000, y: 5000 }] };
+  const erase: PaintOp = { kind: "brush", mode: "remove", pts: [{ x: 5000, y: 0 }], rNm: 1500 };
+  ok(isPainted([brush], 3000, 1500) && !isPainted([brush], 3000, 2500), "brush stroke covers its radius");
+  ok(isPainted([brush], 11500, 0) && !isPainted([brush], 12500, 0), "brush stroke has round caps");
+  ok(isPainted([poly], 25000, 0) && !isPainted([poly], 31000, 0), "polygon contains inside only");
+  ok(!isPainted([brush, erase], 5000, 500) && isPainted([brush, erase], 8000, 0), "erase cuts a hole");
+  ok(isPainted([brush, erase, { ...erase, mode: "add" }], 5000, 500), "repainting refills");
+  const mk = (id: string, x: number, y: number) => ({ id, xNm: x, yNm: y }) as Pin;
+  const got = pinsInPaint([mk("a", 1000, 0), mk("b", 25000, 0), mk("c", 15000, 0)], [brush, poly]);
+  ok(got.join() === "a,b", "pinsInPaint picks painted pins");
+  ok(pinsInPaint([mk("a", 1000, 0)], []).length === 0, "no paint, no pins");
+}
+
 process.exit(fails ? 1 : 0);
