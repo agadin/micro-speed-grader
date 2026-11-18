@@ -1156,6 +1156,72 @@ await step("wizard: things to check before Start", async () => {
   return `${row.replace(/\s+/g, " ")} → ${row2.replace(/\s+/g, " ")} · ${kinds.join(", ")} · "${needs}"`;
 });
 
+await step("exam editor: fix and add questions before starting; add a forgotten question inside a session", async () => {
+  const EXAM = path.join(WORK, "edited-exam.json");
+  // ---- in the wizard ----
+  await page.locator(".startup").waitFor();
+  await page.getByText("New grading session…").click();
+  await dialog(path.join(ROOT, "demo/exam.json"));
+  await page.getByText("Choose exam PDF / JSON…").click();
+  await page.waitForTimeout(400);
+  await dialog(path.join(ROOT, "images"));
+  await page.locator(".step").nth(2).getByRole("button").click();
+  await page.waitForTimeout(800);
+  await page.getByRole("button", { name: "Edit questions…" }).click();
+  const ed = page.locator(".exam-editor");
+  await ed.waitFor();
+  expect((await ed.locator(".ee-list li").count()) === 5, "editor doesn't list the 5 questions read");
+  // reword Q2, then add Q6 on VMS133 with the slide picker
+  await ed.locator(".ee-list li").nth(1).click();
+  await ed.locator("textarea").fill("Using VMS109, place a pin on white adipose tissue (reworded)");
+  await ed.getByRole("button", { name: "+ Add question" }).click();
+  await ed.locator(".ee-find input").fill("133");
+  await ed.locator(".ee-tile", { hasText: "VMS133" }).click();
+  await page.waitForTimeout(600); // thumbnails
+  await snap("exam-editor-picker");
+  await ed.getByRole("button", { name: "Done choosing" }).click();
+  await ed.locator("textarea").fill("Using VMS133, place a pin on a mast cell");
+  await ed.getByText("Mark its answer when grading starts").click();
+  await snap("exam-editor");
+  await dialog(EXAM);
+  await ed.getByRole("button", { name: "Save as exam file…" }).click();
+  await page.waitForTimeout(500);
+  const saved = JSON.parse(fs.readFileSync(EXAM, "utf8"));
+  expect(saved.questions.length === 6 && saved.questions[5].slides.join() === "VMS133" && /reworded/.test(saved.questions[1].prompt), `exam file: ${JSON.stringify(saved.questions.map((q) => [q.num, q.slides]))}`);
+  await ed.getByRole("button", { name: "Use these questions" }).click();
+  const table = await page.locator(".qtable tbody tr").count();
+  expect(table === 6, `wizard shows ${table} questions`);
+  await page.getByRole("button", { name: "Cancel" }).click();
+
+  // ---- inside a session: add a forgotten question, review, apply ----
+  await openSession(page, dialog, SESSION);
+  const before = session();
+  await page.locator(".right .ee-open").click();
+  await ed.waitFor();
+  expect(await ed.locator(".ee-risk").isVisible(), "no risk warning inside a session");
+  expect(await ed.locator(".ee-list li").first().locator(".ee-n").innerText().then(() => ed.locator(".ee-num input").isDisabled()), "existing question numbers aren't locked");
+  await ed.getByRole("button", { name: "+ Add question" }).click();
+  await ed.locator(".ee-find input").fill("109");
+  await ed.locator(".ee-tile", { hasText: "VMS109" }).click();
+  await ed.getByRole("button", { name: "Done choosing" }).click();
+  await ed.locator("textarea").fill("Using VMS109, place a pin on a hair follicle");
+  await ed.getByRole("button", { name: "Review changes…" }).click();
+  await ed.locator(".ee-review").waitFor({ timeout: 30000 });
+  const changes = await ed.locator(".ee-changes").innerText();
+  await snap("exam-editor-review");
+  expect(/Q6/.test(changes) && /New question on VMS109/.test(changes), `review: ${changes}`);
+  await ed.getByRole("button", { name: "Apply changes" }).click();
+  await page.waitForTimeout(1200);
+  const after = session();
+  const copies = fs.readdirSync(path.dirname(SESSION)).filter((f) => f.includes("(before question edit"));
+  expect(after.questions.length === before.questions.length + 1 && after.questions.some((q) => q.num === 6 && /hair follicle/.test(q.prompt)), `session questions: ${after.questions.map((q) => q.num)}`);
+  expect(copies.length === 1, `backup copies: ${copies.join(", ")}`);
+  const opts = await page.locator(".topbar select option").allInnerTexts();
+  expect(opts.some((o) => o.startsWith("Q6 · VMS109")), "Q6 isn't in the image list");
+  const note = await page.locator(".notice-banner").innerText();
+  return `wizard: 5 → 6 questions, exam file saved; session: +Q6 on VMS109 (${changes.split("\n").length} change), backup ${copies[0]}; "${note.split("\n")[0].slice(0, 60)}…"`;
+});
+
 await browser.close();
 tiles.stop();
 for (const r of results) {

@@ -126,6 +126,11 @@ export function RightPanel(p: Props) {
           <span className="slide">{p.task.slide}</span>
         </div>
         <p className="prompt">{p.question?.prompt || <span className="muted">No prompt text.</span>}</p>
+        {!!ui.session && !ui.session.guestPack && (
+          <button className="text-link small ee-open" onClick={() => ui.set({ examEditOpen: true })} title="Fix a question, add a forgotten one, or change its slides" data-help="exam-questions/inside-a-session">
+            Edit questions…
+          </button>
+        )}
         {p.question && p.question.slides.length > 1 && (
           <p className="help">Either slide: {p.question.slides.join(" or ")}. One pin in total; pins on both count as multiple.</p>
         )}

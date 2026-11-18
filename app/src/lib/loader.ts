@@ -60,7 +60,7 @@ export function groupProblems(problems: ScanProblem[]): { kind: ScanProblemKind;
 /** What the new-session wizard still needs before it can start (empty when ready). */
 export function startBlockers(w: { examPath: string; questions: Question[]; subDir: string; slidesDir: string; sessionPath: string }): string[] {
   const out: string[] = [];
-  if (!w.examPath) out.push("the exam");
+  if (!w.examPath && !w.questions.length) out.push("the exam (or questions set up by hand)");
   else if (!w.questions.some((q) => q.include)) out.push("at least one included question");
   if (!w.subDir) out.push("the submissions folder");
   if (!w.slidesDir) out.push("the slides folder");

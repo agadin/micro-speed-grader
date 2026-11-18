@@ -188,6 +188,7 @@ fn build_menu<R: tauri::Runtime>(app: &tauri::AppHandle<R>) -> tauri::Result<Men
     let open_s = MenuItem::with_id(app, "open_session", "Open Session…", true, Some("CmdOrCtrl+O"))?;
     let export = MenuItem::with_id(app, "export", "Export Grades…", true, Some("CmdOrCtrl+E"))?;
     let rescan = MenuItem::with_id(app, "rescan_submissions", "Rescan Submissions", true, None::<&str>)?;
+    let edit_q = MenuItem::with_id(app, "edit_questions", "Edit Questions…", true, None::<&str>)?;
     let close_s = MenuItem::with_id(app, "close_session", "Close Session", true, Some("CmdOrCtrl+W"))?;
     let updates = MenuItem::with_id(app, "check_updates", "Check for Updates…", true, None::<&str>)?;
     let help = MenuItem::with_id(app, "help", "Micro Speed Grader Help", true, Some("CmdOrCtrl+Shift+/"))?;
@@ -217,7 +218,7 @@ fn build_menu<R: tauri::Runtime>(app: &tauri::AppHandle<R>) -> tauri::Result<Men
     let file_menu = {
         #[cfg(target_os = "macos")]
         {
-            Submenu::with_items(app, "File", true, &[&new_s, &open_s, &PredefinedMenuItem::separator(app)?, &rescan, &export, &PredefinedMenuItem::separator(app)?, &close_s])?
+            Submenu::with_items(app, "File", true, &[&new_s, &open_s, &PredefinedMenuItem::separator(app)?, &edit_q, &rescan, &export, &PredefinedMenuItem::separator(app)?, &close_s])?
         }
         #[cfg(not(target_os = "macos"))]
         {
@@ -225,7 +226,7 @@ fn build_menu<R: tauri::Runtime>(app: &tauri::AppHandle<R>) -> tauri::Result<Men
                 app,
                 "File",
                 true,
-                &[&new_s, &open_s, &PredefinedMenuItem::separator(app)?, &rescan, &export, &prefs, &updates, &PredefinedMenuItem::separator(app)?, &close_s, &PredefinedMenuItem::quit(app, None)?],
+                &[&new_s, &open_s, &PredefinedMenuItem::separator(app)?, &edit_q, &rescan, &export, &prefs, &updates, &PredefinedMenuItem::separator(app)?, &close_s, &PredefinedMenuItem::quit(app, None)?],
             )?
         }
     };
@@ -296,7 +297,7 @@ pub fn run() {
                 let _ = open_preferences(app.clone());
             } else if id == "help" {
                 let _ = open_help(app.clone(), String::new());
-            } else if matches!(id, "new_session" | "open_session" | "export" | "close_session" | "check_updates" | "rescan_submissions") {
+            } else if matches!(id, "new_session" | "open_session" | "export" | "close_session" | "check_updates" | "rescan_submissions" | "edit_questions") {
                 let _ = app.emit("menu", id);
             }
         })

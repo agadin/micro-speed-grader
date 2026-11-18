@@ -25,7 +25,7 @@ order: 1
 
 ![Setting up a new session](img/new-session.png)
 
-1. **Exam questions**: click **Choose exam PDF / JSON…**. The app reads every line shaped like `Q1. Using VMS123, …` and lists the questions in a table. Edit the session name if you like.
+1. **Exam questions**: click **Choose exam PDF / JSON…**. To fix what was read, or to add questions it missed, click **Edit questions…** (see [Set up exam questions](exam-questions.md)). No exam file? Choose **Set up the questions by hand**. The app reads every line shaped like `Q1. Using VMS123, …` and lists the questions in a table. Edit the session name if you like.
 2. **Student submissions folder**: click **Choose folder…** and pick the folder that holds one folder per student. The app shows how many student folders and annotation files it found.
 3. **Slide images folder**: click **Choose folder…** and pick the folder of slides. Each question's slides are marked **✓** when found or **missing** when not.
 4. **Save session as**: click **Choose…** and pick where to keep the session file. It's pre-filled next to the submissions folder.

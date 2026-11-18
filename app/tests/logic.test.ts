@@ -14,11 +14,12 @@ import { exportTable, kr20, parseStudentName, EXPORT_PRESETS, testStats, safeFil
 import { MAX_ANNOTATIONS } from "../src/lib/ndpa";
 import { parseMarkdown, slug } from "../src/lib/markdown";
 import { applyPlan, emptyKey, makeKeyFile, matchPin, newMark, parseKeyFile, planKey, type AnswerKey } from "../src/lib/answerKey";
+import { checkQuestions, examJson, nextNum, normSlide, planQuestionEdit, questionChanges, renumbered } from "../src/lib/examEdit";
 import { area, dist, fmtArea, fmtLength, measureLabel, perimeter } from "../src/lib/measure";
 import { canCarry, carryOver, dismissRows, mergeRescan, rescanMessage, restorePins, reviewPinIds, reviewRows } from "../src/lib/rescan";
 import { KEY, HOST, agreement, conflictPins, hostGraded, planOverlap, recallChecks, resolveWith, sameReason, seeded, awayPins, splitWeighted, guestSession, makePack, makeResult, mergeResult, parsePack, parseResult, remainingByTask } from "../src/lib/handoff";
 import { AUTO, autoRows, filterGroups, findStudents, graderOptions, isFiltered, noFilter, rowPasses, studentLabel, studentSummary, type LedgerFilter } from "../src/lib/review";
-import type { GradeState, Pin, Session } from "../src/lib/types";
+import type { GradeState, Pin, Question, Session } from "../src/lib/types";
 import { emptyGrades } from "../src/lib/types";
 
 (globalThis as any).DOMParser = new JSDOM().window.DOMParser;
@@ -733,9 +734,43 @@ ok(!!dbl && studentResults(session, dbl, defaultSettings)[0].text === defaultSet
   ok(demo.problems.length === 0 && demo.students.length === students.length, `demo class: ${demo.problems.length} problems`);
   // what Start grading → is waiting for
   const w = { examPath: "", questions: [], subDir: "", slidesDir: "", sessionPath: "" };
-  ok(startBlockers(w).join() === "the exam,the submissions folder,the slides folder,a save location", "start blockers: everything");
+  ok(startBlockers(w).join() === "the exam (or questions set up by hand),the submissions folder,the slides folder,a save location", "start blockers: everything");
+  ok(startBlockers({ ...w, questions: [{ num: 1, slides: ["VMS1"], prompt: "", include: true }], subDir: "s", slidesDir: "i", sessionPath: "p" }).length === 0, "start blockers: questions set up by hand count as the exam");
   ok(startBlockers({ ...w, examPath: "e", questions: no133.map((q: any) => ({ ...q, include: false })), subDir: "s", slidesDir: "i" }).join() === "at least one included question,a save location", "start blockers: no questions, no save path");
   ok(startBlockers({ examPath: "e", questions: no133, subDir: "s", slidesDir: "i", sessionPath: "p" }).length === 0, "start blockers: ready");
+}
+
+// ---- exam editor: check questions, describe changes, edit questions inside a session ----
+{
+  const Q = (num: number, slides: string[], include = true, prompt = `Q${num}`): Question => ({ num, slides, prompt, include });
+  const c1 = checkQuestions([Q(1, ["VMS109"]), Q(1, ["VMS133"]), Q(2, []), Q(3, ["ABC"]), Q(4, ["VMS999"])], new Set(["VMS109", "VMS133"]));
+  ok(c1.errors.some((e) => /Q1 is used 2 times/.test(e)) && c1.errors.some((e) => /Q2 has no slide/.test(e)) && c1.errors.some((e) => /“ABC” isn't a slide ID/.test(e)), `errors: ${c1.errors.join(" | ")}`);
+  ok(c1.warnings.some((w) => /VMS999 isn't in the slides folder/.test(w)), "slide missing from the folder is a warning, not an error");
+  ok(checkQuestions([Q(1, ["VMS109"], false)]).errors.includes("Include at least one question.") && checkQuestions([Q(1, ["VMS109"])]).errors.length === 0, "needs one included question; a good list has no errors");
+  ok(normSlide("vms 109") === "VMS109" && nextNum([Q(2, ["VMS1"]), Q(7, ["VMS1"])]) === 8 && renumbered([Q(5, ["A"]), Q(2, ["B"])]).map((q) => q.num).join() === "1,2", "slide IDs, next number, renumber");
+  const ch = questionChanges([Q(1, ["VMS109"]), Q(2, ["VMS133"]), Q(3, ["VMS133"])], [Q(1, ["VMS109", "VMS110"]), Q(2, ["VMS133"], false, "new words"), Q(4, ["VMS200"])]);
+  ok(ch.map((c) => `${c.q}:${c.kind}`).join() === "1:slides,2:prompt,2:left-out,3:removed,4:added", `changes: ${ch.map((c) => `${c.q}:${c.kind}`).join()}`);
+  const ex = JSON.parse(examJson("Prac", [Q(2, ["VMS133"]), Q(1, ["VMS109"])]));
+  ok(ex.name === "Prac" && ex.questions.map((q: Question) => q.num).join() === "1,2" && ex.questions[0].slides[0] === "VMS109", "exam file: sorted, same format the wizard reads");
+
+  // inside a session: slide A only had Q1, so a pin titled "Q2" was graded as Q1. Adding Q2 on A moves it.
+  const P = (id: string, stu: string, slide: string, q: number | null, title: string, x = 0) =>
+    ({ id, studentId: stu, slide, rawTitle: title, details: "", q, candidates: [], titleGuessed: false, xNm: x, yNm: 0, annotationType: "pin" }) as Pin;
+  const s0: Session = {
+    version: 1, name: "E", createdAt: 0, savedAt: 0, sessionPath: "/e.msgrade", submissionsDir: "/subs", slidesDir: "/s",
+    questions: [Q(1, ["A", "B"])],
+    students: [{ id: "s1", name: "s1", folder: "s1" }, { id: "s2", name: "s2", folder: "s2" }],
+    pins: [P("p1", "s1", "A", 1, "Q1"), P("p2", "s2", "A", 1, "Q2", 50), P("p3", "s1", "B", 1, "Q1", 9)],
+    slides: [], taskIndex: 0,
+    grades: { groups: { g1: { id: "g1", taskId: "Q1|A", status: "correct", text: "", pinIds: ["p1"], createdAt: 1 }, g2: { id: "g2", taskId: "Q1|A", status: "wrong", text: "Q2 answer", pinIds: ["p2"], createdAt: 1 }, g3: { id: "g3", taskId: "Q1|B", status: "correct", text: "", pinIds: ["p3"], createdAt: 1 } }, pinGroup: { p1: "g1", p2: "g2", p3: "g3" }, assign: {} },
+  };
+  const scanOf = (pins: Pin[]) => ({ students: s0.students.map((x) => ({ ...x, id: `n${x.id}` })), pins: pins.map((p) => ({ ...p, id: `x${p.id}`, studentId: `n${p.studentId}` })) });
+  // the edited exam: Q2 added on A, and Q1 no longer uses B (so p3's file isn't read any more)
+  const after = [Q(1, ["A"]), Q(2, ["A"])];
+  const plan = planQuestionEdit(s0, after, scanOf([P("p1", "s1", "A", 1, "Q1"), P("p2", "s2", "A", 2, "Q2", 50)]));
+  ok(plan.changes.map((c) => `${c.q}:${c.kind}`).join() === "1:slides,2:added", `plan changes: ${plan.changes.map((c) => `${c.q}:${c.kind}`).join()}`);
+  ok(plan.regraded === 1 && !plan.grades.pinGroup.p2 && plan.merged.pins.find((p) => p.id === "p2")?.q === 2, "the Q2 pin graded as Q1 loses that grade and now answers Q2");
+  ok(!!plan.grades.pinGroup.p1 && plan.retired === 1 && plan.merged.retired[0].pin.id === "p3" && !plan.merged.retired[0].review, "other grades kept; the dropped slide's pin steps aside quietly (grade kept, not up for review)");
 }
 
 // ---- ruler: lengths, areas and how they read ----

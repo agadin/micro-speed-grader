@@ -38,7 +38,11 @@ function answers(np: Pin, q: number | null, old: Pin) {
   return np.slide === old.slide && (np.q === null ? np.candidates.some((c) => old.candidates.includes(c)) : old.candidates.includes(np.q));
 }
 
-export function mergeRescan(s: Session, scan: { students: Student[]; pins: Pin[] }): RescanResult {
+/**
+ * `quiet`: pins retired by this merge aren't put up for review (used when the exam's questions were
+ * edited: a slide taken off a question retires its pins on purpose; their grades are still kept).
+ */
+export function mergeRescan(s: Session, scan: { students: Student[]; pins: Pin[] }, opts: { quiet?: boolean } = {}): RescanResult {
   // students: keep existing ids, add new folders
   const byFolder = new Map(s.students.map((st) => [st.folder, st]));
   const scanFolder = new Map(scan.students.map((st) => [st.id, st.folder]));
@@ -69,7 +73,8 @@ export function mergeRescan(s: Session, scan: { students: Student[]; pins: Pin[]
   for (const p of scan.pins) {
     const folder = scanFolder.get(p.studentId) ?? "";
     const same = old.get(pinKey(folder, p))?.shift();
-    if (same) pins.push(same);
+    // a kept pin takes the question it matches now (it changes only when the exam's questions were edited)
+    if (same) pins.push(same.q === p.q && same.candidates.join() === p.candidates.join() ? same : { ...same, q: p.q, candidates: p.candidates });
     else {
       const np = { ...p, id: `p${++nextP}`, studentId: byFolder.get(folder)!.id };
       pins.push(np);
@@ -112,7 +117,7 @@ export function mergeRescan(s: Session, scan: { students: Student[]; pins: Pin[]
       retiredAt: now,
       ...(replacedBy ? { replacedBy } : {}),
       // a changed pin with no grade has nothing to carry over; a removed pin can always be restored
-      review: !!grp || !replacedBy,
+      review: !opts.quiet && (!!grp || !replacedBy),
     };
   });
   // earlier changes whose new pin changed again: follow it to the newest pin, unless a person graded

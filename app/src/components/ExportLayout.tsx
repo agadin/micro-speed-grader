@@ -85,7 +85,7 @@ export function ExportLayoutEditor() {
 }
 
 /** move cols[from] to sit where cols[to] is (the rest shift) */
-function moved<T>(arr: T[], from: number, to: number) {
+export function moved<T>(arr: T[], from: number, to: number) {
   const next = [...arr];
   const [c] = next.splice(from, 1);
   next.splice(to, 0, c);
@@ -148,7 +148,7 @@ const EASE = "transform 200ms cubic-bezier(.2,.8,.3,1)";
  * e.g. every cell of a table column). The dragged item follows the pointer, the others slide aside,
  * and on release it settles into its slot before onMove(from, to) commits the new order.
  */
-function useDragSort(axis: "x" | "y", rootRef: RefObject<HTMLElement | null>, onMove: (from: number, to: number) => void) {
+export function useDragSort(axis: "x" | "y", rootRef: RefObject<HTMLElement | null>, onMove: (from: number, to: number) => void) {
   const onMoveRef = useRef(onMove);
   onMoveRef.current = onMove;
 

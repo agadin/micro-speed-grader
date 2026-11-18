@@ -1,5 +1,5 @@
 import { create } from "zustand";
-import type { GradeState, GradeStatus, Group, Pin, RetiredPin, Session } from "./types";
+import type { GradeState, GradeStatus, Group, Pin, RetiredPin, Session, Question } from "./types";
 import { graderLabel, hostGraded, type Handoff } from "./handoff";
 import type { AnswerKey } from "./answerKey";
 import type { RescanResult, ReviewChange } from "./rescan";
@@ -50,6 +50,8 @@ interface Store {
   conflictsOpen: boolean;
   /** the Changed submissions review */
   changesOpen: boolean;
+  /** the exam question editor (inside a session) */
+  examEditOpen: boolean;
   /** editing the answer key instead of grading */
   keyMode: boolean;
   /** the "what should the key apply to?" dialog */
@@ -85,6 +87,8 @@ interface Store {
   setHandoffs: (h: Handoff[]) => void;
   /** host: merge a guest's results (one undo step) */
   applyResult: (grades: GradeState, h: Handoff[]) => void;
+  /** the exam's questions were edited inside the session (clears undo; a copy was saved at `backup`) */
+  applyQuestionEdit: (questions: Question[], r: RescanResult, grades: GradeState, backup: string) => void;
   /** "Things to check" after a rescan: files whose slide was chosen, and acknowledged problems */
   setScanFixes: (fileSlides: Record<string, string>, scanAck: string[]) => void;
   /** save the answer key (marks aren't part of undo; applying them is) */
@@ -154,6 +158,7 @@ export const useStore = create<Store>((set, get) => {
     changesOpen: false,
     keyMode: false,
     keyApplyOpen: false,
+    examEditOpen: false,
     studentView: null,
     notice: null,
     rescanAsk: 0,
@@ -262,6 +267,20 @@ export const useStore = create<Store>((set, get) => {
       if (!s) return;
       set({ session: { ...s, handoffs } });
       commit(grades);
+    },
+    applyQuestionEdit: (questions, r, grades, backup) => {
+      const s = get().session;
+      if (!s) return;
+      set({
+        session: { ...s, questions, students: r.students, pins: r.pins, retired: r.retired, grades, taskIndex: 0 },
+        past: [],
+        future: [],
+        selection: [],
+        menu: null,
+        dirty: true,
+        notice: { kind: "info", text: `Questions updated. A copy of the session from before was saved as “${backup.split(/[\\/]/).pop()}”.` },
+      });
+      scheduleSave();
     },
     setScanFixes: (fileSlides, scanAck) => {
       const s = get().session;

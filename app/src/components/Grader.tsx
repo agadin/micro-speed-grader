@@ -24,6 +24,7 @@ import { ContextMenu } from "./ContextMenu";
 import { Ledger } from "./Ledger";
 import { RightPanel, type Progress } from "./RightPanel";
 import { KeyPanel } from "./KeyPanel";
+import { ExamEditor } from "./ExamEditor";
 import { KeyApplyDialog } from "./KeyApplyDialog";
 import { planKey, applyPlan, suggest } from "../lib/answerKey";
 import type { Measure } from "../lib/measure";
@@ -686,7 +687,7 @@ export function Grader({ session }: { session: Session }) {
         t.tagName === "SELECT")
     )
       return;
-    if (st.menu || st.settingsOpen || st.exportOpen || st.handoffOpen || st.conflictsOpen || st.changesOpen || st.keyApplyOpen || showScanProblems) return;
+    if (st.menu || st.settingsOpen || st.exportOpen || st.handoffOpen || st.conflictsOpen || st.changesOpen || st.keyApplyOpen || st.examEditOpen || showScanProblems) return;
     const mod = isMac ? e.metaKey : e.ctrlKey;
     const k = e.key;
     if (mod && k.toLowerCase() === "z") {
@@ -1325,6 +1326,9 @@ export function Grader({ session }: { session: Session }) {
           onClose={() => setShowScanProblems(false)}
           onRecheck={() => st.set({ rescanAsk: Date.now() })}
         />
+      )}
+      {st.examEditOpen && !guestPack && (
+        <ExamEditor questions={session.questions} slides={session.slides} examName={session.name} session={session} onClose={() => st.set({ examEditOpen: false })} />
       )}
       {st.keyApplyOpen && <KeyApplyDialog session={session} onClose={() => st.set({ keyApplyOpen: false })} />}
       {st.changesOpen && <ChangesDialog session={session} tasks={tasks} onClose={() => st.set({ changesOpen: false })} />}

@@ -9,7 +9,8 @@ import { ScanProblemsDialog, ScanProblemsRow, type Resolve } from "./ScanProblem
 import { basename, dirname, joinPath, listFiles, pathExists, readText, withExt, writeText } from "../lib/backend";
 import { forgetRecent, recentSessions, rememberRecent, useStore, type Recent } from "../lib/store";
 import { guestSession, parsePack } from "../lib/handoff";
-import { parseTaskId } from "../lib/grading";
+import { buildTasks, parseTaskId } from "../lib/grading";
+import { ExamEditor } from "./ExamEditor";
 import { applyPlan, emptyKey, parseKeyFile, planKey, type AnswerKey, type KeyMark } from "../lib/answerKey";
 
 async function openSessionFile(path: string): Promise<Session> {
@@ -210,6 +211,9 @@ function NewSession({ onCancel }: { onCancel: () => void }) {
   const [subInfo, setSubInfo] = useState<{ files: number; folders: number } | null>(null);
   const [slidesDir, setSlidesDir] = useState("");
   const [slides, setSlides] = useState<SlideRef[]>([]);
+  /** the question editor, and questions whose answer to mark when grading starts */
+  const [editing, setEditing] = useState(false);
+  const [markAfter, setMarkAfter] = useState<Set<number>>(new Set());
   const [sessionPath, setSessionPath] = useState("");
   const [busy, setBusy] = useState<string | null>(null);
   const [err, setErr] = useState<string | null>(null);
@@ -364,7 +368,13 @@ function NewSession({ onCancel }: { onCancel: () => void }) {
       // an imported key grades the matching pins straight away (nothing else is graded yet)
       if (session.key && session.key.mode === "grade") session.grades = applyPlan(session, planKey(session, session.key, 1));
       load(session);
-      if (markFirst) useStore.getState().set({ keyMode: true });
+      if (markFirst || markAfter.size) {
+        // start on the first question whose answer is to be marked
+        const first = [...markAfter].sort((a, b) => a - b)[0];
+        const i = first ? buildTasks(session.questions, new Set(session.slides.map((r) => r.id))).findIndex((t) => t.q === first) : -1;
+        if (i > 0) useStore.getState().setTask(i);
+        useStore.getState().set({ keyMode: true });
+      }
       await useStore.getState().saveNow();
       if (scan.warnings.length) console.warn(scan.warnings);
     } catch (e) {
@@ -383,9 +393,24 @@ function NewSession({ onCancel }: { onCancel: () => void }) {
           <div className="step-body">
             <div className="step-head">
               <b>Exam questions</b>
-              <button onClick={pickExam}>{examPath ? "Change…" : "Choose exam PDF / JSON…"}</button>
+              <span className="step-btns">
+                {(examPath || questions.length > 0) && (
+                  <button onClick={() => setEditing(true)} title="Fix, add or reorder questions, pick slides, and save them as an exam file" data-help="exam-questions">
+                    Edit questions…
+                  </button>
+                )}
+                <button onClick={pickExam}>{examPath ? "Change…" : "Choose exam PDF / JSON…"}</button>
+              </span>
             </div>
             {examPath && <div className="muted small">{examPath}</div>}
+            {!examPath && !questions.length && (
+              <div className="muted small">
+                No exam file?{" "}
+                <button className="text-link" onClick={() => setEditing(true)} data-help="exam-questions">
+                  Set up the questions by hand
+                </button>
+              </div>
+            )}
             {questions.length > 0 && (
               <>
                 <label className="field wide">
@@ -539,6 +564,20 @@ function NewSession({ onCancel }: { onCancel: () => void }) {
           </span>
         </div>
       </div>
+      {editing && (
+        <ExamEditor
+          questions={questions}
+          slides={slides}
+          examName={name || "Exam"}
+          markAfter={markAfter}
+          onMarkAfter={setMarkAfter}
+          onDone={(qs) => {
+            setQuestions(qs);
+            if (!name) setName("Exam");
+          }}
+          onClose={() => setEditing(false)}
+        />
+      )}
       {showProblems && problems && (
         <ScanProblemsDialog problems={problems} onClose={() => setShowProblems(false)} onRecheck={() => setRecheck((n) => n + 1)} resolve={resolve} />
       )}
