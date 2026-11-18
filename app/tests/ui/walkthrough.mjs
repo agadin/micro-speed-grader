@@ -640,6 +640,60 @@ await step("hand off: host splits work, guest grades the pack, host merges resul
   return `${cardLabel}: ${n} pins handed to Jamie, graded, merged — "${msg}"`;
 });
 
+await step("help: styled tooltip → ? → article; help search; preferences search and About", async () => {
+  // hover a control: the app's own tooltip (not the native one) with a ? to its article
+  const exportBtn = page.locator(".topbar").getByRole("button", { name: "Export" });
+  await exportBtn.hover();
+  await page.locator(".tip").waitFor({ timeout: 3000 });
+  const tipText = await page.locator(".tip-text").innerText();
+  expect(/grades\.csv/.test(tipText), `tooltip text: ${tipText}`);
+  expect((await exportBtn.getAttribute("title")) === null, "native title not suppressed while hovering");
+  await snap("help-tooltip");
+  // travel to the ? like a person: from the button, across whatever lies between, at a normal speed
+  const from = await exportBtn.boundingBox();
+  const q = await page.locator(".tip-help").boundingBox();
+  await page.mouse.move(from.x + from.width / 2, from.y + from.height / 2);
+  const steps = 14;
+  for (let i = 1; i <= steps; i++) {
+    const t = i / steps;
+    await page.mouse.move(from.x + from.width / 2 + (q.x + q.width / 2 - from.x - from.width / 2) * t, from.y + from.height / 2 + (q.y + q.height / 2 - from.y - from.height / 2) * t);
+    await page.waitForTimeout(25);
+  }
+  expect((await page.locator(".tip-help").count()) === 1, "tooltip closed on the way to its ?");
+  await page.mouse.down();
+  await page.mouse.up();
+  await page.locator(".help-panel").waitFor({ timeout: 3000 });
+  const art = await page.locator(".help-panel .hp-article").innerText();
+  expect(art.startsWith("Exporting grades"), `? opened: ${art.slice(0, 40)}`);
+  await page.mouse.move(5, 5);
+  await page.waitForTimeout(500);
+  expect((await exportBtn.getAttribute("title")) !== null, "title not restored after hover");
+  // search the wiki
+  await page.locator(".help-panel .hp-search input").fill("kr-20");
+  const hits = await page.locator(".help-panel .hp-hit").allInnerTexts();
+  expect(hits.some((h) => h.includes("Exporting grades")), `search hits: ${hits.join(" | ")}`);
+  await page.locator(".help-panel .hp-search input").fill("");
+  await page.locator(".help-panel").getByRole("button", { name: "Help home" }).click();
+  const topics = await page.locator(".help-panel .hp-topics button").count();
+  await snap("help-home");
+  expect(topics >= 9, `home lists ${topics} topics`);
+  await page.locator(".help-panel").getByRole("button", { name: "Close help" }).click();
+
+  // preferences: search a setting, land on its pane; About shows the version
+  await page.locator('button[title="Preferences (⌘,)"]').click();
+  await page.locator(".prefs-search input").waitFor();
+  await page.locator(".prefs-search input").fill("radius");
+  await page.locator(".prefs-results button", { hasText: "Cluster radius" }).click();
+  const h2 = await page.locator(".prefs-content h2").innerText();
+  expect(h2 === "Clusters & zoom", `search went to ${h2}`);
+  await page.locator(".prefs-nav button", { hasText: "About" }).click();
+  const about = await page.locator(".about").innerText();
+  await snap("prefs-about");
+  expect(/Version \d+\.\d+\.\d+/.test(about), `about: ${about.slice(0, 80)}`);
+  await page.keyboard.press("Escape");
+  return `tooltip "${tipText}" → ${art.split("\n")[0]}; ${hits.length} hits for kr-20; ${topics} topics`;
+});
+
 await browser.close();
 tiles.stop();
 for (const r of results) {

@@ -1,4 +1,4 @@
-// Records the short looping demos shown in Preferences → Selection (public/help/*.gif).
+// Records the short looping demos shown in Preferences → Selection (docs/help/img/*.gif).
 //   (dev server running)  node tests/ui/record-help-gifs.mjs [name …]
 // Each clip is cropped around the current cluster. A drawn cursor and key badges stand in
 // for the real pointer, which headless screen captures don't show.
@@ -8,7 +8,7 @@ import { execFileSync } from "node:child_process";
 import { chromium } from "playwright";
 import { APP, ROOT, startTileServer } from "./harness.mjs";
 
-const OUT = path.join(APP, "public/help");
+const OUT = path.join(ROOT, "docs/help/img");
 const WORK = path.join(APP, "tests/.out/help-gifs");
 fs.rmSync(WORK, { recursive: true, force: true });
 fs.mkdirSync(WORK, { recursive: true });

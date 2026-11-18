@@ -18,6 +18,8 @@ and the app updates itself from new releases (**Micro Speed Grader → Check for
 
 ## Features
 
+The full user guide is in [docs/help](docs/help/index.md); the same pages are built into the app (Help ▸ Micro Speed Grader Help, ⌘?).
+
 - Opens NDP.view slides (`.ndpi`, plus other OpenSlide formats) and student `.ndpa` annotations
 - Clusters answers by distance (µm), largest first; jump between clusters and single pins
 - Grade with the keyboard: **C** correct, **W** wrong + reason (recent reasons are one key away)
@@ -34,7 +36,7 @@ and the app updates itself from new releases (**Micro Speed Grader → Check for
 - Feedback wording edited in place on a live "Student sees" preview (Preferences → Grading text)
 - Grade with other people: the host hands off part of the remaining images to any number of graders
   as pack files (drag images between people, or split evenly by pin count); those pins lock until each
-  grader's results file is imported, and the host can recall a pack at any time ([how it works](docs/handoff.md))
+  grader's results file is imported, and the host can recall a pack at any time ([how it works](docs/help/handoff.md))
 
 ## Run
 

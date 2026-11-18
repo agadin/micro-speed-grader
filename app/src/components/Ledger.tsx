@@ -52,7 +52,7 @@ export function Ledger({ session, task, tasks, doubles, settings, studentName }:
   const taskLabel = (id: string) => id.replace("|", " · ");
 
   return (
-    <div className="ledger">
+    <div className="ledger" data-help="ledger">
       <div className="phead static">
         <span className="title">Ledger</span>
         <span className="meta">

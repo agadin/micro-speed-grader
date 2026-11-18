@@ -6,7 +6,16 @@ const host = process.env.TAURI_DEV_HOST;
 
 // https://vite.dev/config/
 export default defineConfig(() => ({
-  plugins: [react()],
+  plugins: [
+    react(),
+    {
+      // the help wiki lives outside the app folder: watch it so new articles and images appear in dev
+      name: "watch-help-docs",
+      configureServer(server) {
+        server.watcher.add(new URL("../docs/help", import.meta.url).pathname);
+      },
+    },
+  ],
 
   // Vite options tailored for Tauri development and only applied in `tauri dev` or `tauri build`
   //
@@ -24,6 +33,8 @@ export default defineConfig(() => ({
           port: 1421,
         }
       : undefined,
+    // the help articles and their images live in ../docs/help (also read on GitHub)
+    fs: { allow: [".."] },
     watch: {
       // 3. tell Vite to ignore watching `src-tauri`
       ignored: ["**/src-tauri/**"],

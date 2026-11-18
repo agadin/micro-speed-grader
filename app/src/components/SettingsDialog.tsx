@@ -3,12 +3,16 @@ import { getCurrentWindow } from "@tauri-apps/api/window";
 import { keyLabel, useSettings, type Settings } from "../lib/settings";
 import { SliderRow } from "./RightPanel";
 import { drawMarker } from "../lib/markers";
-import { IconCircleDash, IconExport, IconKeyboard, IconLasso, IconPin, IconText } from "./icons";
+import { IconCircleDash, IconExport, IconInfo, IconKeyboard, IconLasso, IconPin, IconText } from "./icons";
+import { searchHelp } from "../lib/help";
+import { showHelp } from "../lib/backend";
+import { AboutPane } from "./AboutPane";
 import { CsvPreviewTable, ExportLayoutEditor } from "./ExportLayout";
 import { exportTable, type ExportRow } from "../lib/exportCsv";
 import { defaultSettings } from "../lib/settings";
+import { helpImage } from "../lib/help";
 
-type Pane = "pins" | "select" | "input" | "clusters" | "text" | "export";
+type Pane = "pins" | "select" | "input" | "clusters" | "text" | "export" | "about";
 const PANES: { id: Pane; label: string; icon: ReactNode; lede: string }[] = [
   { id: "pins", label: "Pins", icon: <IconPin />, lede: "How student pins are drawn on the slide." },
   {
@@ -26,6 +30,49 @@ const PANES: { id: Pane; label: string; icon: ReactNode; lede: string }[] = [
     icon: <IconExport />,
     lede: "The layout of grades.csv: which columns, their order and header names. Also editable from the Export dialog.",
   },
+  { id: "about", label: "About", icon: <IconInfo />, lede: "Version, help and updates." },
+];
+/** the section of help/preferences.md for each pane */
+const HELP_ANCHOR: Record<Pane, string> = {
+  pins: "pins",
+  select: "selection",
+  input: "mouse--keys",
+  clusters: "clusters--zoom",
+  text: "grading-text",
+  export: "export",
+  about: "about",
+};
+/** what the search field finds: each setting's label (as shown) and extra words people might type */
+const SETTINGS_INDEX: { label: string; pane: Pane; words?: string }[] = [
+  { label: "Marker", pane: "pins", words: "flag push-pin dot crosshair style size pin look" },
+  { label: "Pin text", pane: "pins", words: "label title student name" },
+  { label: "Faded pins", pane: "pins", words: "other questions opacity grey" },
+  { label: "Colours", pane: "pins", words: "color colour ungraded selected correct wrong double cluster outline painted stain" },
+  { label: "Lasso", pane: "select", words: "selection tool" },
+  { label: "Paint brush", pane: "select", words: "brush size selection tool" },
+  { label: "Polygon", pane: "select", words: "selection tool corners" },
+  { label: "Paint with pins hidden", pane: "select", words: "hidden paint crowded" },
+  { label: "Pin by pin", pane: "select", words: "one at a time crowded" },
+  { label: "Spotlight on hover", pane: "select", words: "hover hide others" },
+  { label: "Small pins when zoomed", pane: "select", words: "shrink marker zoom" },
+  { label: "Click to add / remove", pane: "select", words: "toggle click selection" },
+  { label: "Buttons", pane: "input", words: "mouse left right pan select" },
+  { label: "Scroll zoom speed", pane: "input", words: "wheel trackpad zoom" },
+  { label: "Double-click", pane: "input", words: "zoom" },
+  { label: "Keys", pane: "input", words: "shortcut rebind show hide pins minimap space" },
+  { label: "Cluster radius", pane: "clusters", words: "group distance µm um" },
+  { label: "Min pins per cluster", pane: "clusters", words: "minimum size singles" },
+  { label: "Single-pin field", pane: "clusters", words: "zoom lone pin" },
+  { label: "Padding", pane: "clusters", words: "zoom margin" },
+  { label: "Next cluster", pane: "clusters", words: "auto zoom automatically" },
+  { label: "Animation", pane: "clusters", words: "smooth zoom pan" },
+  { label: "Wrong answers need a reason", pane: "text", words: "required blank incorrect" },
+  { label: "Student sees", pane: "text", words: "feedback wording comment text mistakes only all questions" },
+  { label: "Score line", pane: "text", words: "score total percent" },
+  { label: "All wording as fields", pane: "text", words: "header correct wrong multiple pins no answer ungraded" },
+  { label: "Columns", pane: "export", words: "csv grades uid surname first name order header preset item analysis" },
+  { label: "Ungraded items", pane: "export", words: "blank zero" },
+  { label: "Version", pane: "about", words: "about updates check update licence license" },
 ];
 const COLOR_LABELS: Record<keyof Settings["colors"], string> = {
   ungraded: "Ungraded",
@@ -54,11 +101,41 @@ export function PreferencesWindow() {
 export function SettingsDialog({ onClose, asWindow = false }: { onClose: () => void; asWindow?: boolean }) {
   const { s, set, reset } = useSettings();
   const [pane, setPane] = useState<Pane>("pins");
+  const [q, setQ] = useState("");
+  const contentRef = useRef<HTMLDivElement>(null);
+  const words = q.toLowerCase().split(/\s+/).filter(Boolean);
+  const settingHits = words.length
+    ? SETTINGS_INDEX.filter((x) => {
+        const hay = `${x.label} ${PANES.find((p) => p.id === x.pane)!.label} ${x.words ?? ""}`.toLowerCase();
+        return words.every((w) => hay.includes(w));
+      })
+    : [];
+  const helpHits = words.length ? searchHelp(q, 5) : [];
+  /** go to a setting: open its pane, then scroll to and flash the row whose label matches */
+  const goSetting = (pn: Pane, label: string) => {
+    setPane(pn);
+    setQ("");
+    requestAnimationFrame(() =>
+      requestAnimationFrame(() => {
+        const root = contentRef.current;
+        if (!root) return;
+        const el = [...root.querySelectorAll<HTMLElement>("label, .sp-title, .sel-item, h3, .group-h, .keyrow span, b, span")].find(
+          (n) => n.childElementCount < 3 && n.textContent?.trim().toLowerCase().startsWith(label.toLowerCase()),
+        );
+        const row = el?.closest<HTMLElement>(".prow2, .sel-item, .group, .keyrow") ?? el;
+        if (!row) return;
+        row.scrollIntoView({ block: "center", behavior: "smooth" });
+        row.classList.remove("pref-flash");
+        void row.offsetWidth;
+        row.classList.add("pref-flash");
+      }),
+    );
+  };
   const [capturing, setCapturing] = useState<null | "toggleFlagsKey" | "minimapKey">(null);
   const meta = PANES.find((p) => p.id === pane)!;
 
   useEffect(() => {
-    const k = (e: KeyboardEvent) => e.key === "Escape" && !capturing && onClose();
+    const k = (e: KeyboardEvent) => e.key === "Escape" && !capturing && !(e.target as HTMLElement)?.closest?.(".prefs-search") && onClose();
     window.addEventListener("keydown", k);
     return () => window.removeEventListener("keydown", k);
   }, [capturing, onClose]);
@@ -122,16 +199,62 @@ export function SettingsDialog({ onClose, asWindow = false }: { onClose: () => v
   const body = (
     <div className="prefs">
       <nav className="prefs-nav">
-        {PANES.map((p) => (
-          <button key={p.id} className={pane === p.id ? "on" : ""} onClick={() => setPane(p.id)}>
-            {p.icon}
-            {p.label}
-          </button>
-        ))}
+        <label className="prefs-search">
+          <svg viewBox="0 0 16 16" width="12" height="12" aria-hidden>
+            <circle cx="7" cy="7" r="4.5" fill="none" stroke="currentColor" strokeWidth="1.6" />
+            <path d="M10.5 10.5 14 14" stroke="currentColor" strokeWidth="1.6" strokeLinecap="round" />
+          </svg>
+          <input
+            placeholder="Search"
+            value={q}
+            onChange={(e) => setQ(e.target.value)}
+            onKeyDown={(e) => {
+              if (e.key === "Escape") {
+                e.stopPropagation();
+                setQ("");
+              } else if (e.key === "Enter") {
+                if (settingHits[0]) goSetting(settingHits[0].pane, settingHits[0].label);
+                else if (helpHits[0]) void showHelp(helpHits[0].anchor ? `${helpHits[0].id}/${helpHits[0].anchor}` : helpHits[0].id);
+              }
+            }}
+          />
+        </label>
+        {q.trim() ? (
+          <div className="prefs-results">
+            {settingHits.length > 0 && <div className="pr-h">Settings</div>}
+            {settingHits.map((h) => (
+              <button key={h.label} onClick={() => goSetting(h.pane, h.label)}>
+                <span>{h.label}</span>
+                <span className="pr-where">{PANES.find((p) => p.id === h.pane)!.label}</span>
+              </button>
+            ))}
+            {helpHits.length > 0 && <div className="pr-h">Help</div>}
+            {helpHits.map((h, i) => (
+              <button key={i} onClick={() => void showHelp(h.anchor ? `${h.id}/${h.anchor}` : h.id)}>
+                <span>{h.anchor ? h.label : h.title}</span>
+                <span className="pr-where">{h.anchor ? h.title : "Help"} ↗</span>
+              </button>
+            ))}
+            {!settingHits.length && !helpHits.length && <p className="pr-none">Nothing matches “{q}”.</p>}
+          </div>
+        ) : (
+          PANES.map((p) => (
+            <button key={p.id} className={pane === p.id ? "on" : ""} onClick={() => setPane(p.id)}>
+              {p.icon}
+              {p.label}
+            </button>
+          ))
+        )}
       </nav>
-      <div className="prefs-content">
-        <h2>{meta.label}</h2>
+      <div className="prefs-content" ref={contentRef} data-help={`preferences/${HELP_ANCHOR[pane]}`}>
+        <div className="prefs-h">
+          <h2>{meta.label}</h2>
+          <button className="prefs-help" onClick={() => void showHelp(`preferences/${HELP_ANCHOR[pane]}`)} title={`Help: ${meta.label} settings`}>
+            ?
+          </button>
+        </div>
         <p className="lede">{meta.lede}</p>
+        {pane === "about" && <AboutPane />}
 
         {pane === "pins" && (
           <>
@@ -596,13 +719,13 @@ function SelectionPane({ s, set }: { s: Settings; set: (patch: Partial<Settings>
         ))}
       </div>
       <div className="sel-preview">
-        {missing[cur.id] ? (
+        {missing[cur.id] || !helpImage(`${cur.id}.gif`) ? (
           <div className="demo none">No demo</div>
         ) : (
           <img
             key={cur.id}
             className="demo"
-            src={`help/${cur.id}.gif`}
+            src={helpImage(`${cur.id}.gif`)}
             alt={`${cur.title} demo`}
             onError={() => setMissing((m) => ({ ...m, [cur.id]: true }))}
           />

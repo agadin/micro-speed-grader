@@ -116,8 +116,9 @@ fn open_preferences<R: tauri::Runtime>(app: tauri::AppHandle<R>) -> Result<(), S
 /// The window loads the app's own page and has no capabilities (it only shows text).
 #[tauri::command]
 fn open_help<R: tauri::Runtime>(app: tauri::AppHandle<R>, topic: String) -> Result<(), String> {
-    // ids are short slugs; anything else falls back to the topic list
-    let topic = if topic.len() <= 40 && topic.chars().all(|c| c.is_ascii_lowercase() || c.is_ascii_digit() || c == '-') { topic } else { String::new() };
+    // "article" or "article/section": short slugs only; anything else opens the help home page
+    let ok = topic.len() <= 80 && topic.chars().all(|c| c.is_ascii_lowercase() || c.is_ascii_digit() || c == '-' || c == '/');
+    let topic = if ok { topic } else { String::new() };
     let url = format!("index.html?window=help&topic={topic}");
     if let Some(w) = app.get_webview_window("help") {
         let _ = w.eval(&format!("location.replace({url:?})"));
@@ -127,7 +128,7 @@ fn open_help<R: tauri::Runtime>(app: tauri::AppHandle<R>, topic: String) -> Resu
     }
     let mut b = tauri::WebviewWindowBuilder::new(&app, "help", tauri::WebviewUrl::App(url.into()))
         .title("Micro Speed Grader Help")
-        .inner_size(380.0, 640.0)
+        .inner_size(420.0, 680.0)
         .min_inner_size(320.0, 360.0);
     // open beside the main window when there's room
     if let Some(m) = app.get_webview_window("main") {
@@ -294,7 +295,7 @@ pub fn run() {
                 let _ = open_preferences(app.clone());
             } else if id == "help" {
                 let _ = open_help(app.clone(), String::new());
-            } else if matches!(id, "new_session" | "open_session" | "export" | "close_session") {
+            } else if matches!(id, "new_session" | "open_session" | "export" | "close_session" | "check_updates") {
                 let _ = app.emit("menu", id);
             }
         })

@@ -40,14 +40,25 @@ interface Props {
 
 const pct = (a: number, b: number) => (b ? Math.round((a / b) * 100) : 100);
 
+/** each section's help article and the tooltip on its heading */
+const PANEL_HELP: Record<string, [string, string]> = {
+  question: ["clusters/images", "The question and slide you're grading"],
+  clusters: ["clusters/how-clusters-work", "How close pins must be to group into a cluster"],
+  select: ["selecting", "Tools for picking out pins by hand"],
+  display: ["grading/showing-the-pins-differently", "What's drawn on the slide"],
+  reasons: ["grading/reasons-for-wrong-answers", "Reasons you've given on this question; click one to reuse it"],
+  progress: ["grading/progress", "How much of the exam is graded"],
+};
+
 /** collapsible side panel with a disclosure-triangle header */
 function Panel({ id, title, meta, children, fixed }: { id: string; title: string; meta?: ReactNode; children: ReactNode; fixed?: boolean }) {
   const { s, set } = useSettings();
   const closed = !fixed && s.collapsedPanels.includes(id);
+  const [help, tip] = PANEL_HELP[id] ?? [undefined, undefined];
   if (fixed)
     return (
-      <section className="panel">
-        <div className="phead">
+      <section className="panel" data-help={help}>
+        <div className="phead" title={tip}>
           {title}
           <span className="sp" />
           {meta && <span className="meta">{meta}</span>}
@@ -56,9 +67,10 @@ function Panel({ id, title, meta, children, fixed }: { id: string; title: string
       </section>
     );
   return (
-    <section className="panel">
+    <section className="panel" data-help={help}>
       <button
         className="phead"
+        title={tip}
         onClick={() =>
           set({ collapsedPanels: closed ? s.collapsedPanels.filter((x) => x !== id) : [...s.collapsedPanels, id] })
         }

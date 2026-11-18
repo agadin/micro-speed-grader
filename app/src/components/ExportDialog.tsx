@@ -80,7 +80,7 @@ export function ExportDialog({ session, onClose }: { session: Session; onClose: 
 
   return (
     <div className="modal-backdrop" onMouseDown={onClose}>
-      <div className="modal export-modal" onMouseDown={(e) => e.stopPropagation()}>
+      <div className="modal export-modal" data-help="export" onMouseDown={(e) => e.stopPropagation()}>
         <div className="ex-head">
           <h2>Export grades</h2>
           <div className="seg">

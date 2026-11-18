@@ -146,7 +146,7 @@ export function Startup() {
 
   return (
     <div className="startup" data-tauri-drag-region>
-      <div className="startup-card" ref={fitRef}>
+      <div className="startup-card" ref={fitRef} data-help="getting-started/the-start-screen">
         <h1>Micro Speed Grader</h1>
         <p className="muted">Grade histology practicals one question at a time.</p>
         <div className="startup-actions">
@@ -299,7 +299,7 @@ function NewSession({ onCancel }: { onCancel: () => void }) {
 
   return (
     <div className="startup" data-tauri-drag-region>
-      <div className="startup-card wide" ref={fitRef}>
+      <div className="startup-card wide" ref={fitRef} data-help="getting-started/create-a-session">
         <h1>New grading session</h1>
 
         <div className="step">

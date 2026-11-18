@@ -10,7 +10,7 @@ import {
   type PinState,
 } from "../lib/grading";
 import { computeClusters, type Cluster } from "../lib/cluster";
-import { openSlide, dirname, joinPath, writeText } from "../lib/backend";
+import { openSlide, dirname, joinPath, showHelp, writeText } from "../lib/backend";
 import { awayPins, awayTasks, guestProgress, makeResult } from "../lib/handoff";
 import { safeFileName } from "../lib/exportCsv";
 import { save } from "@tauri-apps/plugin-dialog";
@@ -690,7 +690,7 @@ export function Grader({ session }: { session: Session }) {
       className={`grader ${macOverlay ? "mac-overlay" : ""}`}
       style={{ ["--ledger-h" as string]: `${ledgerH}px` }}
     >
-      <header className="topbar" data-tauri-drag-region>
+      <header className="topbar" data-tauri-drag-region data-help="grading/the-grading-screen">
         <span className="session" title={session.sessionPath}>
           {session.name}
         </span>
@@ -720,6 +720,7 @@ export function Grader({ session }: { session: Session }) {
           onClick={st.undo}
           disabled={!st.past.length}
           title="Undo (⌘Z / Ctrl+Z)"
+          data-help="ledger/undo-and-redo"
         >
           <IconUndo />
         </button>
@@ -728,12 +729,14 @@ export function Grader({ session }: { session: Session }) {
           onClick={st.redo}
           disabled={!st.future.length}
           title="Redo (⇧⌘Z / Ctrl+Y)"
+          data-help="ledger/undo-and-redo"
         >
           <IconRedo />
         </button>
         <span
           className={`saved ${st.saveError ? "err" : ""}`}
-          title={st.saveError ?? session.sessionPath}
+          title={st.saveError ? `Save failed: ${st.saveError}` : `Saves automatically to ${session.sessionPath}`}
+          data-help={st.saveError ? "troubleshooting/while-grading" : "getting-started/saving-and-backups"}
         >
           {st.saveError ? (
             "Save failed"
@@ -747,26 +750,32 @@ export function Grader({ session }: { session: Session }) {
         </span>
         <span className="vsep" />
         {guestPack ? (
-          <button className={`btn ${allDone ? "light" : ""}`} onClick={sendResults} title={`Save the results file to send back (${guestPack.host})`}>
+          <button className={`btn ${allDone ? "light" : ""}`} onClick={sendResults} title={`Save the results file to send back (${guestPack.host})`} data-help="handoff/guest-grade-the-pack">
             <IconExport /> Send results · {gp.done}/{gp.total}
           </button>
         ) : (
           <>
-            <button className="btn ghost" onClick={() => st.set({ handoffOpen: true })} title="Split the remaining work with a second grader">
+            <button className="btn ghost" onClick={() => st.set({ handoffOpen: true })} title="Share the remaining work with other graders" data-help="handoff">
               <IconHandoff /> Hand off
             </button>
             <button
               className={`btn ${allDone ? "light" : ""}`}
               onClick={() => st.set({ exportOpen: true })}
+              title="Export grades.csv, feedback files and item statistics (⌘E)"
+              data-help="export"
             >
               <IconExport /> Export
             </button>
           </>
         )}
+        <button className="btn ghost icon help-q" onClick={() => void showHelp("index")} title="Micro Speed Grader Help (⌘?)" aria-label="Help">
+          ?
+        </button>
         <button
           className="btn ghost icon"
           onClick={() => st.set({ settingsOpen: true })}
           title="Preferences (⌘,)"
+          data-help="preferences"
         >
           <IconSliders />
         </button>
@@ -777,6 +786,7 @@ export function Grader({ session }: { session: Session }) {
             st.close();
           }}
           title="Save and close session"
+          data-help="getting-started/saving-and-backups"
         >
           <IconClose />
         </button>
@@ -882,9 +892,9 @@ export function Grader({ session }: { session: Session }) {
               </div>
             )}
           </div>
-          <div className="vtool">
+          <div className="vtool" data-help="grading/grade-a-cluster">
             <div className="vside">
-              <div className="cnav">
+              <div className="cnav" data-help="clusters/moving-around">
                 <button
                   className="step"
                   onClick={prevCluster}

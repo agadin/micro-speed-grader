@@ -14,6 +14,15 @@ export const pathExists = (path: string) => invoke<boolean>("path_exists", { pat
 /** opens/focuses the separate Preferences window; rejects outside Tauri */
 export const openPreferencesWindow = () => invoke<void>("open_preferences");
 export const openHelpWindow = (topic: string) => invoke<void>("open_help", { topic });
+/** Open a help article ("article" or "article/section") in the Help window; in a plain browser, the in-page panel. */
+export const showHelp = async (ref: string) => {
+  try {
+    await openHelpWindow(ref);
+  } catch {
+    const { useStore } = await import("./store");
+    useStore.getState().set({ help: ref });
+  }
+};
 
 const isWindows = navigator.userAgent.includes("Windows");
 /** Base URL of the custom `slide://` tile protocol (differs on Windows/WebView2). */

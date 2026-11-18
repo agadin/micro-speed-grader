@@ -8,6 +8,7 @@ import { Startup } from "./components/Startup";
 import { Grader } from "./components/Grader";
 import { SettingsDialog } from "./components/SettingsDialog";
 import { HelpPanel } from "./components/HelpPanel";
+import { HelpTips } from "./components/HelpTips";
 
 
 export default function App() {
@@ -82,6 +83,7 @@ export default function App() {
       {session ? <Grader session={session} /> : <Startup />}
       <UpdateBanner />
       {helpFallback && <HelpPanel />}
+      <HelpTips />
       {settingsOpen && prefsFallback && <SettingsDialog onClose={() => set({ settingsOpen: false })} />}
     </>
   );

@@ -1,8 +1,12 @@
-# Grading with other people: hand-off packs
+---
+title: Grade with other people
+blurb: Split the remaining work with one or more graders using hand-off packs.
+order: 8
+---
+
+# Grade with other people
 
 Split a grading session with one or more other graders. You (the **host**) keep the session. Each other grader (a **guest**) gets part of the remaining work as a file. They grade it on their own computer and send back a results file. You merge it in.
-
-The same guide is built into the app: click **?** in the Hand off window.
 
 There is no server and no account. The files travel however you like: email, Google Drive, a shared folder or a USB stick.
 
@@ -10,6 +14,8 @@ There is no server and no account. The files travel however you like: email, Goo
  host ── Exam - Jamie.msgpack ──▶ guest grades only that work
  host ◀── Exam - Jamie.msgresult ── guest
 ```
+
+![Splitting the work between three people](img/handoff.png)
 
 ## Before you start
 
@@ -27,7 +33,9 @@ There is no server and no account. The files travel however you like: email, Goo
    - **Split evenly** shares the pins between everyone, you included. **Give all away** shares them only between the other graders. **Keep all** gives everything back to you.
 
    An image is never split, so every answer to a given image is marked by the same person. The coloured bar at the top shows how many pins each person will grade.
-4. Click **Create pack…** (or **Create N packs…** for several graders). With one grader you choose where to save the file; with several, you choose a folder and get one `.msgpack` per person, named after them. Send each person their own file.
+4. Click **Create pack (N pins)…** (or **Create N packs…** for several graders). With one grader you choose where to save the file; with several, you choose a folder and get one `.msgpack` per person, named after them. Send each person their own file.
+
+![Dragging an image to another grader](img/handoff-drag.gif)
 
 The handed-off pins are now **locked** in your session:
 

@@ -185,7 +185,7 @@ export function HandoffDialog({ session, tasks, onClose }: { session: Session; t
 
   return (
     <div className="modal-backdrop" onMouseDown={onClose} onClick={() => setPicker(null)}>
-      <div className="modal handoff-modal" onMouseDown={(e) => e.stopPropagation()}>
+      <div className="modal handoff-modal" data-help="handoff" onMouseDown={(e) => e.stopPropagation()}>
         <div className="ho-head">
           <h2>Hand off work</h2>
           <button className="ho-help" onClick={() => setStore({ help: "handoff" })} title="How hand-off works" aria-label="Help">

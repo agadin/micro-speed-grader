@@ -10,6 +10,7 @@ import { defaultSettings } from "../src/lib/settings";
 import { isPainted, pinsInPaint, type PaintOp } from "../src/lib/paint";
 import { exportTable, kr20, parseStudentName, EXPORT_PRESETS, testStats, safeFileName, uniqueFileNames, textCell, toCsv, type ExportRow } from "../src/lib/exportCsv";
 import { MAX_ANNOTATIONS } from "../src/lib/ndpa";
+import { parseMarkdown, slug } from "../src/lib/markdown";
 import { awayPins, splitEven, guestSession, makePack, makeResult, mergeResult, parsePack, parseResult, remainingByTask } from "../src/lib/handoff";
 import type { Pin, Session } from "../src/lib/types";
 import { emptyGrades } from "../src/lib/types";
@@ -242,6 +243,51 @@ ok(!!dbl && studentResults(session, dbl, defaultSettings)[0].text === defaultSet
     m2.handoffs.every((h) => h.status === "returned") && [...ta.pinIds, ...tb.pinIds].every((id) => m2.grades.pinGroup[id]),
     "two graders' results merge in any order",
   );
+}
+
+// ---- help wiki (docs/help): parses, nested lists survive, every link/anchor/image exists ----
+{
+  const dir = path.resolve("../docs/help"); // run from app/
+  const files = fs.readdirSync(dir).filter((f) => f.endsWith(".md"));
+  const docs = new Map(files.map((f) => [f, parseMarkdown(fs.readFileSync(path.join(dir, f), "utf8"))]));
+  ok(files.includes("index.md") && files.length >= 8, `help articles: ${files.length}`);
+  const bad: string[] = [];
+  for (const [f, d] of docs) {
+    if (!d.meta.title) bad.push(`${f}: no title`);
+    const src = fs.readFileSync(path.join(dir, f), "utf8");
+    for (const m of src.matchAll(/!\[[^\]]*\]\(([^)]+)\)/g)) if (!fs.existsSync(path.join(dir, m[1]))) bad.push(`${f}: image ${m[1]}`);
+    for (const m of src.matchAll(/(?<!!)\[[^\]\n]*\]\(([^)]+)\)/g)) {
+      const href = m[1];
+      if (/^https?:/.test(href)) continue;
+      const [file, anchor] = href.split("#");
+      const target = file ? docs.get(file) : d;
+      if (!target) bad.push(`${f}: link ${href}`);
+      else if (anchor && !target.headings.some((h) => h.id === anchor)) bad.push(`${f}: anchor ${href}`);
+    }
+  }
+  ok(bad.length === 0, `help links and images resolve${bad.length ? `: ${bad.join("; ")}` : ""}`);
+  const ho = docs.get("handoff.md")!;
+  const steps = ho.blocks.find((b) => b.t === "ol") as { items: { text: string; sub: string[]; more: string[] }[] } | undefined;
+  ok(!!steps && steps.items.length === 4 && steps.items[2].sub.length === 3 && steps.items[2].more.length === 1, `nested list parsed (${steps?.items.map((i) => `${i.sub.length}/${i.more.length}`)})`);
+  // every help reference in the app (data-help="a/b", showHelp("a/b"), HELP_ANCHOR, PANEL_HELP) points somewhere real
+  const srcDir = path.resolve("src");
+  const refs = new Set<string>();
+  for (const f of fs.readdirSync(srcDir, { recursive: true }) as string[]) {
+    if (!/\.tsx?$/.test(f)) continue;
+    const t = fs.readFileSync(path.join(srcDir, f), "utf8");
+    for (const m of t.matchAll(/data-help="([^"]+)"|showHelp\("([^"]+)"\)|\[\s*"([a-z-]+\/[a-z0-9-]+)",/g)) refs.add(m[1] ?? m[2] ?? m[3]);
+    for (const m of t.matchAll(/HELP_ANCHOR[^=]*=\s*\{([^}]+)\}/g))
+      for (const a of m[1].matchAll(/"([^"]+)"/g)) refs.add(`preferences/${a[1]}`);
+  }
+  refs.delete("article");
+  refs.delete("article/section");
+  const badRefs = [...refs].filter((r) => {
+    const [id, anchor] = r.split("/");
+    const d = docs.get(`${id}.md`);
+    return !d || (anchor && !d.headings.some((h) => h.id === anchor));
+  });
+  ok(refs.size > 20 && badRefs.length === 0, `app help references resolve (${refs.size})${badRefs.length ? `: ${badRefs.join(", ")}` : ""}`);
+  ok(slug("Mouse & keys") === "mouse--keys" && slug("**Bold** `x` title") === "bold-x-title", "GitHub-style heading ids");
 }
 
 process.exit(fails ? 1 : 0);
