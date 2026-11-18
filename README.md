@@ -28,6 +28,10 @@ and the app updates itself from new releases (**Micro Speed Grader → Check for
 - Auto-flags students who submit more than one pin per question
 - Ledger of every grading decision with undo/redo, editable afterwards
 - Autosave with crash recovery; CSV + feedback export
+- Export layout you arrange (drag columns; UID, surname, first name, correct / total, comment, one
+  1/0 column per question) and a Statistics tab with KR-20 and item statistics (difficulty,
+  point-biserial, KR-20 if deleted), saved as item-stats.csv
+- Feedback wording edited in place on a live "Student sees" preview (Preferences → Grading text)
 
 ## Run
 

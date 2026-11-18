@@ -490,21 +490,33 @@ await step("Preferences from the app menu", async () => {
   await page.getByRole("button", { name: "Done" }).click();
 });
 
-await step("export grades.csv + feedback", async () => {
+await step("export grades.csv (item columns) + feedback; statistics tab saves item-stats.csv", async () => {
   await page.getByRole("button", { name: /^Export/ }).first().click();
   await page.waitForTimeout(400);
   await snap("export-dialog");
   const exp = path.join(WORK, "export");
   await dialog(exp);
-  await page.locator(".modal").getByRole("button").first().click();
+  await page.locator(".modal").getByRole("button", { name: "Choose…" }).click();
   await page.waitForTimeout(300);
-  await page.locator(".modal").getByRole("button", { name: "Export" }).click();
+  await page.locator(".modal").getByRole("button", { name: "Export grades.csv" }).click();
   await page.waitForTimeout(1500);
   await snap("export-done");
+  await page.locator(".modal").getByRole("button", { name: "Statistics" }).click();
+  await page.waitForTimeout(200);
+  await page.locator(".modal").getByRole("button", { name: "Count ungraded as wrong" }).click();
+  await page.waitForTimeout(200);
+  await snap("export-stats");
+  const kr = await page.locator(".kr.big b").innerText();
+  await page.locator(".modal").getByRole("button", { name: "Save item-stats.csv" }).click();
+  await page.waitForTimeout(500);
+  const statsCsv = fs.readFileSync(path.join(exp, "item-stats.csv"), "utf8");
+  expect(/KR-20,/.test(statsCsv) && /^Q1,/m.test(statsCsv), "item-stats.csv has KR-20 and per-question rows");
+  expect(/^-?\d\.\d\d$/.test(kr), `provisional KR-20 shown: ${kr}`);
   const csv = fs.readFileSync(path.join(exp, "grades.csv"), "utf8");
   const fb = fs.readdirSync(path.join(exp, "feedback"));
   const lines = parseCsv(csv.replace(/^\uFEFF/, "").trim()).map((r) => r.map((c) => c.replace(/\n/g, " / ")).join(","));
   expect(lines.length === 239, `csv has ${lines.length} records`);
+  expect(/^UID,Surname,First_name,Number_of_correct_answers,Total_questions_asked,Comment,Q\d/.test(lines[0]), `header: ${lines[0]}`);
   const graded = groups()[0].pinIds;
   const s = session();
   const stu = s.students.find((x) => x.id === s.pins.find((p) => p.id === graded[0]).studentId);

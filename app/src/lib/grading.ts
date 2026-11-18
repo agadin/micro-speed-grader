@@ -1,5 +1,5 @@
 import type { GradeState, Pin, Question, Session, Student, Task } from "./types";
-import type { Settings } from "./settings";
+import { defaultSettings, type Settings } from "./settings";
 
 export const taskId = (q: number, slide: string) => `Q${q}|${slide}`;
 
@@ -65,7 +65,7 @@ export function studentResults(session: Session, student: Student, settings: Set
     if (qp.length === 0) {
       out.push(
         pending
-          ? { q: q.num, status: "ungraded", text: "Ungraded (unlabelled pin)" }
+          ? { q: q.num, status: "ungraded", text: `${settings.fbUngraded} (unlabelled pin)` }
           : { q: q.num, status: "wrong", text: settings.noAnswerMessage },
       );
       continue;
@@ -76,27 +76,53 @@ export function studentResults(session: Session, student: Student, settings: Set
         .map((p) => g.groups[g.pinGroup[p.id]])
         .filter(Boolean)
         .sort((a, b) => b.createdAt - a.createdAt)[0];
-      if (latest) out.push({ q: q.num, status: latest.status, text: resultText(latest.status, latest.text) });
+      if (latest) out.push({ q: q.num, status: latest.status, text: resultText(latest.status, latest.text, settings) });
       else out.push({ q: q.num, status: "wrong", text: settings.doubleMessage });
       continue;
     }
     const grp = graded.length ? g.groups[g.pinGroup[qp[0].id]] : undefined;
-    if (!grp) out.push({ q: q.num, status: "ungraded", text: "Ungraded" });
-    else out.push({ q: q.num, status: grp.status, text: resultText(grp.status, grp.text) });
+    if (!grp) out.push({ q: q.num, status: "ungraded", text: settings.fbUngraded });
+    else out.push({ q: q.num, status: grp.status, text: resultText(grp.status, grp.text, settings) });
   }
   return out;
 }
 
-function resultText(status: "correct" | "wrong", text: string) {
-  if (status === "correct") return text ? `Correct (${text})` : "Correct";
-  return text || "Incorrect";
+type Wording = Pick<
+  Settings,
+  | "fbHeader"
+  | "fbLine"
+  | "fbCorrect"
+  | "fbCorrectNote"
+  | "fbWrongNote"
+  | "fbScore"
+  | "fbScoreOn"
+  | "fbShow"
+  | "fbAllCorrect"
+  | "wrongDefaultText"
+>;
+
+/** fill {name} placeholders; unknown names are left as typed */
+export const fillTemplate = (t: string, vars: Record<string, string | number>) =>
+  t.replace(/\{(\w+)\}/g, (m, k: string) => (k in vars ? String(vars[k]) : m));
+
+/** the text one graded question reads as: grader's note run through the correct / wrong wording */
+export function resultText(status: "correct" | "wrong", note: string, w: Wording) {
+  note = note.trim();
+  if (status === "correct") return note ? fillTemplate(w.fbCorrectNote, { note }) : w.fbCorrect;
+  return note ? fillTemplate(w.fbWrongNote, { note }) : w.wrongDefaultText || "Incorrect";
 }
 
-export function feedbackText(results: QuestionResult[]): { text: string; score: number; total: number } {
+export function feedbackText(results: QuestionResult[], w: Wording = defaultSettings): { text: string; score: number; total: number } {
   const score = results.filter((r) => r.status === "correct").length;
   const total = results.length;
-  const lines = ["Overall Feedback", ...results.map((r) => `Q${r.q}: ${r.text}`), "", `Score: ${score}/${total}`];
-  return { text: lines.join("\n"), score, total };
+  const percent = total ? Math.round((score / total) * 100) : 0;
+  const shown = w.fbShow === "notCorrect" ? results.filter((r) => r.status !== "correct") : results;
+  const lines: string[] = [];
+  if (w.fbHeader.trim()) lines.push(fillTemplate(w.fbHeader, { score, total, percent }));
+  lines.push(...shown.map((r) => fillTemplate(w.fbLine, { q: r.q, text: r.text })));
+  if (!shown.length && w.fbAllCorrect.trim()) lines.push(w.fbAllCorrect);
+  if (w.fbScoreOn && w.fbScore.trim()) lines.push("", fillTemplate(w.fbScore, { score, total, percent }));
+  return { text: lines.join("\n").replace(/^\n+/, ""), score, total };
 }
 
 /** Autocomplete suggestions: this question's recent reasons first, then the rest of the exam. */

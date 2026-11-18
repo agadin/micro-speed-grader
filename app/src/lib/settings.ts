@@ -1,4 +1,5 @@
 import { create } from "zustand";
+import { COLUMN_INFO, EXPORT_PRESETS, type ExportColumn } from "./exportCsv";
 
 /** flag / pushpin mirror NDP.view's annotation icons */
 export type PinStyle = "flag" | "pushpin" | "dot" | "cross";
@@ -21,6 +22,18 @@ export interface Settings {
   wrongDefaultText: string;
   doubleMessage: string;
   noAnswerMessage: string;
+  /** feedback wording; {q} {text} {note} {score} {total} {percent} are filled in */
+  fbHeader: string;
+  fbLine: string;
+  fbCorrect: string;
+  fbCorrectNote: string;
+  fbWrongNote: string;
+  fbUngraded: string;
+  fbScore: string;
+  fbScoreOn: boolean;
+  /** list every question, or only the ones not answered correctly */
+  fbShow: "all" | "notCorrect";
+  fbAllCorrect: string;
   showOtherQuestions: boolean;
   selectTool: SelectTool;
   /** which selection tools appear in the tool switcher (B cycles through them) */
@@ -53,6 +66,12 @@ export interface Settings {
   autoZoomCluster: boolean;
   /** smooth zoom / pan animation */
   animate: boolean;
+  /** export: CSV columns in order (header text editable, each on/off) */
+  exportColumns: ExportColumn[];
+  exportUid: "folder" | "blank";
+  exportUngraded: "blank" | "0";
+  /** export: also write feedback/<student>.txt */
+  exportFeedback: boolean;
   /** background of the marker preview in Preferences (he / toluidine / ihc / reticulin) */
   previewStain: string;
   /** collapsed side panels (by id) */
@@ -84,6 +103,16 @@ export const defaultSettings: Settings = {
   wrongDefaultText: "Incorrect",
   doubleMessage: "Multiple pins submitted (only one allowed)",
   noAnswerMessage: "No answer",
+  fbHeader: "Overall Feedback",
+  fbLine: "Q{q}: {text}",
+  fbCorrect: "Correct",
+  fbCorrectNote: "Correct ({note})",
+  fbWrongNote: "{note}",
+  fbUngraded: "Ungraded",
+  fbScore: "Score: {score}/{total}",
+  fbScoreOn: true,
+  fbShow: "all",
+  fbAllCorrect: "All answers correct.",
   showOtherQuestions: false,
   selectTool: "lasso",
   tools: { lasso: true, brush: true, polygon: true },
@@ -103,6 +132,10 @@ export const defaultSettings: Settings = {
   autoZoomCluster: true,
   animate: true,
   previewStain: "he",
+  exportColumns: EXPORT_PRESETS[0].columns,
+  exportUid: "folder",
+  exportUngraded: "blank",
+  exportFeedback: true,
   collapsedPanels: ["reasons"],
   panelsVersion: 1,
   colors: {
@@ -115,6 +148,20 @@ export const defaultSettings: Settings = {
     paint: "#5ec8f2",
   },
 };
+
+/** saved column list → valid: known ids only, each once, any missing ones appended (off) */
+function fixColumns(cols: unknown): ExportColumn[] {
+  if (!Array.isArray(cols)) return defaultSettings.exportColumns;
+  const seen = new Set<string>();
+  const out: ExportColumn[] = [];
+  for (const c of cols as ExportColumn[])
+    if (c && c.id in COLUMN_INFO && !seen.has(c.id)) {
+      seen.add(c.id);
+      out.push({ id: c.id, header: typeof c.header === "string" ? c.header : COLUMN_INFO[c.id].header, on: !!c.on });
+    }
+  for (const c of defaultSettings.exportColumns) if (!seen.has(c.id)) out.push({ ...c, on: false });
+  return out;
+}
 
 /** the tool actually in use: the chosen one if enabled, else the first enabled one */
 export function activeTool(s: Settings): SelectTool {
@@ -137,6 +184,7 @@ function load(): Settings {
         ...s,
         pinStyle,
         tools: { ...defaultSettings.tools, ...(s.tools ?? {}) },
+        exportColumns: fixColumns(s.exportColumns),
         colors: { ...defaultSettings.colors, ...(s.colors ?? {}) },
       };
       if ((s.panelsVersion ?? 0) < 1) {

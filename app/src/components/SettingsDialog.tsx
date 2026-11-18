@@ -1,11 +1,14 @@
-import { useEffect, useRef, useState, type ReactNode } from "react";
+import { Fragment, useEffect, useRef, useState, type ReactNode } from "react";
 import { getCurrentWindow } from "@tauri-apps/api/window";
 import { keyLabel, useSettings, type Settings } from "../lib/settings";
 import { SliderRow } from "./RightPanel";
 import { drawMarker } from "../lib/markers";
-import { IconCircleDash, IconKeyboard, IconLasso, IconPin, IconText } from "./icons";
+import { IconCircleDash, IconExport, IconKeyboard, IconLasso, IconPin, IconText } from "./icons";
+import { CsvPreviewTable, ExportLayoutEditor } from "./ExportLayout";
+import { exportTable, type ExportRow } from "../lib/exportCsv";
+import { defaultSettings } from "../lib/settings";
 
-type Pane = "pins" | "select" | "input" | "clusters" | "text";
+type Pane = "pins" | "select" | "input" | "clusters" | "text" | "export";
 const PANES: { id: Pane; label: string; icon: ReactNode; lede: string }[] = [
   { id: "pins", label: "Pins", icon: <IconPin />, lede: "How student pins are drawn on the slide." },
   {
@@ -17,6 +20,12 @@ const PANES: { id: Pane; label: string; icon: ReactNode; lede: string }[] = [
   { id: "input", label: "Mouse & keys", icon: <IconKeyboard />, lede: "Which button pans and which selects, zooming, and the keys you can rebind." },
   { id: "clusters", label: "Clusters & zoom", icon: <IconCircleDash />, lede: "How pins are grouped and how far the view zooms in." },
   { id: "text", label: "Grading text", icon: <IconText />, lede: "What students read in their feedback." },
+  {
+    id: "export",
+    label: "Export",
+    icon: <IconExport />,
+    lede: "The layout of grades.csv: which columns, their order and header names. Also editable from the Export dialog.",
+  },
 ];
 const COLOR_LABELS: Record<keyof Settings["colors"], string> = {
   ungraded: "Ungraded",
@@ -224,6 +233,8 @@ export function SettingsDialog({ onClose, asWindow = false }: { onClose: () => v
 
         {pane === "select" && <SelectionPane s={s} set={set} />}
 
+        {pane === "export" && <ExportPane s={s} />}
+
         {pane === "clusters" && (
           <div className="group">
             {row("Cluster radius", numField("clusterRadiusUm", 2, 1000, "µm"), "pins within this distance group together")}
@@ -249,32 +260,7 @@ export function SettingsDialog({ onClose, asWindow = false }: { onClose: () => v
           </div>
         )}
 
-        {pane === "text" && (
-          <div className="group">
-            {row(
-              "Wrong answers",
-              <label className="check">
-                <input type="checkbox" checked={s.wrongNeedsReason} onChange={(e) => set({ wrongNeedsReason: e.target.checked })} />
-                require a reason
-              </label>,
-            )}
-            {!s.wrongNeedsReason && row("Default wrong text", txt("wrongDefaultText"))}
-            {row("Multiple pins", txt("doubleMessage"))}
-            {row("No answer", txt("noAnswerMessage"))}
-            <div className="student-sees">
-              <div className="gt">Student sees</div>
-              <pre>
-                {`Overall Feedback
-Q1: Correct
-Q2: ${s.doubleMessage}
-Q3: Eccrine sweat gland
-Q4: ${s.noAnswerMessage}
-
-Score: 1/4`}
-              </pre>
-            </div>
-          </div>
-        )}
+        {pane === "text" && <TextPane s={s} set={set} row={row} txt={txt} />}
       </div>
     </div>
   );
@@ -630,6 +616,309 @@ function SelectionPane({ s, set }: { s: Settings; set: (patch: Partial<Settings>
         <p className="mdesc">{cur.desc}</p>
         {cur.extra && <div className={cur.on ? "" : "dim"}>{cur.extra}</div>}
       </div>
+    </div>
+  );
+}
+
+/** made-up students so the layout can be previewed without a session open */
+const SAMPLE: ExportRow[] = (
+  [
+    ["1028899 - Okafor, Hana", ["correct", "correct", "wrong", "correct"]],
+    ["1031407 - Lindqvist, Mateo", ["correct", "wrong", "wrong", "correct"]],
+    ["1030215 - Abara, Priya", ["correct", "correct", "correct", "ungraded"]],
+  ] as const
+).map(([folder, st], i) => {
+  const res = st.map((status, j) => ({ q: j + 1, status, text: status === "correct" ? "Correct" : status === "wrong" ? "Dermis" : "Ungraded" }));
+  const score = res.filter((r) => r.status === "correct").length;
+  const name = folder.replace(/^\d+ - /, "");
+  return {
+    stu: { id: String(i), name, folder },
+    res,
+    text: res.map((r) => `Q${r.q}: ${r.text}`).join("\n") + `\n\nScore: ${score}/4`,
+    score,
+    total: 4,
+  };
+});
+
+function ExportPane({ s }: { s: Settings }) {
+  const t = exportTable(SAMPLE, [1, 2, 3, 4], { columns: s.exportColumns, uidFrom: s.exportUid, ungradedItem: s.exportUngraded });
+  return (
+    <div className="ex-pref">
+      <ExportLayoutEditor />
+      <div className="ex-sub">
+        <span>Sample</span>
+        <span className="muted small">made-up students, 4 questions · drag headers to reorder</span>
+      </div>
+      <CsvPreviewTable table={t} qCount={4} clip={24} />
+    </div>
+  );
+}
+
+const TEXT_KEYS = [
+  "wrongNeedsReason",
+  "wrongDefaultText",
+  "doubleMessage",
+  "noAnswerMessage",
+  "fbHeader",
+  "fbLine",
+  "fbCorrect",
+  "fbCorrectNote",
+  "fbWrongNote",
+  "fbUngraded",
+  "fbScore",
+  "fbScoreOn",
+  "fbShow",
+  "fbAllCorrect",
+] as const;
+
+const Tok = ({ t }: { t: string }) => <code className="tok">{`{${t}}`}</code>;
+
+type TextKey =
+  | "fbHeader"
+  | "fbLine"
+  | "fbCorrect"
+  | "fbCorrectNote"
+  | "fbWrongNote"
+  | "wrongDefaultText"
+  | "doubleMessage"
+  | "noAnswerMessage"
+  | "fbUngraded"
+  | "fbScore"
+  | "fbAllCorrect";
+
+const WORDING: Record<TextKey, { label: string; help: ReactNode }> = {
+  fbHeader: { label: "Header", help: "first line; leave empty for none" },
+  fbLine: {
+    label: "Question line",
+    help: (
+      <>
+        <Tok t="q" /> question number, <Tok t="text" /> the result
+      </>
+    ),
+  },
+  fbCorrect: { label: "Correct", help: "a correct answer with no note" },
+  fbCorrectNote: {
+    label: "Correct + note",
+    help: (
+      <>
+        <Tok t="note" /> what you typed when grading
+      </>
+    ),
+  },
+  fbWrongNote: {
+    label: "Wrong + reason",
+    help: (
+      <>
+        <Tok t="note" /> the reason; e.g. <code>Incorrect: {"{note}"}</code>
+      </>
+    ),
+  },
+  wrongDefaultText: { label: "Wrong, no reason", help: "a wrong answer with no reason given" },
+  doubleMessage: { label: "Multiple pins", help: "more than one pin for the question" },
+  noAnswerMessage: { label: "No answer", help: "no pin for the question" },
+  fbUngraded: { label: "Not graded yet", help: "only seen if you export before finishing" },
+  fbScore: {
+    label: "Score line",
+    help: (
+      <>
+        <Tok t="score" /> <Tok t="total" /> <Tok t="percent" />
+      </>
+    ),
+  },
+  fbAllCorrect: { label: "All correct", help: "with Mistakes only, shown when nothing is wrong" },
+};
+
+/** made-up answers covering each kind of line */
+const FB_SAMPLE: { q: number; kind: "correct" | "correctNote" | "wrongNote" | "wrong" | "double" | "none" | "ungraded"; note?: string }[] = [
+  { q: 1, kind: "correct" },
+  { q: 2, kind: "correctNote", note: "eccrine gland" },
+  { q: 3, kind: "wrongNote", note: "Dermis, not epidermis" },
+  { q: 4, kind: "wrong" },
+  { q: 5, kind: "double" },
+  { q: 6, kind: "none" },
+  { q: 7, kind: "ungraded" },
+];
+
+/**
+ * The feedback a student reads, where each piece of wording is clickable and edits its template in place.
+ * Per-student values ({q}, {note}, the score) render as grey chips and aren't editable.
+ */
+function EditableFeedback({
+  s,
+  set,
+  onFocusKey,
+}: {
+  s: Settings;
+  set: (patch: Partial<Settings>) => void;
+  onFocusKey: (k: TextKey | null) => void;
+}) {
+  const [editing, setEditing] = useState<{ key: TextKey; at: string; orig: string } | null>(null);
+
+  const val = (v: ReactNode) => <span className="fb-val">{v}</span>;
+  /** one template: its literal text is the editable part, {tokens} become the given nodes */
+  const T = (key: TextKey, at: string, vars: Record<string, ReactNode> = {}) => {
+    if (editing?.key === key && editing.at === at)
+      return (
+        <input
+          className="fb-input"
+          autoFocus
+          spellCheck={false}
+          value={s[key]}
+          style={{ width: `${Math.max(6, s[key].length + 3)}ch` }}
+          onChange={(e) => set({ [key]: e.target.value } as Partial<Settings>)}
+          onKeyDown={(e) => {
+            e.stopPropagation();
+            if (e.key === "Enter") setEditing(null);
+            if (e.key === "Escape") {
+              set({ [key]: editing.orig } as Partial<Settings>);
+              setEditing(null);
+            }
+          }}
+          onBlur={() => {
+            setEditing(null);
+            onFocusKey(null);
+          }}
+        />
+      );
+    const parts = s[key].split(/(\{\w+\})/);
+    const empty = !s[key];
+    return (
+      <span
+        className={`fb-ed ${empty ? "empty" : ""}`}
+        data-k={key}
+        onMouseDown={(e) => {
+          if ((e.target as HTMLElement).closest(".fb-ed") !== e.currentTarget) return; // inner template handles it
+          e.preventDefault();
+          setEditing({ key, at, orig: s[key] });
+          onFocusKey(key);
+        }}
+      >
+        {empty
+          ? `+ ${WORDING[key].label.toLowerCase()}`
+          : parts.map((p, i) => {
+              const m = p.match(/^\{(\w+)\}$/);
+              return <Fragment key={i}>{m && m[1] in vars ? vars[m[1]] : p}</Fragment>;
+            })}
+      </span>
+    );
+  };
+
+  const shown = FB_SAMPLE.filter((r) => s.fbShow === "all" || !(r.kind === "correct" || r.kind === "correctNote"));
+  const score = FB_SAMPLE.filter((r) => r.kind === "correct" || r.kind === "correctNote").length;
+  const total = FB_SAMPLE.length;
+  const nums = { score: val(score), total: val(total), percent: val(Math.round((score / total) * 100)) };
+  const body = (r: (typeof FB_SAMPLE)[number]) => {
+    const at = `q${r.q}`;
+    switch (r.kind) {
+      case "correct":
+        return T("fbCorrect", at);
+      case "correctNote":
+        return T("fbCorrectNote", at, { note: val(r.note) });
+      case "wrongNote":
+        return T("fbWrongNote", at, { note: val(r.note) });
+      case "wrong":
+        return T("wrongDefaultText", at);
+      case "double":
+        return T("doubleMessage", at);
+      case "none":
+        return T("noAnswerMessage", at);
+      case "ungraded":
+        return T("fbUngraded", at);
+    }
+  };
+
+  return (
+    <div
+      className={`fb-doc ${editing ? "editing" : ""}`}
+      onMouseOver={(e) => {
+        if (editing) return;
+        const el = (e.target as HTMLElement).closest<HTMLElement>(".fb-ed");
+        onFocusKey((el?.dataset.k as TextKey) ?? null);
+      }}
+      onMouseLeave={() => !editing && onFocusKey(null)}
+    >
+      <div className="fb-line">{T("fbHeader", "head", nums)}</div>
+      {shown.map((r) => (
+        <div className="fb-line" key={r.q}>
+          {T("fbLine", `line${r.q}`, { q: val(r.q), text: body(r) })}
+        </div>
+      ))}
+      {s.fbScoreOn && (
+        <>
+          <div className="fb-line">&nbsp;</div>
+          <div className="fb-line">{T("fbScore", "score", nums)}</div>
+        </>
+      )}
+    </div>
+  );
+}
+
+function TextPane({
+  s,
+  set,
+  row,
+  txt,
+}: {
+  s: Settings;
+  set: (patch: Partial<Settings>) => void;
+  row: (label: string, ctl: ReactNode, help?: ReactNode) => ReactNode;
+  txt: (k: keyof Settings) => ReactNode;
+}) {
+  const [focus, setFocus] = useState<TextKey | null>(null);
+  const changed = TEXT_KEYS.some((k) => s[k] !== defaultSettings[k]);
+  const resetText = () => set(Object.fromEntries(TEXT_KEYS.map((k) => [k, defaultSettings[k]])) as Partial<Settings>);
+
+  return (
+    <div className="text-pane">
+      <div className="fb-bar">
+        <label className="check">
+          <input type="checkbox" checked={s.wrongNeedsReason} onChange={(e) => set({ wrongNeedsReason: e.target.checked })} />
+          Wrong answers need a reason
+        </label>
+        <div className="seg">
+          <button className={s.fbShow === "all" ? "on" : ""} onClick={() => set({ fbShow: "all" })}>
+            All questions
+          </button>
+          <button className={s.fbShow === "notCorrect" ? "on" : ""} onClick={() => set({ fbShow: "notCorrect" })}>
+            Mistakes only
+          </button>
+        </div>
+        <label className="check">
+          <input type="checkbox" checked={s.fbScoreOn} onChange={(e) => set({ fbScoreOn: e.target.checked })} />
+          Score line
+        </label>
+      </div>
+
+      <div className="fb-frame">
+        <div className="fb-title">
+          <span>Student sees</span>
+          {changed && (
+            <button className="btn ghost small" onClick={resetText}>
+              Reset wording
+            </button>
+          )}
+        </div>
+        <EditableFeedback s={s} set={set} onFocusKey={setFocus} />
+        <div className="fb-hint">
+          {focus ? (
+            <>
+              <b>{WORDING[focus].label}</b> · {WORDING[focus].help}
+            </>
+          ) : (
+            <>Hover the text to see what each piece is, click to change it. Grey parts are filled in for each student.</>
+          )}
+        </div>
+      </div>
+      <p className="muted small">The same text goes into the Comment column of grades.csv.</p>
+
+      <details className="fb-fields">
+        <summary>All wording as fields</summary>
+        <div className="group">
+          {(Object.keys(WORDING) as TextKey[]).map((k) => (
+            <Fragment key={k}>{row(WORDING[k].label, txt(k), WORDING[k].help)}</Fragment>
+          ))}
+        </div>
+      </details>
     </div>
   );
 }
