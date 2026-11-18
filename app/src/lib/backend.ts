@@ -4,7 +4,8 @@ import type { SlideInfo } from "./types";
 export const openSlide = (path: string) => invoke<SlideInfo>("open_slide", { path });
 export const listFiles = (dir: string, suffixes: string[] = []) =>
   invoke<string[]>("list_files", { dir, suffixes });
-export const readText = (path: string) => invoke<string>("read_text", { path });
+/** maxBytes: reject files larger than this (used for untrusted student files) */
+export const readText = (path: string, maxBytes?: number) => invoke<string>("read_text", { path, maxBytes });
 export const readBytes = async (path: string) =>
   new Uint8Array(await invoke<ArrayBuffer>("read_bytes", { path }));
 export const writeText = (path: string, contents: string, keepBackup = false) =>

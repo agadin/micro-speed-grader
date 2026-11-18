@@ -12,6 +12,10 @@ use libloading::Library;
 use serde::Serialize;
 
 pub const TILE_SIZE: u32 = 256;
+/// Largest region read from one pyramid level for a single tile. Coarse Deep-Zoom tiles of a
+/// normal slide read the whole coarsest level (a few megapixels); this only stops slides with no
+/// usable low-resolution level from asking for gigabytes (or an overflowed size).
+const MAX_REGION_PIXELS: i64 = 8192 * 8192;
 
 type OsrPtr = *mut std::ffi::c_void;
 
@@ -215,8 +219,9 @@ impl Slide {
         let ds = 2f64.powi((self.info.max_level - level) as i32);
         let lw = (self.info.width as f64 / ds).ceil() as u32;
         let lh = (self.info.height as f64 / ds).ceil() as u32;
-        let x0 = tx * TILE_SIZE;
-        let y0 = ty * TILE_SIZE;
+        let (Some(x0), Some(y0)) = (tx.checked_mul(TILE_SIZE), ty.checked_mul(TILE_SIZE)) else {
+            return Err("tile out of range".into());
+        };
         if x0 >= lw || y0 >= lh {
             return Err("tile out of range".into());
         }
@@ -230,7 +235,13 @@ impl Slide {
         let l0y = (y0 as f64 * ds) as i64;
         let rw = ((tw as f64 * ds) / lds).ceil().max(1.0) as i64;
         let rh = ((th as f64 * ds) / lds).ceil().max(1.0) as i64;
-        let mut buf = vec![0u32; (rw * rh) as usize];
+        // The region size comes from the file's pyramid. A slide with no coarse levels would
+        // ask for a huge (or, wrapped, too small) buffer; refuse instead of trusting it.
+        let n = match rw.checked_mul(rh) {
+            Some(n) if n > 0 && n <= MAX_REGION_PIXELS => n as usize,
+            _ => return Err("tile region too large (slide has no low-resolution levels)".into()),
+        };
+        let mut buf = vec![0u32; n];
         unsafe { (a.read_region)(self.osr, buf.as_mut_ptr(), l0x, l0y, best as i32, rw, rh) };
         let err = unsafe { (a.get_error)(self.osr) };
         if !err.is_null() {

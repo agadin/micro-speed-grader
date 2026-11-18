@@ -8,7 +8,8 @@ import { computeClusters } from "../src/lib/cluster";
 import { buildTasks, pinsForTask, doublePinIds, studentResults, feedbackText } from "../src/lib/grading";
 import { defaultSettings } from "../src/lib/settings";
 import { isPainted, pinsInPaint, type PaintOp } from "../src/lib/paint";
-import { exportTable, kr20, parseStudentName, EXPORT_PRESETS, testStats, type ExportRow } from "../src/lib/exportCsv";
+import { exportTable, kr20, parseStudentName, EXPORT_PRESETS, testStats, safeFileName, uniqueFileNames, textCell, toCsv, type ExportRow } from "../src/lib/exportCsv";
+import { MAX_ANNOTATIONS } from "../src/lib/ndpa";
 import type { Pin, Session } from "../src/lib/types";
 import { emptyGrades } from "../src/lib/types";
 
@@ -124,6 +125,51 @@ ok(!!dbl && studentResults(session, dbl, defaultSettings)[0].text === defaultSet
   const st = testStats(rows, [1, 2, 3]);
   ok(st.n === 4 && st.excluded === 1 && Math.abs((st.kr20 ?? 0) - 0.75) < 1e-9, `stats: n=${st.n} kr20=${st.kr20}`);
   ok(Math.abs(st.items[0].p - 0.75) < 1e-9, "item difficulty");
+}
+
+
+// security patch regressions
+{
+  // CSV: student names that look like formulas are written as text; numbers are untouched
+  ok(textCell("=HYPERLINK(1)") === "'=HYPERLINK(1)" && textCell("+1") === "'+1" && textCell("@x") === "'@x" && textCell("Smith") === "Smith", "formula-like text neutralised");
+  const stu = (folder: string) => ({ stu: { id: folder, name: folder, folder }, res: [{ q: 1, status: "wrong" as const, text: "x" }], text: "fb", score: -1, total: 1 });
+  const t = exportTable([stu("123 - =cmd, -2+3")], [1], { columns: EXPORT_PRESETS[0].columns, uidFrom: "folder", ungradedItem: "blank" });
+  ok(t[1][1] === "'=cmd" && t[1][2] === "'-2+3" && t[1][3] === "-1", `csv row ${t[1].join("|")}`);
+  ok(!/(^|,)[=+@]/.test(toCsv(t).split("\r\n")[1]), "no cell starts with a formula character");
+
+  // feedback file names: reserved Windows names, control chars, length, collisions
+  ok(safeFileName("CON") === "_CON" && safeFileName("nul.txt") === "_nul.txt" && safeFileName("com1") === "_com1", "reserved names prefixed");
+  ok(safeFileName("a\u0001b. ") === "ab", "control chars and trailing dot/space removed");
+  for (const n of ["../..", "..", ".", "a/../b", "C:\\x", " "]) {
+    const f = safeFileName(n);
+    ok(!/[\\/:]/.test(f) && f !== "." && f !== "..", `safe name for ${JSON.stringify(n)} -> ${JSON.stringify(f)}`);
+  }
+  ok(new TextEncoder().encode(safeFileName("a".repeat(400))).length <= 150, "long names truncated");
+  const u = uniqueFileNames(["Smith_Jane", "Smith_Jane", "smith_jane", "a:b", "a*b"]);
+  ok(new Set(u.map((x) => x.toLowerCase())).size === u.length, `unique names ${u.join(" | ")}`);
+
+  // title regex stays linear on hostile input
+  const t0 = performance.now();
+  matchTitle("q" + " ".repeat(200000) + "x", [1, 2]);
+  matchTitle("question" + " ".repeat(200000) + "#" + " ".repeat(200000) + "x", [1, 2]);
+  ok(performance.now() - t0 < 200, `hostile title matched in ${(performance.now() - t0).toFixed(1)} ms`);
+  ok(matchTitle("Question # 3", [3]).q === 3 && matchTitle("q#4", [4]).q === 4, "q# forms still match");
+
+  // nested viewstates don't duplicate annotations; count is capped
+  const pin = "<annotation type='pin'><x>1</x><y>2</y></annotation>";
+  const nested = `<annotations><ndpviewstate><title>a</title>${pin}<ndpviewstate><title>b</title>${pin}<ndpviewstate><title>c</title>${pin}</ndpviewstate></ndpviewstate></ndpviewstate></annotations>`;
+  const pn = parseNdpa(nested);
+  ok(pn.length === 3 && pn.map((a) => a.title).join("") === "abc", `nested viewstates -> ${pn.map((a) => a.title).join(",")}`);
+  const flood = `<annotations><ndpviewstate><title>x</title>${pin.repeat(5000)}</ndpviewstate></annotations>`;
+  ok(parseNdpa(flood).length === MAX_ANNOTATIONS, "annotation count capped");
+
+  // clustering stays fast with far-apart pairs (was cubic)
+  const many: Pin[] = [];
+  for (let i = 0; i < 3000; i++) for (const k of [0, 1]) many.push({ id: `c${i}_${k}`, studentId: "s", slide: "S", rawTitle: "", details: "", q: 1, candidates: [], titleGuessed: false, xNm: i * 1e7, yNm: k, annotationType: "pin" } as Pin);
+  const c0 = performance.now();
+  const cl = computeClusters(many, 25, 2);
+  ok(cl.filter((c) => !c.single).length === 3000, `pairs clustered (${cl.length})`);
+  ok(performance.now() - c0 < 2000, `6000 pins clustered in ${(performance.now() - c0).toFixed(0)} ms`);
 }
 
 process.exit(fails ? 1 : 0);

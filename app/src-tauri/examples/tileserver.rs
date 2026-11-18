@@ -34,10 +34,16 @@ fn unescape(s: &str) -> String {
     String::from_utf8_lossy(&out).into_owned()
 }
 
+/// Only the local dev page may read responses (was `*`, which let any website read local slides).
+fn allowed_origin() -> String {
+    std::env::var("MSG_TILE_ORIGIN").unwrap_or_else(|_| "http://localhost:1420".into())
+}
+
 fn reply(mut s: TcpStream, status: &str, ctype: &str, body: &[u8]) {
     let head = format!(
-        "HTTP/1.1 {status}\r\nContent-Type: {ctype}\r\nContent-Length: {}\r\nAccess-Control-Allow-Origin: *\r\nConnection: close\r\n\r\n",
-        body.len()
+        "HTTP/1.1 {status}\r\nContent-Type: {ctype}\r\nContent-Length: {}\r\nAccess-Control-Allow-Origin: {}\r\nVary: Origin\r\nConnection: close\r\n\r\n",
+        body.len(),
+        allowed_origin()
     );
     let _ = s.write_all(head.as_bytes());
     let _ = s.write_all(body);
@@ -49,11 +55,22 @@ fn handle(reg: &SlideRegistry, s: TcpStream) {
     if r.read_line(&mut line).is_err() {
         return;
     }
+    let mut host = String::new();
     loop {
         let mut h = String::new();
         if r.read_line(&mut h).is_err() || h == "\r\n" || h.is_empty() {
             break;
         }
+        if let Some((k, v)) = h.split_once(':') {
+            if k.eq_ignore_ascii_case("host") {
+                host = v.trim().to_ascii_lowercase();
+            }
+        }
+    }
+    // reject DNS-rebinding requests: the Host must be the loopback address we bound
+    let name = host.rsplit_once(':').map(|(n, _)| n).unwrap_or(&host);
+    if !matches!(name, "127.0.0.1" | "localhost" | "[::1]") {
+        return reply(s, "403 Forbidden", "text/plain", b"bad host");
     }
     let target = line.split_whitespace().nth(1).unwrap_or("/").to_string();
     if let Some(q) = target.strip_prefix("/open?path=") {

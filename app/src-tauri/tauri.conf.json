@@ -48,7 +48,8 @@
       "pubkey": "dW50cnVzdGVkIGNvbW1lbnQ6IG1pbmlzaWduIHB1YmxpYyBrZXk6IDkyMjQxRTg3RDQxMUU2RTYKUldUbTVoSFVoeDRra2xLWjRBSHpSeVA2bW1scVFCeUo2dWl4bFlVR1RpdHB3QnpoVWdvU3gyQ04K",
       "endpoints": [
         "https://github.com/agadin/micro-speed-grader/releases/latest/download/latest.json"
-      ]
+      ],
+      "requireSignedVersion": true
     }
   }
 }

@@ -4,10 +4,9 @@ import type { Session } from "../lib/types";
 import { useSettings } from "../lib/settings";
 import { feedbackText, studentResults } from "../lib/grading";
 import { dirname, joinPath, writeText } from "../lib/backend";
-import { exportTable, statsTable, testStats, toCsv, type ExportRow } from "../lib/exportCsv";
+import { exportTable, statsTable, testStats, toCsv, uniqueFileNames, type ExportRow } from "../lib/exportCsv";
 import { CsvPreviewTable, ExportLayoutEditor } from "./ExportLayout";
 
-const safeFile = (s: string) => s.replace(/[\\/:*?"<>|]+/g, "_").trim() || "student";
 const fmt = (x: number | null, d = 2) => (x === null || !Number.isFinite(x) ? "—" : (x + 0).toFixed(d).replace(/^-(0\.0*)$/, "$1"));
 
 /** rule-of-thumb reading of KR-20 for a classroom test */
@@ -50,9 +49,19 @@ export function ExportDialog({ session, onClose }: { session: Session; onClose: 
   const exportCsv = async () => {
     try {
       await writeText(joinPath(dir, "grades.csv"), toCsv(table));
-      if (settings.exportFeedback)
-        for (const r of rows) await writeText(joinPath(dir, "feedback", `${safeFile(r.stu.name)}.txt`), r.text);
-      setStatus(`Wrote grades.csv${settings.exportFeedback ? ` and ${rows.length} feedback files` : ""} to ${dir}`);
+      const failed: string[] = [];
+      if (settings.exportFeedback) {
+        const names = uniqueFileNames(rows.map((r) => r.stu.name));
+        // one bad file must not stop the other students' feedback from being written
+        for (const [i, r] of rows.entries())
+          await writeText(joinPath(dir, "feedback", `${names[i]}.txt`), r.text).catch(() => failed.push(r.stu.name));
+      }
+      const wrote = rows.length - failed.length;
+      setStatus(
+        failed.length
+          ? `Export failed for ${failed.length} feedback file${failed.length > 1 ? "s" : ""} (${failed.slice(0, 3).join(", ")}${failed.length > 3 ? "…" : ""}); wrote grades.csv and ${wrote} others to ${dir}`
+          : `Wrote grades.csv${settings.exportFeedback ? ` and ${rows.length} feedback files` : ""} to ${dir}`,
+      );
     } catch (e) {
       setStatus(`Export failed: ${e}`);
     }

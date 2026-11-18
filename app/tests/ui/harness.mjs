@@ -61,6 +61,7 @@ async function command(cmd, a) {
     case "list_files":
       return listFiles(a.dir, a.suffixes ?? []);
     case "read_text":
+      if (a.maxBytes != null && fs.statSync(a.path).size > a.maxBytes) throw new Error(`${a.path}: file is larger than ${a.maxBytes} bytes`);
       return fs.readFileSync(a.path, "utf8").replace(/^﻿/, "");
     case "read_bytes":
       return { __bytes: fs.readFileSync(a.path).toString("base64") };

@@ -10,14 +10,27 @@ export interface RawAnnotation {
 
 const text = (el: Element | null | undefined) => (el?.textContent ?? "").trim();
 
+/** Limits on student-supplied annotation files (real submissions have a handful of pins). */
+export const MAX_ANNOTATIONS = 200;
+const MAX_TITLE = 300;
+
+const childNamed = (el: Element, tag: string) => Array.from(el.children).find((c) => c.tagName === tag) ?? el.getElementsByTagName(tag)[0];
+function nearestViewstate(el: Element): Element | null {
+  for (let p = el.parentElement; p; p = p.parentElement) if (p.tagName === "ndpviewstate") return p;
+  return null;
+}
+
 export function parseNdpa(xml: string): RawAnnotation[] {
   const doc = new DOMParser().parseFromString(xml, "application/xml");
   if (doc.querySelector("parsererror")) throw new Error("Invalid annotation XML");
   const out: RawAnnotation[] = [];
   for (const vs of Array.from(doc.getElementsByTagName("ndpviewstate"))) {
-    const title = text(vs.getElementsByTagName("title")[0]);
-    const details = text(vs.getElementsByTagName("details")[0]);
-    for (const ann of Array.from(vs.getElementsByTagName("annotation"))) {
+    const title = text(childNamed(vs, "title")).slice(0, MAX_TITLE);
+    const details = text(childNamed(vs, "details")).slice(0, MAX_TITLE);
+    // only annotations whose nearest viewstate is this one: nested viewstates must not count them twice
+    const own = Array.from(vs.getElementsByTagName("annotation")).filter((a) => nearestViewstate(a) === vs);
+    for (const ann of own) {
+      if (out.length >= MAX_ANNOTATIONS) return out;
       const type = ann.getAttribute("type") ?? "pin";
       let x: number, y: number;
       const direct = Array.from(ann.children);
@@ -56,10 +69,11 @@ export function slideIdFromFilename(name: string): string | null {
  * Returns the number if it is a valid question for this slide; otherwise null.
  */
 export function matchTitle(title: string, slideQuestions: number[]): { q: number | null; clean: boolean } {
-  const t = title.trim();
+  // titles are student-written: cap the length so matching stays cheap
+  const t = title.trim().slice(0, MAX_TITLE);
   const strict = t.match(/^q\s*(\d+)$/i);
   if (strict && slideQuestions.includes(Number(strict[1]))) return { q: Number(strict[1]), clean: true };
-  const qish = t.match(/\bq(?:uestion)?\s*#?\s*(\d+)/i) ?? t.match(/q(\d+)/i);
+  const qish = t.match(/\bq(?:uestion)?\s*(?:#\s*)?(\d+)/i) ?? t.match(/q(\d+)/i);
   if (qish && slideQuestions.includes(Number(qish[1]))) return { q: Number(qish[1]), clean: false };
   const nums = (t.match(/\d+/g) ?? []).map(Number).filter((n) => slideQuestions.includes(n));
   if (nums.length === 1) return { q: nums[0], clean: false };

@@ -33,7 +33,7 @@ ditto -c -k --keepParent "Micro Speed Grader.app" "$OUT/app.zip"
 xcrun notarytool submit "$OUT/app.zip" --keychain-profile notary --wait
 xcrun stapler staple "Micro Speed Grader.app"
 COPYFILE_DISABLE=1 tar -czf "$OUT/Micro-Speed-Grader.app.tar.gz" "Micro Speed Grader.app"
-(cd "$APP" && TAURI_SIGNING_PRIVATE_KEY_PASSWORD="" npx tauri signer sign -f "$KEY" "$OUT/Micro-Speed-Grader.app.tar.gz")
+(cd "$APP" && TAURI_SIGNING_PRIVATE_KEY_PASSWORD="" npx tauri signer sign -f "$KEY" --app-version "$VER" "$OUT/Micro-Speed-Grader.app.tar.gz")
 
 DMG="$OUT/Micro-Speed-Grader_${VER}_macOS-arm64.dmg"
 cp "$B/dmg/Micro Speed Grader_${VER}_aarch64.dmg" "$DMG"

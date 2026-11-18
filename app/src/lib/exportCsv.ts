@@ -113,6 +113,13 @@ export interface ExportRow {
   total: number;
 }
 
+/**
+ * Text that a spreadsheet would read as a formula (=, +, -, @, tab, CR at the start) gets a leading
+ * apostrophe so it is shown as text. Student names come from folder names, so they are untrusted.
+ * Only applied to text columns: numbers (scores, item columns, statistics) stay numeric.
+ */
+export const textCell = (s: string) => (/^[=+\-@\t\r]/.test(s) ? `'${s}` : s);
+
 const csvCell = (v: string | number) => {
   const s = String(v);
   return /[",\n\r]/.test(s) ? `"${s.replace(/"/g, '""')}"` : s;
@@ -123,8 +130,8 @@ export function exportTable(rows: ExportRow[], qs: number[], o: ExportOptions): 
   const head: string[] = [];
   for (const c of o.columns)
     if (c.on) {
-      if (c.id === "items") head.push(...qs.map((q) => `${c.header}${q}`));
-      else head.push(c.header);
+      if (c.id === "items") head.push(...qs.map((q) => textCell(`${c.header}${q}`)));
+      else head.push(textCell(c.header));
     }
   const body = rows.map((r) => {
     const n = parseStudentName(r.stu.folder || r.stu.name);
@@ -133,16 +140,16 @@ export function exportTable(rows: ExportRow[], qs: number[], o: ExportOptions): 
       if (!c.on) continue;
       switch (c.id) {
         case "uid":
-          out.push(o.uidFrom === "folder" ? n.uid : "");
+          out.push(o.uidFrom === "folder" ? textCell(n.uid) : "");
           break;
         case "surname":
-          out.push(n.surname);
+          out.push(textCell(n.surname));
           break;
         case "first":
-          out.push(n.first);
+          out.push(textCell(n.first));
           break;
         case "student":
-          out.push(r.stu.name);
+          out.push(textCell(r.stu.name));
           break;
         case "correct":
           out.push(String(r.score));
@@ -157,7 +164,7 @@ export function exportTable(rows: ExportRow[], qs: number[], o: ExportOptions): 
           out.push(r.total ? String(Math.round((r.score / r.total) * 1000) / 10) : "");
           break;
         case "comment":
-          out.push(r.text);
+          out.push(textCell(r.text));
           break;
         case "items":
           for (const q of qs) {
@@ -271,4 +278,33 @@ export function statsTable(s: TestStats): string[][] {
     ["Question", "Difficulty (p)", "Point-biserial (corrected)", "KR-20 if deleted", "Correct", "Incorrect"],
     ...s.items.map((it) => [`Q${it.q}`, f(it.p), f(it.rpb), f(it.kr20IfDeleted), String(it.correct), String(it.incorrect)]),
   ];
+}
+
+// ---------- feedback file names ----------
+
+const WIN_RESERVED = /^(con|prn|aux|nul|com[0-9]|lpt[0-9])(\..*)?$/i;
+
+/** A file name (without extension) that is safe on macOS, Windows and Linux. */
+export function safeFileName(name: string): string {
+  let s = name
+    .replace(/[\u0000-\u001f\u007f]/g, "")
+    .replace(/[\\/:*?"<>|]+/g, "_")
+    .trim()
+    .replace(/[. ]+$/, "");
+  if (WIN_RESERVED.test(s)) s = `_${s}`;
+  // leave room for ".txt" and the writer's temporary suffix within the 255-byte limit
+  while (new TextEncoder().encode(s).length > 150) s = s.slice(0, -1);
+  return s || "student";
+}
+
+/** Distinct safe names for each input, case-insensitively, so no student's file overwrites another's. */
+export function uniqueFileNames(names: string[]): string[] {
+  const used = new Set<string>();
+  return names.map((n) => {
+    const base = safeFileName(n);
+    let s = base;
+    for (let i = 2; used.has(s.toLowerCase()); i++) s = `${base} (${i})`;
+    used.add(s.toLowerCase());
+    return s;
+  });
 }

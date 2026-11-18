@@ -25,12 +25,17 @@ export interface ScanResult {
   warnings: string[];
 }
 
+/** Student annotation files are a few KB; refuse anything absurd before parsing. */
+export const MAX_NDPA_BYTES = 2 * 1024 * 1024;
+export const MAX_PINS_PER_STUDENT_SLIDE = 50;
+
 export async function scanSubmissions(dir: string, questions: Question[]): Promise<ScanResult> {
   const files = await listFiles(dir, [".ndpa"]);
   const warnings: string[] = [];
   const root = dir.replace(/[\\/]+$/, "");
   const studentsByFolder = new Map<string, Student>();
   const pins: Pin[] = [];
+  const pinsPerStudentSlide = new Map<string, number>();
 
   const included = questions.filter((q) => q.include);
   const questionsBySlide = new Map<string, number[]>();
@@ -52,11 +57,19 @@ export async function scanSubmissions(dir: string, questions: Question[]): Promi
     if (!slideQs) continue; // slide not used by any included question
     let anns;
     try {
-      anns = parseNdpa(await readText(f));
+      anns = parseNdpa(await readText(f, MAX_NDPA_BYTES));
     } catch (e) {
       warnings.push(`${rel}: ${e}`);
       continue;
     }
+    // one student can't flood a slide with pins (keeps clustering and grading responsive)
+    const key = `${student.id}|${slide}`;
+    const have = pinsPerStudentSlide.get(key) ?? 0;
+    if (have + anns.length > MAX_PINS_PER_STUDENT_SLIDE) {
+      warnings.push(`${rel}: only the first ${MAX_PINS_PER_STUDENT_SLIDE} pins on ${slide} were kept for this student`);
+      anns = anns.slice(0, Math.max(0, MAX_PINS_PER_STUDENT_SLIDE - have));
+    }
+    pinsPerStudentSlide.set(key, have + anns.length);
     for (const a of anns) {
       const m = matchTitle(a.title, slideQs);
       let q = m.q;
@@ -85,11 +98,17 @@ export async function scanSubmissions(dir: string, questions: Question[]): Promi
 
   // Ambiguous pins: if the student already answered every other candidate
   // question on this slide, the leftover one is the obvious match.
+  // (indexed once per student+slide: a per-pin scan of all pins is quadratic)
+  const answeredBy = new Map<string, Set<number>>();
+  for (const o of pins)
+    if (o.q !== null) {
+      const k = `${o.studentId}|${o.slide}`;
+      if (!answeredBy.has(k)) answeredBy.set(k, new Set());
+      answeredBy.get(k)!.add(o.q);
+    }
   for (const p of pins) {
     if (p.q !== null) continue;
-    const answered = new Set(
-      pins.filter((o) => o.studentId === p.studentId && o.slide === p.slide && o.q !== null).map((o) => o.q!),
-    );
+    const answered = answeredBy.get(`${p.studentId}|${p.slide}`) ?? new Set<number>();
     const left = p.candidates.filter((c) => !answered.has(c));
     if (left.length === 1) {
       p.q = left[0];

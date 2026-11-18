@@ -10,10 +10,20 @@ use tauri::{Emitter, Manager};
 
 #[tauri::command]
 async fn open_slide(state: tauri::State<'_, Arc<SlideRegistry>>, path: String) -> Result<SlideInfo, String> {
+    // Slide paths can come from a shared .msgrade file: never let one reach out to a
+    // network share (on Windows a UNC path makes the OS send the grader's credentials).
+    if is_remote_path(&path) {
+        return Err(format!("{path}: network paths are not allowed for slides"));
+    }
     let reg = state.inner().clone();
     tauri::async_runtime::spawn_blocking(move || reg.open(&path))
         .await
         .map_err(|e| e.to_string())?
+}
+
+fn is_remote_path(p: &str) -> bool {
+    let t = p.trim_start();
+    t.starts_with("\\\\") || t.starts_with("//") || t.starts_with("\\/") || t.starts_with("/\\")
 }
 
 /// Recursively list files under `dir` whose name ends with one of `suffixes`
@@ -46,7 +56,13 @@ fn list_files(dir: String, suffixes: Vec<String>) -> Result<Vec<String>, String>
 }
 
 #[tauri::command]
-fn read_text(path: String) -> Result<String, String> {
+fn read_text(path: String, max_bytes: Option<u64>) -> Result<String, String> {
+    if let Some(max) = max_bytes {
+        let len = std::fs::metadata(&path).map_err(|e| format!("{path}: {e}"))?.len();
+        if len > max {
+            return Err(format!("{path}: file is larger than {max} bytes"));
+        }
+    }
     let bytes = std::fs::read(&path).map_err(|e| format!("{path}: {e}"))?;
     // .ndpa files are UTF-8, but be forgiving about BOMs / stray bytes
     let s = String::from_utf8_lossy(&bytes);
