@@ -86,8 +86,8 @@ interface Store {
   saveNow: () => Promise<void>;
   /** host: record packs sent out / recalled */
   setHandoffs: (h: Handoff[]) => void;
-  /** host: merge a guest's results (one undo step) */
-  applyResult: (grades: GradeState, h: Handoff[], timeLog?: TimeEvent[]) => void;
+  /** host: merge a guest's results (one undo step); `retired`: grades for pins changed since the pack was sent */
+  applyResult: (grades: GradeState, h: Handoff[], timeLog?: TimeEvent[], retired?: RetiredPin[]) => void;
   /** the exam's questions were edited inside the session (clears undo; a copy was saved at `backup`) */
   applyQuestionEdit: (questions: Question[], r: RescanResult, grades: GradeState, backup: string) => void;
   /** "Things to check" after a rescan: files whose slide was chosen, and acknowledged problems */
@@ -171,7 +171,7 @@ export const useStore = create<Store>((set, get) => {
 
     load: (session) => {
       lastActivity = Date.now();
-      set({ session, past: [], future: [], dirty: false, selection: [], clusterIndex: 0, menu: null, isolate: false, keyMode: false, keyApplyOpen: false, changesOpen: false, studentView: null });
+      set({ session, past: [], future: [], dirty: false, selection: [], clusterIndex: 0, menu: null, isolate: false, keyMode: false, keyApplyOpen: false, changesOpen: false, studentView: null, notice: null });
     },
     close: () => set({ session: null, past: [], future: [], studentView: null }),
 
@@ -274,11 +274,11 @@ export const useStore = create<Store>((set, get) => {
       set({ session: { ...s, handoffs }, dirty: true });
       scheduleSave();
     },
-    applyResult: (grades, handoffs, timeLog) => {
+    applyResult: (grades, handoffs, timeLog, retired) => {
       const s = get().session;
       if (!s) return;
       set({ session: { ...s, handoffs, ...(timeLog ? { timeLog } : {}) } });
-      commit(grades);
+      commit(grades, retired ? { pins: s.pins, retired } : undefined);
     },
     applyQuestionEdit: (questions, r, grades, backup) => {
       const s = get().session;

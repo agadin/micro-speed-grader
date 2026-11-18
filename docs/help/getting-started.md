@@ -90,6 +90,8 @@ A message over the slide says what changed, for example *Rescan: 2 new students,
 
 ## Review changed submissions
 
+![The Changed submissions window](img/changed-submissions.png)
+
 **Changed submissions** lists the pins students changed or took out after they were graded, grouped by question, one row per student. **Was** shows the old grade and who gave it (for example *✗ Neutrophil · Jamie*); **Now** shows the new pin. For each row:
 
 - **Carry grade over**: give the new pin the old grade. Use it when the student only nudged their pin.

@@ -18,7 +18,7 @@ const SESSION = path.join(WORK, "demo.msgrade");
 const results = [];
 let shot = 0;
 const tiles = await startTileServer();
-const { browser, page, issues, dialog, emit } = await launch();
+const { browser, context, page, issues, dialog, emit } = await launch();
 const snap = async (name) => {
   const f = path.join(OUT, `${String(++shot).padStart(2, "0")}-${name}.png`);
   await page.screenshot({ path: f });
@@ -1242,6 +1242,156 @@ await step("export ▸ Time: grading time per question, grader and student; grad
   expect(/Total active grading time/.test(csv) && /Seconds per pin/.test(csv), "time-stats.csv missing tables");
   await m.getByRole("button", { name: "Close", exact: true }).click();
   return `${log.length} actions; ${text.split("\n").slice(0, 3).join(" ").replace(/\s+/g, " ")}`;
+});
+
+await step("student panel: Copy puts the feedback on the clipboard", async () => {
+  // the test browser only allows reading the clipboard when granted (Chromium); WebKit has no such permission
+  try {
+    await context.grantPermissions(["clipboard-read", "clipboard-write"], { origin: new URL(APP_URL).origin });
+  } catch (e) {
+    return `skipped: this browser can't grant clipboard access (${String(e.message ?? e).split("\n")[0]})`;
+  }
+  await page.evaluate(() => navigator.clipboard.writeText("(nothing yet)"));
+  await page.keyboard.press("Escape");
+  await page.keyboard.press("/");
+  const panel = page.locator(".student-panel");
+  await panel.locator(".sv-search input").waitFor({ timeout: 2000 });
+  await page.keyboard.press("Enter"); // the first student
+  await panel.locator(".sv-who").waitFor({ timeout: 2000 });
+  const shown = await panel.locator(".sv-fb pre").textContent();
+  const btn = panel.locator(".sv-fb").getByRole("button", { name: "Copy" });
+  await btn.click();
+  await panel.locator(".sv-fb").getByRole("button", { name: "Copied" }).waitFor({ timeout: 2000 });
+  const copied = await page.evaluate(() => navigator.clipboard.readText());
+  await panel.getByRole("button", { name: "Close" }).click();
+  expect(shown.length > 20 && copied === shown, `copied ${JSON.stringify(copied.slice(0, 60))}, shown ${JSON.stringify(shown.slice(0, 60))}`);
+  return `${copied.split("\n").length} lines copied, same as shown`;
+});
+
+await step("wizard: drag a question to renumber, mark its answer, start → answer key on that question", async () => {
+  const EXAM = path.join(WORK, "renumbered-exam.json");
+  const confirms = [];
+  const onDialog = (d) => {
+    confirms.push(d.message());
+    d.accept().catch(() => {});
+  };
+  page.on("dialog", onDialog);
+  try {
+    await closeSession(page);
+    await page.getByText("New grading session…").click();
+    await dialog(path.join(ROOT, "demo/exam.json"));
+    await page.getByText("Choose exam PDF / JSON…").click();
+    await page.waitForTimeout(400);
+    await dialog(path.join(ROOT, "demo/submissions"));
+    await page.locator(".step").nth(1).getByRole("button", { name: "Choose folder…" }).click();
+    await page.waitForTimeout(800);
+    await dialog(path.join(ROOT, "images"));
+    await page.locator(".step").nth(2).getByRole("button", { name: "Choose folder…" }).click();
+    await page.waitForTimeout(800);
+    await dialog(path.join(WORK, "renumbered.msgrade"));
+    await page.locator(".step").nth(3).getByRole("button").click();
+    await page.waitForTimeout(300);
+    await page.getByRole("button", { name: "Edit questions…" }).click();
+    const ed = page.locator(".exam-editor");
+    await ed.waitFor();
+    const items = ed.locator(".ee-list li");
+    // Q5 (VMS133, toluidine blue): mark its answer, then drag it to the top
+    await items.nth(4).click();
+    await ed.getByText("Mark its answer when grading starts").click();
+    const from = await items.nth(4).boundingBox();
+    const to = await items.nth(0).boundingBox();
+    await page.mouse.move(from.x + from.width / 2, from.y + from.height / 2);
+    await page.mouse.down();
+    await page.mouse.move(from.x + from.width / 2, from.y + from.height / 2 - 10, { steps: 3 });
+    await page.mouse.move(to.x + to.width / 2, to.y + 4, { steps: 12 });
+    await page.mouse.up();
+    await page.waitForTimeout(500);
+    const nums = await items.locator(".ee-n").allInnerTexts();
+    const prompts = await items.locator(".ee-prompt").allInnerTexts();
+    await snap("exam-editor-renumbered");
+    expect(confirms.length === 1 && /renumbers/.test(confirms[0]), `confirm before renumbering: ${JSON.stringify(confirms)}`);
+    expect(nums.join() === "Q1,Q2,Q3,Q4,Q5" && /toluidine/.test(prompts[0]) && /Pacinian/.test(prompts[1]), `after the drag: ${nums.map((n, i) => `${n} ${prompts[i].slice(0, 30)}`).join(" | ")}`);
+    // the moved question (now Q1) is still the one whose answer is marked
+    await items.nth(0).click();
+    expect(await ed.getByLabel("Mark its answer when grading starts").isChecked(), "the mark didn't follow the question to its new number");
+    // a second drag doesn't ask again
+    const a = await items.nth(1).boundingBox();
+    const b = await items.nth(2).boundingBox();
+    await page.mouse.move(a.x + a.width / 2, a.y + a.height / 2);
+    await page.mouse.down();
+    await page.mouse.move(a.x + a.width / 2, a.y + a.height / 2 + 10, { steps: 3 });
+    await page.mouse.move(b.x + b.width / 2, b.y + b.height - 4, { steps: 8 });
+    await page.mouse.up();
+    await page.waitForTimeout(500);
+    const prompts2 = await items.locator(".ee-prompt").allInnerTexts();
+    expect(confirms.length === 1 && /white adipose/.test(prompts2[1]) && /Pacinian/.test(prompts2[2]), `second drag: ${prompts2.map((x) => x.slice(0, 25)).join(" | ")}`);
+    await dialog(EXAM);
+    await ed.getByRole("button", { name: "Save as exam file…" }).click();
+    await page.waitForTimeout(500);
+    const saved = JSON.parse(fs.readFileSync(EXAM, "utf8")).questions;
+    expect(
+      saved.map((q) => q.num).join() === "1,2,3,4,5" && /toluidine/.test(saved[0].prompt) && saved[0].slides.join() === "VMS133" && /white adipose/.test(saved[1].prompt) && /Pacinian/.test(saved[2].prompt),
+      `exam file: ${saved.map((q) => `${q.num} ${q.prompt.slice(6, 30)}`).join(" | ")}`,
+    );
+    await ed.getByRole("button", { name: "Use these questions" }).click();
+    await page.getByText("Start grading →").click();
+    await page.locator(".topbar").waitFor({ timeout: 30000 });
+    await page.locator(".key-panel").waitFor({ timeout: 5000 });
+    await waitTiles();
+    const cur = await page.locator(".topbar select").evaluate((s) => s.options[s.selectedIndex].text);
+    await snap("marked-answer-on-start");
+    expect(cur.startsWith("Q1 · VMS133"), `opened on ${cur}`);
+    return `Q5 dragged to Q1 (one confirm), saved in the new order; started in the answer key on "${cur}"`;
+  } finally {
+    page.off("dialog", onDialog);
+  }
+});
+
+await step("in-session edit: graded pins that now answer another question are ungraded; a copy is saved first", async () => {
+  // back to the main session; Q1 moves from VMS109 to VMS133 and Q6 (added earlier) goes, so VMS109 is Q2's alone:
+  // pins titled "Q1" there now answer Q2, and their Q1 grades no longer apply
+  const onDialog = (d) => d.accept().catch(() => {});
+  page.on("dialog", onDialog);
+  try {
+    await closeSession(page);
+    await openSession(page, dialog, SESSION);
+    await waitTiles();
+    const before = session();
+    await page.locator(".right .ee-open").click();
+    const ed = page.locator(".exam-editor");
+    await ed.waitFor();
+    await ed.locator(".ee-list li", { hasText: "Q6" }).click();
+    await ed.locator(".ee-del").click();
+    await ed.locator(".ee-list li", { hasText: "Q1" }).click();
+    await ed.getByRole("button", { name: "Remove VMS109" }).click();
+    await ed.getByRole("button", { name: "Choose slide…" }).click();
+    await ed.locator(".ee-find input").fill("133");
+    await ed.locator(".ee-tile", { hasText: "VMS133" }).click();
+    await ed.getByRole("button", { name: "Done choosing" }).click();
+    await ed.getByRole("button", { name: "Review changes…" }).click();
+    await ed.locator(".ee-review").waitFor({ timeout: 30000 });
+    const changes = await ed.locator(".ee-changes").innerText();
+    const impact = await ed.locator(".ee-impact").innerText();
+    await snap("exam-editor-review-moves");
+    const regraded = Number(impact.match(/(\d+)\s+graded pins? now answer a different question/)?.[1]);
+    expect(/Q1 adds VMS133, drops VMS109/.test(changes) && /Q6 Removed/.test(changes), `changes: ${changes.replace(/\n/g, " | ")}`);
+    expect(regraded > 0, `impact: ${impact.replace(/\n/g, " | ")}`);
+    await ed.getByRole("button", { name: "Apply changes" }).click();
+    await page.waitForTimeout(1500);
+    const after = session();
+    // every pin graded before whose question is now another one
+    const qOf = (g, id) => Number(g.groups[g.pinGroup[id]].taskId.match(/^Q(\d+)/)[1]);
+    const moved = after.pins.filter((p) => before.grades.pinGroup[p.id] && p.q !== null && p.q !== qOf(before.grades, p.id));
+    expect(moved.length === regraded, `${moved.length} pins changed question, review said ${regraded}`);
+    expect(moved.every((p) => !after.grades.pinGroup[p.id]), `${moved.filter((p) => after.grades.pinGroup[p.id]).length} of them are still graded`);
+    expect(after.questions.find((q) => q.num === 1).slides.join() === "VMS133" && !after.questions.some((q) => q.num === 6), "questions not updated");
+    const copies = fs.readdirSync(WORK).filter((f) => f.includes("(before question edit"));
+    const copy = copies.map((f) => JSON.parse(fs.readFileSync(path.join(WORK, f), "utf8"))).find((c) => c.questions.some((q) => q.num === 6));
+    expect(copy && copy.questions.find((q) => q.num === 1).slides.join() === "VMS109" && moved.every((p) => copy.grades.pinGroup[p.id]), "no copy of the session from just before the edit");
+    return `${regraded} graded pins now answer another question and were ungraded; backup kept (${copies.length} cop${copies.length === 1 ? "y" : "ies"})`;
+  } finally {
+    page.off("dialog", onDialog);
+  }
 });
 
 await browser.close();

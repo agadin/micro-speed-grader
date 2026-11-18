@@ -98,7 +98,10 @@ export function ExamEditor(p: {
         return;
       setWarnedRenumber(true);
     }
-    setDraft((qs) => renumbered(moved(qs, from, to)));
+    const next = moved(draft, from, to);
+    setDraft(renumbered(next));
+    // "mark its answer" follows the question to its new number
+    if (p.markAfter?.size) p.onMarkAfter?.(new Set(next.flatMap((x, i) => (p.markAfter!.has(x.num) ? [i + 1] : []))));
     setSel(to);
   });
 

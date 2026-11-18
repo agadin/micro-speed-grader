@@ -64,6 +64,8 @@ If some answers are ungraded, choose **Leave those students out** or **Count ung
 
 The app quietly keeps track of how long grading takes. You never see it while grading; it shows up only here, as a **Time** tab in the Export window, once some grading has been done.
 
+![The Time tab of the Export window](img/export-time.png)
+
 - **Grading time**: total active time. Each grading action counts the time since the previous one, or since the image was opened. Gaps longer than 2 minutes count as 2 minutes, so breaks don't inflate it.
 - **By question**: time, pins, time per pin and per student for each question. Slow questions are often ambiguous ones.
 - **By grader**: when you [handed work to other graders](handoff.md), their time comes back in their results file, so you can compare time per pin.

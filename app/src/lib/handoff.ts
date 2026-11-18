@@ -9,7 +9,7 @@
  * Neither sees the other's grade. When both verdicts are in they're compared; agreements become
  * the grade, disagreements are left ungraded and flagged for the host to resolve.
  */
-import type { GradeState, Group, Pin, Session, SlideRef, Task } from "./types";
+import type { GradeState, Group, Pin, RetiredPin, Session, SlideRef, Task } from "./types";
 import { cloneGrades, detach, doublePinIds, pinMap, pinsForTask } from "./grading";
 import { uid } from "./util";
 import { IDLE_CAP, MAX_EVENTS, type TimeEvent } from "./timing";
@@ -119,6 +119,21 @@ export function awayTasks(s: Session): Map<string, string> {
         if (whole) m.set(t, m.has(t) ? `${m.get(t)}, ${h.guest}` : h.guest);
       }
   return m;
+}
+
+/**
+ * Out packs whose pins a rescan has since taken out of the session (the student changed or removed
+ * them): pack id → how many. The guest's grades for those pins won't count when their results come in.
+ */
+export function changedSinceSent(s: Session): Map<string, number> {
+  const live = new Set(s.pins.map((p) => p.id));
+  const out = new Map<string, number>();
+  for (const h of s.handoffs ?? []) {
+    if (h.status !== "out") continue;
+    const n = h.pinIds.filter((id) => !live.has(id)).length;
+    if (n) out.set(h.id, n);
+  }
+  return out;
 }
 
 /** Ungraded pins per task (excluding pins already handed out and auto-wrong double pins). */
@@ -469,11 +484,26 @@ export function resolveWith(g: GradeState, pinIds: string[], by: string, pins: M
  *  - Pins the host graded meanwhile (e.g. after a recall) keep the host's grade.
  *  - Pins this guest graded before (an earlier results file) are updated.
  *  - Pins another guest graded meanwhile (after a recall) become a check between the two.
+ *  - Pins a rescan took out after the pack was sent (`changed`): the guest's grade doesn't count, but is
+ *    kept with the old pin (`retired`) so it shows in Changed submissions, ready to carry over or restore.
  */
 export function mergeResult(
   s: Session,
   r: ResultFile,
-): { grades: GradeState; handoffs: Handoff[]; merged: number; updated: number; skipped: number; conflicts: number; waiting: number; timeLog: TimeEvent[] } {
+): {
+  grades: GradeState;
+  handoffs: Handoff[];
+  merged: number;
+  updated: number;
+  skipped: number;
+  conflicts: number;
+  waiting: number;
+  timeLog: TimeEvent[];
+  /** the guest's grades for pins that changed or were removed since the pack was sent */
+  changed: number;
+  /** set when `changed`: the session's retired pins with those grades kept aside */
+  retired?: RetiredPin[];
+} {
   const hs = s.handoffs ?? [];
   const h = hs.find((x) => x.id === r.packId);
   if (!h) throw new Error("These results are for a pack that wasn't made from this session.");
@@ -482,13 +512,28 @@ export function mergeResult(
   const pinById = pinMap(s.pins);
   const fresh: Parameters<typeof applyVerdicts>[1] = [];
   const touched = new Set<string>();
-  let merged = 0, updated = 0, skipped = 0;
+  let merged = 0, updated = 0, skipped = 0, changed = 0;
   const now = Date.now();
+  const retiredAt = new Map((s.retired ?? []).map((x, i) => [x.pin.id, i]));
+  let retired: RetiredPin[] | undefined;
   for (const grp of r.groups) {
     if (grp.status !== "correct" && grp.status !== "wrong") continue;
     const v: Verdict = { by: r.guest, status: grp.status, text: String(grp.text ?? "").slice(0, 2000), at: Number(grp.createdAt) || now };
     for (const id of grp.pinIds) {
-      if (!allowed.has(id) || !pinById.has(id)) continue;
+      if (!allowed.has(id)) continue;
+      if (!pinById.has(id)) {
+        // the student changed or removed this pin after the pack went out
+        const i = retiredAt.get(id);
+        if (i === undefined) continue;
+        changed++;
+        retired ??= [...s.retired!];
+        const old = retired[i];
+        if (!old.grade || old.grade.by === r.guest) {
+          const grade = { taskId: String(grp.taskId), status: v.status, text: v.text, by: r.guest, createdAt: v.at };
+          retired[i] = { ...old, grade, ...(old.grade ? {} : { review: true }) };
+        }
+        continue;
+      }
       const assignQ = typeof r.assign?.[id] === "number" ? r.assign[id] : undefined;
       const c = g.checks![id];
       if (c && c.graders.includes(r.guest) && c.state !== "resolved") {
@@ -536,7 +581,7 @@ export function mergeResult(
     }))
     .filter((e) => e.pinIds.length);
   const timeLog = [...(s.timeLog ?? []).filter((e) => e.pack !== h.id), ...theirs];
-  return { grades: g, handoffs, merged, updated, skipped, conflicts, waiting, timeLog };
+  return { grades: g, handoffs, merged, updated, skipped, conflicts, waiting, timeLog, changed, ...(retired ? { retired } : {}) };
 }
 
 // ---------------------------------------------------------------- how well graders agree

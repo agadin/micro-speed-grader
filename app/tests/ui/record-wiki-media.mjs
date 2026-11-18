@@ -265,6 +265,32 @@ await closeSession(page);
   // some agreements too, so the agreement table has numbers
   for (const id of pick(tasks[3], 30)) g.checks[id] = { taskId: tasks[3], graders: ["Jamie", "Sam"], verdicts: [{ by: "Jamie", status: "correct", text: "", at: now }, { by: "Sam", status: "correct", text: "", at: now }], state: "agreed" };
   for (const id of pick(tasks[4], 20)) g.checks[id] = { taskId: tasks[4], graders: ["@host", "Jamie"], verdicts: [{ by: "@host", status: "correct", text: "", at: now }, { by: "Jamie", status: "correct", text: "", at: now }], state: "agreed" };
+
+  // time spent: the robot grades in milliseconds, so write a plausible log (seconds per pin vary by
+  // question; some images graded by Jamie and Sam; pins graded twice timed for both graders)
+  let seed = 7;
+  const rand = () => ((seed = (seed * 16807) % 2147483647) / 2147483647);
+  const perPin = { 1: 3.2, 2: 4.1, 3: 2.7, 4: 6.4, 5: 5.1 };
+  const graderOf = (taskId) => [undefined, "Jamie", "Sam", "Jamie", undefined][Math.max(0, tasks.indexOf(taskId)) % 5];
+  const qOf = (taskId) => Number(taskId.match(/^Q(\d+)/)[1]);
+  const log = [];
+  let at = now - 3 * 3600e3;
+  const event = (taskId, pinIds, by, k = 1) => {
+    const secs = Math.min(120, Math.round((2 + pinIds.length * perPin[qOf(taskId)] * (0.7 + 0.6 * rand()) * k) * 10) / 10);
+    at += secs * 1000;
+    log.push({ at, taskId, pinIds, secs, ...(by ? { by, pack: `pack-${by}` } : {}) });
+  };
+  for (const grp of Object.values(g.groups)) {
+    if (grp.by === "@key") continue;
+    const by = graderOf(grp.taskId);
+    if (by) grp.by = by;
+    for (let i = 0; i < grp.pinIds.length; i += 12) event(grp.taskId, grp.pinIds.slice(i, i + 12), by);
+  }
+  for (const [id, c] of Object.entries(g.checks)) {
+    const agreed = c.state === "agreed";
+    for (const v of c.verdicts) event(c.taskId, [id], v.by === "@host" ? undefined : v.by, agreed ? 1 : 0.55);
+  }
+  s.timeLog = log;
   fs.writeFileSync(file, JSON.stringify(s));
 }
 await openSession(page, dialog, path.join(WORK, "Practical 2.msgrade"));
@@ -275,6 +301,64 @@ await wait(300);
 await page.mouse.move(5, 5);
 await shot("disagreements.png", ".conflicts-modal");
 await page.getByRole("button", { name: "Done" }).click();
+
+// ---- Export ▸ Time ----
+await page.getByRole("button", { name: "Export" }).first().click();
+await page.locator(".export-modal").waitFor();
+await page.locator(".export-modal").getByRole("button", { name: "Time", exact: true }).click();
+await page.locator(".ex-time").waitFor();
+await wait(400);
+await page.mouse.move(5, 5);
+await shot("export-time.png", ".export-modal");
+await page.locator(".export-modal").getByRole("button", { name: "Close", exact: true }).click();
+await closeSession(page);
+
+// ---- Changed submissions: students move or take out pins after grading; rescan, then review ----
+{
+  const file = path.join(WORK, "Practical 2.msgrade");
+  const s = JSON.parse(fs.readFileSync(file, "utf8"));
+  const SUBS = path.join(WORK, "submissions");
+  fs.cpSync(path.join(ROOT, "demo/submissions"), SUBS, { recursive: true });
+  s.submissionsDir = SUBS;
+  const g = s.grades;
+  const folderOf = new Map(s.students.map((x) => [x.id, x.folder]));
+  // per question: graded pins of students with just one pin for it, wrong ones first (their reasons show)
+  const singles = (q, slide) => {
+    const ps = s.pins.filter((p) => p.slide === slide && (p.q ?? g.assign[p.id]) === q);
+    const n = new Map();
+    for (const p of ps) n.set(p.studentId, (n.get(p.studentId) ?? 0) + 1);
+    const status = (p) => g.groups[g.pinGroup[p.id]]?.status;
+    return ps.filter((p) => n.get(p.studentId) === 1 && g.pinGroup[p.id] && g.groups[g.pinGroup[p.id]].by !== "@key").sort((a, b) => (status(a) === "wrong" ? 0 : 1) - (status(b) === "wrong" ? 0 : 1));
+  };
+  const edit = (p, fn) => {
+    const f = path.join(SUBS, folderOf.get(p.studentId), `${p.slide}.ndpi.ndpa`);
+    const parts = fs.readFileSync(f, "utf8").split(/(?=<ndpviewstate)/);
+    const i = parts.findIndex((b) => b.includes(`<x>${p.xNm}</x>`) && b.includes(`<title>${p.rawTitle}</title>`));
+    if (i < 1) throw new Error(`pin ${p.id} not found in ${f}`);
+    parts[i] = fn(parts[i]);
+    fs.writeFileSync(f, parts.join(""));
+  };
+  const move = (p) => edit(p, (b) => b.replaceAll(`<x>${p.xNm}</x>`, `<x>${p.xNm + 300000}</x>`));
+  const drop = (p) => edit(p, (b) => (b.trimEnd().endsWith("</annotations>") ? "</annotations>\n" : ""));
+  const q1 = singles(1, "VMS109");
+  const q3 = singles(3, "VMS133");
+  move(q1[0]);
+  move(q1[1]);
+  drop(q1[2]);
+  move(q3[0]);
+  drop(q3[1]);
+  fs.writeFileSync(file, JSON.stringify(s));
+}
+await openSession(page, dialog, path.join(WORK, "Practical 2.msgrade"));
+await wait(1500);
+await page.locator(".right .rescan").click();
+await page.locator(".notice-banner").filter({ hasText: "Rescan:" }).waitFor({ timeout: 15000 });
+await page.locator(".notice-banner").getByRole("button", { name: "Review" }).click();
+await page.locator(".changes-modal").waitFor();
+await wait(400);
+await page.mouse.move(5, 5);
+await shot("changed-submissions.png", ".changes-modal");
+await page.locator(".changes-modal").getByRole("button", { name: "Done" }).click();
 await closeSession(page);
 
 // ---- start screen with the session under Resume ----
