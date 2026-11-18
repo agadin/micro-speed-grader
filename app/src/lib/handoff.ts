@@ -12,6 +12,7 @@
 import type { GradeState, Group, Pin, Session, SlideRef, Task } from "./types";
 import { cloneGrades, detach, doublePinIds, pinMap, pinsForTask } from "./grading";
 import { uid } from "./util";
+import { IDLE_CAP, MAX_EVENTS, type TimeEvent } from "./timing";
 
 /** the host's name inside checks and verdicts (shown as "You") */
 export const HOST = "@host";
@@ -88,6 +89,8 @@ export interface ResultFile {
   sentAt: number;
   groups: Group[];
   assign: Record<string, number>;
+  /** the guest's grading time on the pack's pins (shown on the host's export) */
+  timeLog?: TimeEvent[];
 }
 
 /** Pins the host can't grade right now because they are out with a guest (and the host isn't one of their graders). */
@@ -283,7 +286,11 @@ export function makeResult(s: Session): ResultFile {
   }
   const assign: Record<string, number> = {};
   for (const [id, q] of Object.entries(s.grades.assign)) if (mine.has(id)) assign[id] = q;
-  return { kind: "msg-handoff-result", version: 1, packId: gp.id, guest: gp.guest, sentAt: Date.now(), groups, assign };
+  const timeLog = (s.timeLog ?? [])
+    .map((e) => ({ ...e, pinIds: e.pinIds.filter((id) => mine.has(id)) }))
+    .filter((e) => e.pinIds.length)
+    .map(({ at, taskId, pinIds, secs }) => ({ at, taskId, pinIds, secs }));
+  return { kind: "msg-handoff-result", version: 1, packId: gp.id, guest: gp.guest, sentAt: Date.now(), groups, assign, ...(timeLog.length ? { timeLog } : {}) };
 }
 
 export function parseResult(raw: string): ResultFile {
@@ -466,7 +473,7 @@ export function resolveWith(g: GradeState, pinIds: string[], by: string, pins: M
 export function mergeResult(
   s: Session,
   r: ResultFile,
-): { grades: GradeState; handoffs: Handoff[]; merged: number; updated: number; skipped: number; conflicts: number; waiting: number } {
+): { grades: GradeState; handoffs: Handoff[]; merged: number; updated: number; skipped: number; conflicts: number; waiting: number; timeLog: TimeEvent[] } {
   const hs = s.handoffs ?? [];
   const h = hs.find((x) => x.id === r.packId);
   if (!h) throw new Error("These results are for a pack that wasn't made from this session.");
@@ -516,7 +523,20 @@ export function mergeResult(
   const handoffs = hs.map((x) =>
     x.id === h.id ? { ...x, status: "returned" as const, returnedAt: now, mergedCount: (x.mergedCount ?? 0) + merged } : x,
   );
-  return { grades: g, handoffs, merged, updated, skipped, conflicts, waiting };
+  // the guest's grading time: a re-sent results file replaces what this pack sent before
+  const theirs: TimeEvent[] = (Array.isArray(r.timeLog) ? r.timeLog : [])
+    .slice(0, MAX_EVENTS)
+    .map((e) => ({
+      at: Number(e.at) || now,
+      taskId: String(e.taskId),
+      pinIds: (Array.isArray(e.pinIds) ? e.pinIds : []).map(String).filter((id) => allowed.has(id)),
+      secs: Math.max(0, Math.min(IDLE_CAP, Number(e.secs) || 0)),
+      by: r.guest,
+      pack: h.id,
+    }))
+    .filter((e) => e.pinIds.length);
+  const timeLog = [...(s.timeLog ?? []).filter((e) => e.pack !== h.id), ...theirs];
+  return { grades: g, handoffs, merged, updated, skipped, conflicts, waiting, timeLog };
 }
 
 // ---------------------------------------------------------------- how well graders agree

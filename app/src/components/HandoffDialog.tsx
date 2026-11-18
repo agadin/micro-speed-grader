@@ -218,7 +218,7 @@ export function HandoffDialog({ session, tasks, onClose }: { session: Session; t
     try {
       const r = parseResult(await readText(p));
       const m = mergeResult(session, r);
-      applyResult(m.grades, m.handoffs);
+      applyResult(m.grades, m.handoffs, m.timeLog);
       const parts = [
         `Merged ${m.merged} grade${m.merged === 1 ? "" : "s"} from ${r.guest}.`,
         m.updated ? `${m.updated} of their earlier grades were updated.` : "",

@@ -1,5 +1,6 @@
 import type { Check, GuestPack, Handoff } from "./handoff";
 import type { AnswerKey } from "./answerKey";
+import type { TimeEvent } from "./timing";
 export interface Question {
   num: number;
   /** Slide ids (e.g. "VMS146") the student may answer on. */
@@ -103,6 +104,8 @@ export interface Session {
   fileSlides?: Record<string, string>;
   /** "Things to check" the instructor acknowledged (problemKey), so a rescan only shows new ones */
   scanAck?: string[];
+  /** time spent grading: one entry per grading action (shown only on export) */
+  timeLog?: TimeEvent[];
   /** the instructor's answer key: painted areas that grade (or suggest) matching pins */
   key?: AnswerKey;
   /** pins that left the submission files (Rescan submissions), with the grades they had */

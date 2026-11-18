@@ -3,6 +3,7 @@ import type { GradeState, GradeStatus, Group, Pin, RetiredPin, Session, Question
 import { graderLabel, hostGraded, type Handoff } from "./handoff";
 import type { AnswerKey } from "./answerKey";
 import type { RescanResult, ReviewChange } from "./rescan";
+import { activeSecs, MAX_EVENTS, type TimeEvent } from "./timing";
 import { writeText } from "./backend";
 import { cloneGrades, detach, pinMap } from "./grading";
 import { uid } from "./util";
@@ -86,7 +87,7 @@ interface Store {
   /** host: record packs sent out / recalled */
   setHandoffs: (h: Handoff[]) => void;
   /** host: merge a guest's results (one undo step) */
-  applyResult: (grades: GradeState, h: Handoff[]) => void;
+  applyResult: (grades: GradeState, h: Handoff[], timeLog?: TimeEvent[]) => void;
   /** the exam's questions were edited inside the session (clears undo; a copy was saved at `backup`) */
   applyQuestionEdit: (questions: Question[], r: RescanResult, grades: GradeState, backup: string) => void;
   /** "Things to check" after a rescan: files whose slide was chosen, and acknowledged problems */
@@ -117,6 +118,8 @@ const overrideText = (names: Map<string, number>) => {
 };
 
 let saveTimer: ReturnType<typeof setTimeout> | null = null;
+/** when the grader last graded (or opened an image): the start of the next grading action's time */
+let lastActivity = Date.now();
 
 export const useStore = create<Store>((set, get) => {
   const commit = (next: GradeState, more?: Omit<Snap, "grades">) => {
@@ -166,13 +169,16 @@ export const useStore = create<Store>((set, get) => {
     help: null,
     startupIntent: null,
 
-    load: (session) =>
-      set({ session, past: [], future: [], dirty: false, selection: [], clusterIndex: 0, menu: null, isolate: false, keyMode: false, keyApplyOpen: false, changesOpen: false, studentView: null }),
+    load: (session) => {
+      lastActivity = Date.now();
+      set({ session, past: [], future: [], dirty: false, selection: [], clusterIndex: 0, menu: null, isolate: false, keyMode: false, keyApplyOpen: false, changesOpen: false, studentView: null });
+    },
     close: () => set({ session: null, past: [], future: [], studentView: null }),
 
     setTask: (i) => {
       const s = get().session;
       if (!s) return;
+      lastActivity = Date.now();
       set({ session: { ...s, taskIndex: i }, selection: [], clusterIndex: 0, menu: null, isolate: false, dirty: true });
       scheduleSave();
     },
@@ -199,6 +205,12 @@ export const useStore = create<Store>((set, get) => {
       // pins graded twice: record your verdict, or settle a disagreement with your grade
       const conflicts = g.checks ? hostGraded(g, all, pinMap(s.pins)) : 0;
       commit(g);
+      // time spent (export only): since the last grade, or since this image was opened; breaks capped
+      const now = Date.now();
+      const ev: TimeEvent = { at: now, taskId: batches[0].taskId ?? tId, pinIds: all, secs: activeSecs(lastActivity, now) };
+      lastActivity = now;
+      const cur = get().session!;
+      set({ session: { ...cur, timeLog: [...(cur.timeLog ?? []), ev].slice(-MAX_EVENTS) } });
       const notice = conflicts
         ? { kind: "conflict" as const, text: `${conflicts} pin${conflicts === 1 ? "" : "s"} you graded disagree${conflicts === 1 ? "s" : ""} with another grader. They're flagged in Disagreements.` }
         : others.size && !get().overrideQuiet
@@ -262,10 +274,10 @@ export const useStore = create<Store>((set, get) => {
       set({ session: { ...s, handoffs }, dirty: true });
       scheduleSave();
     },
-    applyResult: (grades, handoffs) => {
+    applyResult: (grades, handoffs, timeLog) => {
       const s = get().session;
       if (!s) return;
-      set({ session: { ...s, handoffs } });
+      set({ session: { ...s, handoffs, ...(timeLog ? { timeLog } : {}) } });
       commit(grades);
     },
     applyQuestionEdit: (questions, r, grades, backup) => {

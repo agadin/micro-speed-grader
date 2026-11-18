@@ -1,5 +1,7 @@
 import { useMemo, useState } from "react";
 import { Modal } from "./Modal";
+import { TimeTab } from "./TimeTab";
+import { timeCsv, timeReport } from "../lib/timing";
 import { open } from "@tauri-apps/plugin-dialog";
 import type { Session } from "../lib/types";
 import { useSettings } from "../lib/settings";
@@ -22,7 +24,8 @@ function kr20Note(k: number | null) {
 
 export function ExportDialog({ session, onClose }: { session: Session; onClose: () => void }) {
   const settings = useSettings((s) => s.s);
-  const [tab, setTab] = useState<"csv" | "stats">("csv");
+  const [tab, setTab] = useState<"csv" | "stats" | "time">("csv");
+  const hasTime = !!session.timeLog?.length;
   const [dir, setDir] = useState(joinPath(dirname(session.sessionPath), "export"));
   const [status, setStatus] = useState<string | null>(null);
   const [preview, setPreview] = useState(session.students[0]?.id ?? "");
@@ -68,6 +71,16 @@ export function ExportDialog({ session, onClose }: { session: Session; onClose: 
       setStatus(`Export failed: ${e}`);
     }
   };
+  const timeRep = useMemo(() => (hasTime ? timeReport(session) : null), [hasTime, session]);
+  const exportTime = async () => {
+    if (!timeRep) return;
+    try {
+      await writeText(joinPath(dir, "time-stats.csv"), toCsv(timeCsv(timeRep)));
+      setStatus(`Wrote time-stats.csv to ${dir}`);
+    } catch (e) {
+      setStatus(`Export failed: ${e}`);
+    }
+  };
   const exportStats = async () => {
     try {
       await writeText(joinPath(dir, "item-stats.csv"), toCsv(statsTable(stats)));
@@ -91,6 +104,11 @@ export function ExportDialog({ session, onClose }: { session: Session; onClose: 
             <button className={tab === "stats" ? "on" : ""} onClick={() => setTab("stats")}>
               Statistics
             </button>
+            {hasTime && (
+              <button className={tab === "time" ? "on" : ""} onClick={() => setTab("time")} title="How long grading took: per question, grader and student">
+                Time
+              </button>
+            )}
           </div>
         </div>
         <div className="stats">
@@ -147,7 +165,7 @@ export function ExportDialog({ session, onClose }: { session: Session; onClose: 
                 </div>
               </div>
             </div>
-          ) : (
+          ) : tab === "stats" ? (
             <div className="ex-stats">
               {ungraded > 0 && (
                 <div className="ex-sub">
@@ -241,6 +259,8 @@ export function ExportDialog({ session, onClose }: { session: Session; onClose: 
                 any ungraded answer are left out unless you count those answers as wrong.
               </p>
             </div>
+          ) : (
+            <TimeTab report={timeRep} />
           )}
         </div>
 
@@ -264,9 +284,13 @@ export function ExportDialog({ session, onClose }: { session: Session; onClose: 
             <button className="primary" onClick={exportCsv}>
               Export grades.csv
             </button>
-          ) : (
+          ) : tab === "stats" ? (
             <button className="primary" onClick={exportStats}>
               Save item-stats.csv
+            </button>
+          ) : (
+            <button className="primary" onClick={exportTime}>
+              Save time-stats.csv
             </button>
           )}
         </div>

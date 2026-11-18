@@ -59,3 +59,17 @@ The **Statistics** tab shows how the exam performed:
   - **KR-20 if deleted**: reliability without that question. Red when leaving it out would make the test more reliable.
 
 If some answers are ungraded, choose **Leave those students out** or **Count ungraded as wrong**. At least two fully graded students are needed. **Save item-stats.csv** writes the table to the export folder.
+
+## Time spent
+
+The app quietly keeps track of how long grading takes. You never see it while grading; it shows up only here, as a **Time** tab in the Export window, once some grading has been done.
+
+- **Grading time**: total active time. Each grading action counts the time since the previous one, or since the image was opened. Gaps longer than 2 minutes count as 2 minutes, so breaks don't inflate it.
+- **By question**: time, pins, time per pin and per student for each question. Slow questions are often ambiguous ones.
+- **By grader**: when you [handed work to other graders](handoff.md), their time comes back in their results file, so you can compare time per pin.
+- **Pins graded twice**: for each pair of graders, their time per pin on the pins both graded, and the time spent on pins they agreed on versus pins they disagreed on. Disagreements graded much faster than agreements can mean rushed grading.
+- **Students who took longest**: the students whose answers took most time to grade.
+
+Pins the [answer key](answer-key.md) graded take no time and are counted separately. **Save time-stats.csv** writes all of these tables to the export folder.
+
+An action's time is shared equally by the pins it graded, so a cluster of 30 graded with one key press gives each pin a thirtieth of that time. Undoing a grade doesn't remove its time, and sessions created before version 0.3.6 have no time recorded for earlier grading.

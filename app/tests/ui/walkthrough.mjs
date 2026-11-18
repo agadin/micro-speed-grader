@@ -1222,6 +1222,28 @@ await step("exam editor: fix and add questions before starting; add a forgotten 
   return `wizard: 5 → 6 questions, exam file saved; session: +Q6 on VMS109 (${changes.split("\n").length} change), backup ${copies[0]}; "${note.split("\n")[0].slice(0, 60)}…"`;
 });
 
+await step("export ▸ Time: grading time per question, grader and student; graders compared; time-stats.csv", async () => {
+  const log = session().timeLog ?? [];
+  expect(log.length > 10 && log.some((e) => e.by === "Jamie") && log.some((e) => e.by === "Kim"), `time log: ${log.length} actions, graders ${[...new Set(log.map((e) => e.by ?? "you"))]}`);
+  await page.getByRole("button", { name: "Export" }).first().click();
+  const m = page.locator(".export-modal");
+  await m.waitFor();
+  await m.getByRole("button", { name: "Time", exact: true }).click();
+  const t = page.locator(".ex-time");
+  await t.waitFor();
+  const text = await t.innerText();
+  await snap("export-time");
+  expect(/Grading time/.test(text) && /By question/.test(text) && /By grader/.test(text) && /Jamie/.test(text) && /Kim/.test(text), "Time tab is missing tables or graders");
+  expect(/time vs agreement/.test(text) && /You & Kim|Kim & You/.test(text), "no grade-twice comparison");
+  const dir = await m.locator(".field.wide input").inputValue();
+  await m.getByRole("button", { name: "Save time-stats.csv" }).click();
+  await page.waitForTimeout(500);
+  const csv = fs.readFileSync(path.join(dir, "time-stats.csv"), "utf8");
+  expect(/Total active grading time/.test(csv) && /Seconds per pin/.test(csv), "time-stats.csv missing tables");
+  await m.getByRole("button", { name: "Close", exact: true }).click();
+  return `${log.length} actions; ${text.split("\n").slice(0, 3).join(" ").replace(/\s+/g, " ")}`;
+});
+
 await browser.close();
 tiles.stop();
 for (const r of results) {

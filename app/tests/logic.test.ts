@@ -14,6 +14,7 @@ import { exportTable, kr20, parseStudentName, EXPORT_PRESETS, testStats, safeFil
 import { MAX_ANNOTATIONS } from "../src/lib/ndpa";
 import { parseMarkdown, slug } from "../src/lib/markdown";
 import { applyPlan, emptyKey, makeKeyFile, matchPin, newMark, parseKeyFile, planKey, type AnswerKey } from "../src/lib/answerKey";
+import { activeSecs, fmtDuration, IDLE_CAP, timeCsv, timeReport } from "../src/lib/timing";
 import { checkQuestions, examJson, nextNum, normSlide, planQuestionEdit, questionChanges, renumbered } from "../src/lib/examEdit";
 import { area, dist, fmtArea, fmtLength, measureLabel, perimeter } from "../src/lib/measure";
 import { canCarry, carryOver, dismissRows, mergeRescan, rescanMessage, restorePins, reviewPinIds, reviewRows } from "../src/lib/rescan";
@@ -771,6 +772,51 @@ ok(!!dbl && studentResults(session, dbl, defaultSettings)[0].text === defaultSet
   ok(plan.changes.map((c) => `${c.q}:${c.kind}`).join() === "1:slides,2:added", `plan changes: ${plan.changes.map((c) => `${c.q}:${c.kind}`).join()}`);
   ok(plan.regraded === 1 && !plan.grades.pinGroup.p2 && plan.merged.pins.find((p) => p.id === "p2")?.q === 2, "the Q2 pin graded as Q1 loses that grade and now answers Q2");
   ok(!!plan.grades.pinGroup.p1 && plan.retired === 1 && plan.merged.retired[0].pin.id === "p3" && !plan.merged.retired[0].review, "other grades kept; the dropped slide's pin steps aside quietly (grade kept, not up for review)");
+}
+
+// ---- time spent: capping breaks, sharing an action's time, per question / grader / student, pairs ----
+{
+  ok(activeSecs(0, 30_000) === 30 && activeSecs(0, 10 * 60_000) === IDLE_CAP && activeSecs(5000, 0) === 0, "breaks over the cap count as the cap");
+  ok(fmtDuration(7.44) === "7.4 s" && fmtDuration(95) === "1 min 35 s" && fmtDuration(3725) === "1 h 2 min", "durations read as s / min / h");
+  const P = (id: string, stu: string, q: number) =>
+    ({ id, studentId: stu, slide: "A", rawTitle: "", details: "", q, candidates: [], titleGuessed: false, xNm: 0, yNm: 0, annotationType: "pin" }) as Pin;
+  const ts: Session = {
+    version: 1, name: "T", createdAt: 0, savedAt: 0, sessionPath: "/t.msgrade", submissionsDir: "", slidesDir: "",
+    questions: [{ num: 1, slides: ["A"], prompt: "", include: true }, { num: 2, slides: ["A"], prompt: "", include: true }],
+    students: [{ id: "s1", name: "One", folder: "One" }, { id: "s2", name: "Two", folder: "Two" }],
+    pins: [P("a", "s1", 1), P("b", "s2", 1), P("c", "s1", 2), P("d", "s2", 2)],
+    slides: [], taskIndex: 0,
+    grades: {
+      groups: { k: { id: "k", taskId: "Q2|A", status: "correct", text: "", pinIds: ["d"], createdAt: 0, by: KEY } }, pinGroup: { d: "k" }, assign: {},
+      checks: {
+        a: { taskId: "Q1|A", graders: [HOST, "Jo"], state: "agreed", verdicts: [{ by: HOST, status: "correct", text: "", at: 0 }, { by: "Jo", status: "correct", text: "", at: 0 }] },
+        b: { taskId: "Q1|A", graders: [HOST, "Jo"], state: "conflict", verdicts: [{ by: HOST, status: "correct", text: "", at: 0 }, { by: "Jo", status: "wrong", text: "Mast cell", at: 0 }] },
+      },
+    },
+    timeLog: [
+      { at: 1, taskId: "Q1|A", pinIds: ["a", "b"], secs: 20 }, // you: 10 s each
+      { at: 2, taskId: "Q2|A", pinIds: ["c"], secs: 30 },
+      { at: 3, taskId: "Q1|A", pinIds: ["a"], secs: 8, by: "Jo", pack: "p" },
+      { at: 4, taskId: "Q1|A", pinIds: ["b"], secs: 2, by: "Jo", pack: "p" },
+    ],
+  };
+  const tr = timeReport(ts);
+  ok(tr.totalSecs === 60 && tr.pins === 3 && tr.keyPins === 1, `totals: ${tr.totalSecs} s over ${tr.pins} pins, ${tr.keyPins} by the key`);
+  ok(tr.byQuestion.map((r) => `${r.label}:${r.secs}/${r.pins}/${r.students}`).join() === "Q1:30/2/2,Q2:30/1/1", `by question: ${tr.byQuestion.map((r) => `${r.label}:${r.secs}/${r.pins}/${r.students}`).join()}`);
+  ok(tr.byGrader.map((r) => `${r.label}:${r.secs}`).join() === "You:50,Jo:10", `by grader: ${tr.byGrader.map((r) => `${r.label}:${r.secs}`).join()}`);
+  ok(tr.matrix[0].graders[HOST] === 10 && tr.matrix[0].graders.Jo === 5 && tr.matrix[1].graders.Jo === null, "question × grader seconds per pin");
+  ok(tr.byStudent[0].label === "One" && tr.byStudent[0].secs === 48, `slowest student: ${tr.byStudent[0].label} ${tr.byStudent[0].secs} s`);
+  const pr = tr.pairs[0];
+  ok(!!pr && pr.pins === 2 && pr.aPerPin === 10 && pr.bPerPin === 5 && pr.agreedPerPin === 9 && pr.disagreedPerPin === 6, `pair: ${JSON.stringify(pr)}`);
+  const csv = timeCsv(tr);
+  ok(csv.some((r) => r[0] === "Q1" && r[4] === "15.0") && csv.some((r) => r[0] === "You & Jo"), "time-stats.csv has the tables");
+  // a guest's results bring their time; sending again replaces it
+  const host: Session = { ...ts, timeLog: [ts.timeLog![0]], handoffs: [{ id: "p", guest: "Jo", createdAt: 0, taskIds: ["Q1|A"], pinIds: ["a", "b"], status: "out" }], grades: { groups: {}, pinGroup: {}, assign: {} } };
+  const res = (secs: number) => parseResult(JSON.stringify({ kind: "msg-handoff-result", version: 1, packId: "p", guest: "Jo", sentAt: 1, assign: {}, groups: [], timeLog: [{ at: 1, taskId: "Q1|A", pinIds: ["a", "zzz"], secs }] }));
+  const m1 = mergeResult(host, res(9999));
+  ok(m1.timeLog.length === 2 && m1.timeLog[1].by === "Jo" && m1.timeLog[1].secs === IDLE_CAP && m1.timeLog[1].pinIds.join() === "a", "guest time merged, capped, only the pack's pins");
+  const m2 = mergeResult({ ...host, timeLog: m1.timeLog, handoffs: m1.handoffs }, res(12));
+  ok(m2.timeLog.length === 2 && m2.timeLog[1].secs === 12, "a re-sent results file replaces the earlier time");
 }
 
 // ---- ruler: lengths, areas and how they read ----
