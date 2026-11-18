@@ -1,3 +1,4 @@
+import { isMac } from "../lib/backend";
 import { useLayoutEffect, useMemo, useRef, useState, type ReactNode } from "react";
 import { IconCheck, IconCross, IconEraser, IconHalf, IconTarget } from "./icons";
 import type { MenuState } from "../lib/store";
@@ -23,7 +24,7 @@ interface Props {
   onPaintGrade?: () => void;
 }
 
-const mod = navigator.userAgent.includes("Mac") ? "⌘" : "Ctrl+";
+const mod = isMac ? "⌘" : "Ctrl+";
 
 export function ContextMenu({ menu, grades, q, settings, anyGraded, onGrade, onInvert, onIsolate, onUngrade, onMode, onClose, paintRest = 0, onPaintGrade }: Props) {
   const painted = paintRest > 0 && !!onPaintGrade;

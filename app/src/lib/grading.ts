@@ -2,6 +2,47 @@ import type { GradeState, Pin, Question, Session, Student, Task } from "./types"
 import { defaultSettings, type Settings } from "./settings";
 
 export const taskId = (q: number, slide: string) => `Q${q}|${slide}`;
+/** "Q3|VMS109" → { q: 3, slide: "VMS109" } */
+export const parseTaskId = (id: string) => {
+  const [q, slide = ""] = id.split("|");
+  return { q: Number(q.replace(/^Q/, "")), slide };
+};
+/** how an image is named in the UI: "Q1 · VMS109", "Q4 · VMS133 (2/2)" */
+export const taskLabel = (t: Task) => `Q${t.q} · ${t.slide}${t.slideCount > 1 ? ` (${t.slideIndex + 1}/${t.slideCount})` : ""}`;
+/** the same, from just an id (when the task isn't at hand) */
+export const taskIdLabel = (id: string, tasks?: Task[]) => {
+  const t = tasks?.find((x) => x.id === id);
+  return t ? taskLabel(t) : id.replace("|", " · ");
+};
+
+/** pin id → pin */
+export const pinMap = (pins: Pin[]) => new Map(pins.map((p) => [p.id, p] as [string, Pin]));
+
+/** a copy of the grades that can be changed without touching the original (one level deep) */
+export const cloneGrades = (g: GradeState): GradeState => ({
+  groups: { ...g.groups },
+  pinGroup: { ...g.pinGroup },
+  assign: { ...g.assign },
+  ...(g.checks ? { checks: { ...g.checks } } : {}),
+});
+
+/** Remove pins from whatever group they're in, deleting groups left empty. Changes `g`. */
+export function detach(g: GradeState, pinIds: string[]) {
+  const set = new Set(pinIds);
+  const touched = new Set<string>();
+  for (const id of pinIds) {
+    const gid = g.pinGroup[id];
+    if (gid) touched.add(gid);
+    delete g.pinGroup[id];
+  }
+  for (const gid of touched) {
+    const grp = g.groups[gid];
+    if (!grp) continue;
+    const rest = grp.pinIds.filter((p) => !set.has(p));
+    if (rest.length) g.groups[gid] = { ...grp, pinIds: rest };
+    else delete g.groups[gid];
+  }
+}
 
 export function buildTasks(questions: Question[], availableSlides: Set<string>): Task[] {
   const tasks: Task[] = [];

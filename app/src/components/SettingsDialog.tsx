@@ -1,16 +1,16 @@
 import { Fragment, useEffect, useRef, useState, type ReactNode } from "react";
 import { getCurrentWindow } from "@tauri-apps/api/window";
-import { keyLabel, useSettings, type Settings } from "../lib/settings";
-import { SliderRow } from "./RightPanel";
+import { BRUSH_MAX, BRUSH_MIN, defaultSettings, keyLabel, useSettings, type Settings } from "../lib/settings";
 import { drawMarker } from "../lib/markers";
-import { IconCircleDash, IconExport, IconInfo, IconKeyboard, IconLasso, IconPin, IconText } from "./icons";
-import { searchHelp } from "../lib/help";
+import { helpImage, hitRef, searchHelp } from "../lib/help";
 import { showHelp } from "../lib/backend";
-import { AboutPane } from "./AboutPane";
-import { CsvPreviewTable, ExportLayoutEditor } from "./ExportLayout";
 import { exportTable, type ExportRow } from "../lib/exportCsv";
-import { defaultSettings } from "../lib/settings";
-import { helpImage } from "../lib/help";
+import { clamp } from "../lib/util";
+import { IconCircleDash, IconExport, IconInfo, IconKeyboard, IconLasso, IconPin, IconText } from "./icons";
+import { AboutPane } from "./AboutPane";
+import { Modal } from "./Modal";
+import { CsvPreviewTable, ExportLayoutEditor } from "./ExportLayout";
+import { flash, SearchField, SliderRow } from "./controls";
 
 type Pane = "pins" | "select" | "input" | "clusters" | "text" | "export" | "about";
 const PANES: { id: Pane; label: string; icon: ReactNode; lede: string }[] = [
@@ -125,9 +125,7 @@ export function SettingsDialog({ onClose, asWindow = false }: { onClose: () => v
         const row = el?.closest<HTMLElement>(".prow2, .sel-item, .group, .keyrow") ?? el;
         if (!row) return;
         row.scrollIntoView({ block: "center", behavior: "smooth" });
-        row.classList.remove("pref-flash");
-        void row.offsetWidth;
-        row.classList.add("pref-flash");
+        flash(row, "pref-flash");
       }),
     );
   };
@@ -165,7 +163,7 @@ export function SettingsDialog({ onClose, asWindow = false }: { onClose: () => v
         min={min}
         max={max}
         value={s[k] as number}
-        onChange={(e) => e.target.value !== "" && set({ [k]: Math.max(min, Math.min(max, Number(e.target.value))) } as Partial<Settings>)}
+        onChange={(e) => e.target.value !== "" && set({ [k]: clamp(Number(e.target.value), min, max) } as Partial<Settings>)}
       />
       <u>{unit}</u>
     </label>
@@ -199,26 +197,15 @@ export function SettingsDialog({ onClose, asWindow = false }: { onClose: () => v
   const body = (
     <div className="prefs">
       <nav className="prefs-nav">
-        <label className="prefs-search">
-          <svg viewBox="0 0 16 16" width="12" height="12" aria-hidden>
-            <circle cx="7" cy="7" r="4.5" fill="none" stroke="currentColor" strokeWidth="1.6" />
-            <path d="M10.5 10.5 14 14" stroke="currentColor" strokeWidth="1.6" strokeLinecap="round" />
-          </svg>
-          <input
-            placeholder="Search"
-            value={q}
-            onChange={(e) => setQ(e.target.value)}
-            onKeyDown={(e) => {
-              if (e.key === "Escape") {
-                e.stopPropagation();
-                setQ("");
-              } else if (e.key === "Enter") {
-                if (settingHits[0]) goSetting(settingHits[0].pane, settingHits[0].label);
-                else if (helpHits[0]) void showHelp(helpHits[0].anchor ? `${helpHits[0].id}/${helpHits[0].anchor}` : helpHits[0].id);
-              }
-            }}
-          />
-        </label>
+        <SearchField
+          className="prefs-search"
+          value={q}
+          onChange={setQ}
+          onEnter={() => {
+            if (settingHits[0]) goSetting(settingHits[0].pane, settingHits[0].label);
+            else if (helpHits[0]) void showHelp(hitRef(helpHits[0]));
+          }}
+        />
         {q.trim() ? (
           <div className="prefs-results">
             {settingHits.length > 0 && <div className="pr-h">Settings</div>}
@@ -230,7 +217,7 @@ export function SettingsDialog({ onClose, asWindow = false }: { onClose: () => v
             ))}
             {helpHits.length > 0 && <div className="pr-h">Help</div>}
             {helpHits.map((h, i) => (
-              <button key={i} onClick={() => void showHelp(h.anchor ? `${h.id}/${h.anchor}` : h.id)}>
+              <button key={i} onClick={() => void showHelp(hitRef(h))}>
                 <span>{h.anchor ? h.label : h.title}</span>
                 <span className="pr-where">{h.anchor ? h.title : "Help"} ↗</span>
               </button>
@@ -409,13 +396,12 @@ export function SettingsDialog({ onClose, asWindow = false }: { onClose: () => v
       </div>
     );
   return (
-    <div className="modal-backdrop" onMouseDown={onClose}>
-      <div className="modal prefs-modal" onMouseDown={(e) => e.stopPropagation()}>
-        <div className="win-title">Preferences</div>
-        {body}
-        {foot}
-      </div>
-    </div>
+    // Esc is handled above (it must not close while a key is being captured)
+    <Modal className="prefs-modal" onClose={onClose} escape={false}>
+      <div className="win-title">Preferences</div>
+      {body}
+      {foot}
+    </Modal>
   );
 }
 
@@ -558,7 +544,7 @@ function SelectionPane({ s, set }: { s: Settings; set: (patch: Partial<Settings>
       extra: (
         <div className="mextra">
           <span>Brush size</span>
-          <SliderRow label="" value={s.brushPx} min={6} max={200} unit="px" onChange={(v) => set({ brushPx: v })} />
+          <SliderRow label="" value={s.brushPx} min={BRUSH_MIN} max={BRUSH_MAX} unit="px" onChange={(v) => set({ brushPx: v })} />
         </div>
       ),
     },

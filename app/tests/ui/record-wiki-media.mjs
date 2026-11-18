@@ -3,9 +3,8 @@
 // The selection-tool clips come from record-help-gifs.mjs.
 import fs from "node:fs";
 import path from "node:path";
-import { chromium } from "playwright";
-import { APP, ROOT, startTileServer, installShim } from "./harness.mjs";
-import { cursorScript, recordGif } from "./media-kit.mjs";
+import { APP, ROOT, closeSession, launch, newDemoSession, openSession, startTileServer } from "./harness.mjs";
+import { cursorScript, motion, recordGif } from "./media-kit.mjs";
 
 const OUT = path.join(ROOT, "docs/help/img");
 const WORK = path.join(APP, "tests/.out/wiki-media");
@@ -15,13 +14,9 @@ fs.mkdirSync(OUT, { recursive: true });
 
 const tiles = await startTileServer();
 const W = 1440, H = 900;
-const browser = await chromium.launch();
-const context = await browser.newContext({ viewport: { width: W, height: H } });
-await installShim(context);
-await context.addInitScript(cursorScript);
-const page = await context.newPage();
-const wait = (ms) => page.waitForTimeout(ms);
-const dialog = (...a) => page.evaluate((x) => window.__dialogQueue.push(...x), a);
+const { browser, context, page, dialog } = await launch({ browser: "chromium", viewport: { width: W, height: H }, initScripts: [cursorScript] });
+const { glide, wait, at } = motion(page, { x: W / 2, y: H / 2 });
+const key = async (k, after = 450) => (await page.keyboard.press(k), wait(after));
 const made = [];
 const ONLY = process.argv.slice(2);
 const wanted = (name) => !ONLY.length || ONLY.includes(name);
@@ -69,49 +64,17 @@ async function maybeGif(name, opts, fn) {
   await fn();
   return { kb: 0, frames: 0 };
 }
-let mx = W / 2, my = H / 2;
-async function glide(x, y, ms = 500) {
-  const n = Math.max(2, Math.round(ms / 25));
-  const x0 = mx, y0 = my;
-  for (let i = 1; i <= n; i++) {
-    const t = i / n, e = t < 0.5 ? 2 * t * t : 1 - (-2 * t + 2) ** 2 / 2;
-    await page.mouse.move(x0 + (x - x0) * e, y0 + (y - y0) * e);
-    await wait(25);
-  }
-  mx = x;
-  my = y;
-}
-const key = async (k, after = 450) => (await page.keyboard.press(k), wait(after));
 async function typeSlow(t) {
   for (const ch of t) await page.keyboard.type(ch), await wait(55);
 }
 
 // ---- set up a session: this is also the "New grading session" screenshot ----
-await page.goto("http://localhost:1420/");
-await page.evaluate(() => localStorage.clear());
-await page.reload();
-await page.getByText("New grading session…").click();
-await dialog(path.join(ROOT, "demo/exam.json"));
-await page.getByText("Choose exam PDF / JSON…").click();
-await wait(400);
-await dialog(path.join(ROOT, "demo/submissions"));
-await page.locator(".step").nth(1).getByRole("button").click();
-await wait(600);
 // a slides folder with just the exam's slides keeps the screenshot readable
 const SLIDES = path.join(WORK, "slides");
 fs.mkdirSync(SLIDES, { recursive: true });
 for (const f of fs.readdirSync(path.join(ROOT, "images")))
   if (/VMS(109|133)\b/.test(f)) fs.symlinkSync(path.join(ROOT, "images", f), path.join(SLIDES, f));
-await dialog(SLIDES);
-await page.locator(".step").nth(2).getByRole("button").click();
-await wait(600);
-await dialog(path.join(WORK, "Practical 2.msgrade"));
-await page.locator(".step").nth(3).getByRole("button").click();
-await wait(300);
-await shot("new-session.png", ".startup-card");
-await page.getByText("Start grading →").click();
-await page.locator(".topbar").waitFor();
-await wait(2500);
+await newDemoSession(page, dialog, { save: path.join(WORK, "Practical 2.msgrade"), slides: SLIDES, beforeStart: () => shot("new-session.png", ".startup-card") });
 
 // ---- grade a few clusters by hand so the screen shows correct, wrong and ungraded pins ----
 await key("c", 900);
@@ -187,9 +150,8 @@ await page.locator(".ho-twice-l input").uncheck();
   const m = await page.locator(".handoff-modal").boundingBox();
   const src = await page.locator('.ho-col[data-col="0"] .ho-card').first().boundingBox();
   const dst = await page.locator('.ho-col[data-col="1"]').boundingBox();
-  mx = src.x + 40;
-  my = src.y + 60;
-  await page.mouse.move(mx, my);
+  at(src.x + 40, src.y + 60);
+  await page.mouse.move(src.x + 40, src.y + 60);
   const r = await maybeGif("handoff-drag.gif", { file: path.join(OUT, "handoff-drag.gif"), crop: m, work: WORK, width: 640 }, async () => {
     await glide(src.x + 60, src.y + src.height / 2, 600);
     await wait(300);
@@ -243,8 +205,7 @@ await key("Escape", 300);
 if (await page.locator(".modal-backdrop").count()) await page.getByRole("button", { name: "Close", exact: true }).click();
 
 // ---- disagreements: write a few into the session file, reopen, and show the window ----
-await page.locator('button[title="Save and close session"]').click();
-await page.locator(".startup").waitFor();
+await closeSession(page);
 {
   const file = path.join(WORK, "Practical 2.msgrade");
   const s = JSON.parse(fs.readFileSync(file, "utf8"));
@@ -272,9 +233,7 @@ await page.locator(".startup").waitFor();
   for (const id of pick(tasks[4], 20)) g.checks[id] = { taskId: tasks[4], graders: ["@host", "Jamie"], verdicts: [{ by: "@host", status: "correct", text: "", at: now }, { by: "Jamie", status: "correct", text: "", at: now }], state: "agreed" };
   fs.writeFileSync(file, JSON.stringify(s));
 }
-await dialog(path.join(WORK, "Practical 2.msgrade"));
-await page.getByRole("button", { name: "Open session…" }).click();
-await page.locator(".topbar").waitFor();
+await openSession(page, dialog, path.join(WORK, "Practical 2.msgrade"));
 await wait(1500);
 await page.locator(".conflicts-btn").click();
 await page.locator(".conflicts-modal").waitFor();
@@ -282,8 +241,7 @@ await wait(300);
 await page.mouse.move(5, 5);
 await shot("disagreements.png", ".conflicts-modal");
 await page.getByRole("button", { name: "Done" }).click();
-await page.locator('button[title="Save and close session"]').click();
-await page.locator(".startup").waitFor();
+await closeSession(page);
 
 // ---- start screen with the session under Resume ----
 await wait(500);

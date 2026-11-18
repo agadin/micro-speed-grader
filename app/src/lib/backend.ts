@@ -13,18 +13,31 @@ export const writeText = (path: string, contents: string, keepBackup = false) =>
 export const pathExists = (path: string) => invoke<boolean>("path_exists", { path });
 /** opens/focuses the separate Preferences window; rejects outside Tauri */
 export const openPreferencesWindow = () => invoke<void>("open_preferences");
-export const openHelpWindow = (topic: string) => invoke<void>("open_help", { topic });
 /** Open a help article ("article" or "article/section") in the Help window; in a plain browser, the in-page panel. */
 export const showHelp = async (ref: string) => {
   try {
-    await openHelpWindow(ref);
+    await invoke<void>("open_help", { topic: ref });
   } catch {
     const { useStore } = await import("./store");
     useStore.getState().set({ help: ref });
   }
 };
+/** Open a web link in the user's browser. */
+export const openExternal = async (url: string) => {
+  try {
+    const { openUrl } = await import("@tauri-apps/plugin-opener");
+    await openUrl(url);
+  } catch {
+    window.open(url, "_blank", "noopener");
+  }
+};
 
+export const isMac = navigator.userAgent.includes("Mac");
 const isWindows = navigator.userAgent.includes("Windows");
+/** running inside the app's window (also true under the UI-test stand-in) */
+export const hasTauri = "__TAURI_INTERNALS__" in window;
+/** running in the real app, not the UI tests */
+export const inRealApp = () => hasTauri && !(window as { __MSG_TEST__?: boolean }).__MSG_TEST__;
 /** Base URL of the custom `slide://` tile protocol (differs on Windows/WebView2). */
 export const tileBase: string =
   (window as unknown as { __MSG_TILE_BASE__?: string }).__MSG_TILE_BASE__ ?? // headless UI tests (tests/ui)
@@ -36,6 +49,8 @@ export const dirname = (p: string) => {
   const i = Math.max(p.lastIndexOf("/"), p.lastIndexOf("\\"));
   return i <= 0 ? p : p.slice(0, i);
 };
+/** add the extension if a save dialog's path doesn't already end with it: withExt("a", "msgrade") → "a.msgrade" */
+export const withExt = (p: string, ext: string) => (p.toLowerCase().endsWith(`.${ext}`) ? p : `${p}.${ext}`);
 export const joinPath = (...parts: string[]) =>
   parts.map((p, i) => (i === 0 ? p.replace(/[\\/]+$/, "") : p.replace(/^[\\/]+|[\\/]+$/g, ""))).join(sep);
 

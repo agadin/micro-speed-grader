@@ -2,8 +2,9 @@ import { create } from "zustand";
 import type { GradeState, GradeStatus, Group, Session } from "./types";
 import { graderLabel, hostGraded, type Handoff } from "./handoff";
 import { writeText } from "./backend";
+import { cloneGrades, detach, pinMap } from "./grading";
+import { uid } from "./util";
 
-const uid = () => Math.random().toString(36).slice(2, 10) + Date.now().toString(36).slice(-4);
 
 export interface MenuState {
   x: number;
@@ -20,7 +21,6 @@ interface Store {
   past: GradeState[];
   future: GradeState[];
   dirty: boolean;
-  lastSaved: number | null;
   saveError: string | null;
 
   // ephemeral UI state
@@ -58,19 +58,14 @@ interface Store {
   redo: () => void;
   set: (patch: Partial<Store>) => void;
   focusPins: (pinIds: string[]) => void;
+  /** go to an image (by index) and select + zoom to these pins */
+  showPins: (taskIndex: number, pinIds: string[]) => void;
   saveNow: () => Promise<void>;
   /** host: record packs sent out / recalled */
   setHandoffs: (h: Handoff[]) => void;
   /** host: merge a guest's results (one undo step) */
   applyResult: (grades: GradeState, h: Handoff[]) => void;
 }
-
-const cloneGrades = (g: GradeState): GradeState => ({
-  groups: { ...g.groups },
-  pinGroup: { ...g.pinGroup },
-  assign: { ...g.assign },
-  ...(g.checks ? { checks: { ...g.checks } } : {}),
-});
 
 /** other graders whose grades on these pins are about to be replaced, e.g. ["Jamie"] and how many pins */
 function othersOn(g: GradeState, pinIds: string[]) {
@@ -86,24 +81,6 @@ const overrideText = (names: Map<string, number>) => {
   const who = [...names.keys()].map(graderLabel).join(", ");
   return `${n} pin${n === 1 ? " was" : "s were"} graded by ${who}. Your grade replaced theirs.`;
 };
-
-/** Remove pins from whatever group they're in (deleting emptied groups). */
-function detach(g: GradeState, pinIds: string[]) {
-  const set = new Set(pinIds);
-  const touched = new Set<string>();
-  for (const id of pinIds) {
-    const gid = g.pinGroup[id];
-    if (gid) touched.add(gid);
-    delete g.pinGroup[id];
-  }
-  for (const gid of touched) {
-    const grp = g.groups[gid];
-    if (!grp) continue;
-    const rest = grp.pinIds.filter((p) => !set.has(p));
-    if (rest.length) g.groups[gid] = { ...grp, pinIds: rest };
-    else delete g.groups[gid];
-  }
-}
 
 let saveTimer: ReturnType<typeof setTimeout> | null = null;
 
@@ -130,7 +107,6 @@ export const useStore = create<Store>((set, get) => {
     past: [],
     future: [],
     dirty: false,
-    lastSaved: null,
     saveError: null,
     selection: [],
     isolate: false,
@@ -181,7 +157,7 @@ export const useStore = create<Store>((set, get) => {
         }
       }
       // pins graded twice: record your verdict, or settle a disagreement with your grade
-      const conflicts = g.checks ? hostGraded(g, all, new Map(s.pins.map((p) => [p.id, p]))) : 0;
+      const conflicts = g.checks ? hostGraded(g, all, pinMap(s.pins)) : 0;
       commit(g);
       const notice = conflicts
         ? { kind: "conflict" as const, text: `${conflicts} pin${conflicts === 1 ? "" : "s"} you graded disagree${conflicts === 1 ? "s" : ""} with another grader. They're flagged in Disagreements.` }
@@ -253,6 +229,11 @@ export const useStore = create<Store>((set, get) => {
       commit(grades);
     },
     focusPins: (pinIds) => set({ focusRequest: { pinIds, nonce: Date.now() } }),
+    showPins: (taskIndex, pinIds) => {
+      const s = get().session;
+      if (s && taskIndex >= 0 && taskIndex !== s.taskIndex) get().setTask(taskIndex);
+      set({ selection: pinIds, focusRequest: { pinIds, nonce: Date.now() } });
+    },
 
     saveNow: async () => {
       const s = get().session;
@@ -260,7 +241,7 @@ export const useStore = create<Store>((set, get) => {
       const toSave: Session = { ...s, savedAt: Date.now() };
       try {
         await writeText(s.sessionPath, JSON.stringify(toSave), true);
-        set({ dirty: false, lastSaved: toSave.savedAt, saveError: null });
+        set({ dirty: false, saveError: null });
         rememberRecent(s.sessionPath, s.name);
       } catch (e) {
         set({ saveError: String(e) });

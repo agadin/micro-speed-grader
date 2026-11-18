@@ -1,5 +1,6 @@
 import { useMemo, useState } from "react";
 import type { Group, Pin, Session, Task } from "../lib/types";
+import { pinMap, taskIdLabel } from "../lib/grading";
 import { useStore } from "../lib/store";
 import type { Settings } from "../lib/settings";
 import { IconCheck, IconCross, IconPencil, IconTrash, IconTri } from "./icons";
@@ -21,10 +22,9 @@ export function Ledger({ session, task, tasks, doubles, settings, studentName }:
   const [draft, setDraft] = useState("");
   const editGroup = useStore((s) => s.editGroup);
   const ungrade = useStore((s) => s.ungrade);
-  const focusPins = useStore((s) => s.focusPins);
-  const setTask = useStore((s) => s.setTask);
+  const showPins = useStore((s) => s.showPins);
 
-  const pinById = useMemo(() => new Map(session.pins.map((p) => [p.id, p])), [session.pins]);
+  const pinById = useMemo(() => pinMap(session.pins), [session.pins]);
   const groups = useMemo(
     () =>
       Object.values(session.grades.groups)
@@ -40,16 +40,11 @@ export function Ledger({ session, task, tasks, doubles, settings, studentName }:
     [session.pins, doubles, session.grades.pinGroup, task.slide],
   );
 
-  const goto = (g: Pick<Group, "taskId" | "pinIds">) => {
-    const idx = tasks.findIndex((t) => t.id === g.taskId);
-    if (idx >= 0 && idx !== session.taskIndex) setTask(idx);
-    set({ selection: g.pinIds });
-    focusPins(g.pinIds);
-  };
+  const goto = (g: Pick<Group, "taskId" | "pinIds">) => showPins(tasks.findIndex((t) => t.id === g.taskId), g.pinIds);
 
   const totalGraded = groups.reduce((s, g) => s + g.pinIds.length, 0);
 
-  const taskLabel = (id: string) => id.replace("|", " · ");
+  const taskLabel = (id: string) => taskIdLabel(id);
 
   return (
     <div className="ledger" data-help="ledger">

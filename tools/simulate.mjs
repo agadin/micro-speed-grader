@@ -2,10 +2,10 @@
 /**
  * Generate a fake class of student submissions from an answer key, for demos.
  *
- *   node tools/simulate.mjs --key sample-data/PracticeExamPractical1 \
- *        --slides VMS146,VMS292 --students 200 --out demo --exam reference/exams/PracticeExam1_Practical.pdf
- *
  *   node tools/simulate.mjs --key demo-key --spec demo-key/demo.json --out demo
+ *
+ * or from your own answer key and exam (course material isn't in the repo):
+ *   node tools/simulate.mjs --key <key folder> --slides VMS146,VMS292 --students 200 --out demo --exam <exam.pdf>
  *
  * Key: .ndpa files whose pins are titled "Q<n>". Several pins with the same
  * title = several acceptable answers. Pins titled "Q<n> wrong: <label>" are

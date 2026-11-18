@@ -1,21 +1,15 @@
 import { useEffect, useLayoutEffect, useMemo, useRef, useState } from "react";
 import { useStore } from "../lib/store";
-import { HOME, TOPICS, article, helpImage, parseRef, searchHelp } from "../lib/help";
+import { HOME, TOPICS, article, helpImage, hitRef, parseRef, searchHelp } from "../lib/help";
+import { flash, SearchField } from "./controls";
 import { renderMarkdown } from "../lib/markdown";
+import { openExternal } from "../lib/backend";
 
 /**
  * The help wiki viewer, in the style of macOS Help: a home page with topics, search, one article at a time
  * and a back button. Articles come from docs/help/*.md (see lib/help.ts).
  */
 
-const openExternal = async (url: string) => {
-  try {
-    const { openUrl } = await import("@tauri-apps/plugin-opener");
-    await openUrl(url);
-  } catch {
-    window.open(url, "_blank", "noopener");
-  }
-};
 
 function HelpBrowser({ initial, onClose, dragProps }: { initial: string; onClose?: () => void; dragProps?: React.HTMLAttributes<HTMLDivElement> }) {
   const [stack, setStack] = useState<string[]>([initial || "index"]);
@@ -39,9 +33,7 @@ function HelpBrowser({ initial, onClose, dragProps }: { initial: string; onClose
     const el = anchor ? bodyRef.current?.querySelector<HTMLElement>(`#${CSS.escape(anchor)}`) : null;
     if (el) {
       bodyRef.current!.scrollTop = el.offsetTop - 12;
-      el.classList.remove("hp-flash");
-      void el.offsetWidth;
-      el.classList.add("hp-flash");
+      flash(el, "hp-flash");
     } else bodyRef.current?.scrollTo(0, 0);
   }, [cur, anchor]);
 
@@ -80,24 +72,7 @@ function HelpBrowser({ initial, onClose, dragProps }: { initial: string; onClose
         <button className="hp-ic hp-home" disabled={id === "index" && !q} onClick={() => go("index")} title="Help home" aria-label="Help home">
           ⌂
         </button>
-        <label className="hp-search">
-          <svg viewBox="0 0 16 16" width="12" height="12" aria-hidden>
-            <circle cx="7" cy="7" r="4.5" fill="none" stroke="currentColor" strokeWidth="1.6" />
-            <path d="M10.5 10.5 14 14" stroke="currentColor" strokeWidth="1.6" strokeLinecap="round" />
-          </svg>
-          <input
-            ref={searchRef}
-            placeholder="Search help"
-            value={q}
-            onChange={(e) => setQ(e.target.value)}
-            onKeyDown={(e) => {
-              if (e.key === "Escape" && q) {
-                e.stopPropagation();
-                setQ("");
-              } else if (e.key === "Enter" && hits[0]) go(hits[0].anchor ? `${hits[0].id}/${hits[0].anchor}` : hits[0].id);
-            }}
-          />
-        </label>
+        <SearchField className="hp-search" placeholder="Search help" value={q} onChange={setQ} inputRef={searchRef} onEnter={() => hits[0] && go(hitRef(hits[0]))} />
         {onClose && (
           <button className="hp-ic" onClick={onClose} title="Close (Esc)" aria-label="Close help">
             ×
@@ -109,7 +84,7 @@ function HelpBrowser({ initial, onClose, dragProps }: { initial: string; onClose
           <div className={hits.length ? "hp-results hp-group" : "hp-results"}>
             {hits.length ? (
               hits.map((h, i) => (
-                <button key={i} className="hp-hit" onClick={() => go(h.anchor ? `${h.id}/${h.anchor}` : h.id)}>
+                <button key={i} className="hp-hit" onClick={() => go(hitRef(h))}>
                   <span className="hp-row-tx">
                     <b>{h.anchor ? h.label : h.title}</b>
                     <span className="muted small">{h.anchor ? h.title : h.label}</span>

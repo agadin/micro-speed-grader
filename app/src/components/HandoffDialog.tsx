@@ -1,10 +1,12 @@
 import { useMemo, useRef, useState } from "react";
 import { open, save } from "@tauri-apps/plugin-dialog";
 import type { Session, Task } from "../lib/types";
+import { pinMap, taskLabel as label } from "../lib/grading";
 import { useStore } from "../lib/store";
-import { dirname, joinPath, readText, writeText } from "../lib/backend";
+import { dirname, joinPath, readText, showHelp, withExt, writeText } from "../lib/backend";
 import { HOST, makePack, mergeResult, parseResult, planOverlap, recallChecks, remainingByTask, seeded, splitWeighted, type Check, type Handoff } from "../lib/handoff";
 import { safeFileName } from "../lib/exportCsv";
+import { Modal } from "./Modal";
 
 /** column colours: You, then one per grader */
 const HUES = ["#e8b25a", "#5ec8c0", "#a98bff", "#ff8fb1", "#8fd17a", "#6fa8ff"];
@@ -24,7 +26,6 @@ interface Grader {
 export function HandoffDialog({ session, tasks, onClose }: { session: Session; tasks: Task[]; onClose: () => void }) {
   const setHandoffs = useStore((s) => s.setHandoffs);
   const applyResult = useStore((s) => s.applyResult);
-  const setStore = useStore((s) => s.set);
   const [graders, setGraders] = useState<Grader[]>([{ key: nextKey++, name: "" }]);
   /** task id → column (0 = you, i = graders[i-1]); null = follow "split evenly" */
   const [manual, setManual] = useState<Map<string, number> | null>(null);
@@ -65,7 +66,6 @@ export function HandoffDialog({ session, tasks, onClose }: { session: Session; t
   const total = load.reduce((a, b) => a + b, 0);
   const outPins = total - load[0] + [...overlap.values()].filter(([a, b]) => a === 0 && b !== 0).length;
   const nameOf = (c: number) => (c === 0 ? "You" : graders[c - 1].name.trim() || `Grader ${c}`);
-  const label = (t: Task) => `Q${t.q} · ${t.slide}${t.slideCount > 1 ? ` (${t.slideIndex + 1}/${t.slideCount})` : ""}`;
 
   const moveTo = (id: string, col: number) => {
     const next = new Map(items.map((i) => [i.id, colOf(i.id)] as [string, number]));
@@ -167,7 +167,7 @@ export function HandoffDialog({ session, tasks, onClose }: { session: Session; t
         filters: [{ name: "Hand-off pack", extensions: ["msgpack"] }],
       });
       if (!p) return;
-      paths = [p.endsWith(".msgpack") ? p : `${p}.msgpack`];
+      paths = [withExt(p, "msgpack")];
     } else {
       const d = await open({
         directory: true,
@@ -236,7 +236,7 @@ export function HandoffDialog({ session, tasks, onClose }: { session: Session; t
     const h = (session.handoffs ?? []).find((x) => x.id === id);
     if (!h || !confirm(`Take back the work given to ${h.guest}? Their pins unlock here; if they send results later, only pins you haven't graded will be merged.`)) return;
     const handoffs = (session.handoffs ?? []).map((x) => (x.id === id ? { ...x, status: "recalled" as const } : x));
-    if (h.checkPins?.length) applyResult(recallChecks(session.grades, h.guest, h.pinIds, new Map(session.pins.map((p) => [p.id, p]))), handoffs);
+    if (h.checkPins?.length) applyResult(recallChecks(session.grades, h.guest, h.pinIds, pinMap(session.pins)), handoffs);
     else setHandoffs(handoffs);
   };
 
@@ -247,11 +247,43 @@ export function HandoffDialog({ session, tasks, onClose }: { session: Session; t
   const dragItem = drag && remaining.find((r) => r.task.id === drag.id);
 
   return (
-    <div className="modal-backdrop" onMouseDown={onClose} onClick={() => setPicker(null)}>
-      <div className="modal handoff-modal" data-help="handoff" onMouseDown={(e) => e.stopPropagation()}>
+    <Modal
+      className="handoff-modal"
+      help="handoff"
+      onClose={onClose}
+      onBackdropClick={() => setPicker(null)}
+      after={
+        <>
+          {picker && (
+            <div className="ho-picker" style={{ left: picker.x, top: picker.y }} onMouseDown={(e) => e.stopPropagation()} onClick={(e) => e.stopPropagation()}>
+              <div className="muted small">Move to</div>
+              {Array.from({ length: cols }, (_, c) => (
+                <button
+                  key={c}
+                  className={colOf(picker.id) === c ? "on" : ""}
+                  onClick={() => {
+                    moveTo(picker.id, c);
+                    setPicker(null);
+                  }}
+                >
+                  <i style={{ background: hue(c) }} />
+                  {nameOf(c)}
+                </button>
+              ))}
+            </div>
+          )}
+          {drag && dragItem && (
+            <div className="ho-ghost" style={{ left: drag.x, top: drag.y }}>
+              <span className="ho-l">{label(dragItem.task)}</span>
+              <span className="ho-n">{dragItem.pinIds.length}</span>
+            </div>
+          )}
+        </>
+      }
+    >
         <div className="ho-head">
           <h2>Hand off work</h2>
-          <button className="ho-help" onClick={() => setStore({ help: "handoff" })} title="How hand-off works" aria-label="Help">
+          <button className="ho-help" onClick={() => void showHelp("handoff")} title="How hand-off works" aria-label="Help">
             ?
           </button>
         </div>
@@ -457,33 +489,7 @@ export function HandoffDialog({ session, tasks, onClose }: { session: Session; t
             {packCount > 1 ? `Create ${packCount} packs (${outPins} pins)…` : `Create pack (${outPins} pins)…`}
           </button>
         </div>
-
-      </div>
-    {picker && (
-        <div className="ho-picker" style={{ left: picker.x, top: picker.y }} onMouseDown={(e) => e.stopPropagation()} onClick={(e) => e.stopPropagation()}>
-          <div className="muted small">Move to</div>
-          {Array.from({ length: cols }, (_, c) => (
-            <button
-              key={c}
-              className={colOf(picker.id) === c ? "on" : ""}
-              onClick={() => {
-                moveTo(picker.id, c);
-                setPicker(null);
-              }}
-            >
-              <i style={{ background: hue(c) }} />
-              {nameOf(c)}
-            </button>
-          ))}
-        </div>
-      )}
-      {drag && dragItem && (
-        <div className="ho-ghost" style={{ left: drag.x, top: drag.y }}>
-          <span className="ho-l">{label(dragItem.task)}</span>
-          <span className="ho-n">{dragItem.pinIds.length}</span>
-        </div>
-      )}
-    </div>
+    </Modal>
   );
 }
 

@@ -1,3 +1,4 @@
+import { inRealApp } from "../lib/backend";
 import { useEffect, useState } from "react";
 import { listen } from "@tauri-apps/api/event";
 import { check, type Update } from "@tauri-apps/plugin-updater";
@@ -11,7 +12,7 @@ type State =
   | { kind: "uptodate" }
   | { kind: "error"; msg: string };
 
-const inTauri = () => "__TAURI_INTERNALS__" in window && !(window as { __MSG_TEST__?: boolean }).__MSG_TEST__;
+const inTauri = inRealApp;
 
 /**
  * Checks GitHub Releases for a newer version once at launch (quietly) and from

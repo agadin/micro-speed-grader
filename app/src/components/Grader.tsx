@@ -1,6 +1,6 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { useStore } from "../lib/store";
-import { activeTool, keyLabel, SELECT_TOOLS, useSettings, type SelectTool } from "../lib/settings";
+import { activeTool, keyLabel, SELECT_TOOLS, useSettings, type SelectTool, BRUSH_MAX, BRUSH_MIN } from "../lib/settings";
 import { pinsInPaint, type PaintOp } from "../lib/paint";
 import {
   buildTasks,
@@ -8,9 +8,11 @@ import {
   pinState,
   pinsForTask,
   type PinState,
+  parseTaskId,
+  taskLabel,
 } from "../lib/grading";
 import { computeClusters, type Cluster } from "../lib/cluster";
-import { openSlide, dirname, joinPath, showHelp, writeText } from "../lib/backend";
+import { openSlide, dirname, hasTauri, isMac, joinPath, showHelp, withExt, writeText } from "../lib/backend";
 import { awayPins, awayTasks, conflictPins, guestProgress, makeResult } from "../lib/handoff";
 import { safeFileName } from "../lib/exportCsv";
 import { save } from "@tauri-apps/plugin-dialog";
@@ -36,9 +38,9 @@ import {
   IconUndo,
 } from "./icons";
 
-const isMac = navigator.userAgent.includes("Mac");
+
 /** macOS window with an overlay title bar: leave room for the traffic lights */
-const macOverlay = isMac && "__TAURI_INTERNALS__" in window;
+const macOverlay = isMac && hasTauri;
 const TOPBAR_H = 48;
 const PANEL_W = 320;
 const GAP = 10;
@@ -424,7 +426,7 @@ export function Grader({ session }: { session: Session }) {
       if (
         gr.status !== "wrong" ||
         !gr.text ||
-        Number(gr.taskId.split("|")[0].slice(1)) !== task.q
+        parseTaskId(gr.taskId).q !== task.q
       )
         continue;
       const e = m.get(gr.text) ?? { text: gr.text, pins: 0, at: 0 };
@@ -629,9 +631,9 @@ export function Grader({ session }: { session: Session }) {
     if (pinModeOn && k === "ArrowRight") return (e.preventDefault(), stepPin(1));
     if (pinModeOn && k === "ArrowLeft") return (e.preventDefault(), stepPin(-1));
     if (k === "-" || k === "_")
-      return setSettings({ brushPx: Math.max(6, settings.brushPx - 4) });
+      return setSettings({ brushPx: Math.max(BRUSH_MIN, settings.brushPx - 4) });
     if (k === "=" || k === "+")
-      return setSettings({ brushPx: Math.min(200, settings.brushPx + 4) });
+      return setSettings({ brushPx: Math.min(BRUSH_MAX, settings.brushPx + 4) });
     if (k === "x") return invertSelection();
     if (k === "s") return jumpKind(onSingles ? "clusters" : "singles");
     if (k === "?") return setSettings({ showKeyHints: !settings.showKeyHints });
@@ -685,7 +687,7 @@ export function Grader({ session }: { session: Session }) {
     });
     if (!path) return;
     try {
-      await writeText(path.endsWith(".msgresult") ? path : `${path}.msgresult`, JSON.stringify(makeResult(session)));
+      await writeText(withExt(path, "msgresult"), JSON.stringify(makeResult(session)));
       alert(`Results saved (${gp.done} of ${gp.total} pins graded). Send the file to ${guestPack!.host}'s grader.`);
     } catch (e) {
       alert(`Could not save results: ${e}`);
@@ -711,10 +713,7 @@ export function Grader({ session }: { session: Session }) {
           >
             {tasks.map((t, i) => (
               <option key={t.id} value={i}>
-                Q{t.q} · {t.slide}
-                {t.slideCount > 1
-                  ? ` (${t.slideIndex + 1}/${t.slideCount})`
-                  : ""}
+                {taskLabel(t)}
                 {away.has(t.id) ? ` → ${away.get(t.id)}` : ""}
               </option>
             ))}
@@ -833,7 +832,7 @@ export function Grader({ session }: { session: Session }) {
               studentName={studentName}
               focus={focus}
               homeNonce={homeNonce}
-              onLasso={(ids, _inv, x, y) => {
+              onLasso={(ids, x, y) => {
                 setPaint([]);
                 if (!ids.length) return st.set({ selection: [] });
                 // beside the selected pins (so they stay visible), else where the drag ended
@@ -849,7 +848,6 @@ export function Grader({ session }: { session: Session }) {
               onEmptyRightClick={(x, y) =>
                 st.selection.length && openMenu(st.selection, x, y)
               }
-              onEmptyClick={() => {}}
               onClusterAdjust={(cx, cy, radiusNm, pinIds) =>
                 baseCluster &&
                 setAdjusted({
@@ -1071,8 +1069,6 @@ export function Grader({ session }: { session: Session }) {
           task={task}
           question={question}
           clusters={clusters}
-          clusterIndex={clusterIndex}
-          current={cluster}
           selectionCount={st.selection.length}
           progress={progress}
           reasons={recentReasons}
@@ -1080,8 +1076,6 @@ export function Grader({ session }: { session: Session }) {
             if (!st.selection.length) return;
             st.grade(st.selection, "wrong", text, task.id, task.q);
           }}
-          onPrevCluster={prevCluster}
-          onNextCluster={nextCluster}
           realClusters={realClusters}
           onSingles={onSingles}
           onJumpKind={jumpKind}

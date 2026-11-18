@@ -5,7 +5,7 @@
 //   node tests/ui/walkthrough.mjs
 import fs from "node:fs";
 import path from "node:path";
-import { launch, startTileServer, APP, ROOT } from "./harness.mjs";
+import { launch, startTileServer, closeSession, openSession, pickTool, ringOf, APP, ROOT } from "./harness.mjs";
 
 const OUT = path.join(APP, "tests/.out/ui");
 const WORK = path.join(APP, "tests/.out/ui-work");
@@ -322,12 +322,14 @@ await step("S switches between clusters and single pins", async () => {
   return `${a.replace(/\n/g, " ")} → ${b.replace(/\n/g, " ")} → ${c.replace(/\n/g, " ")}`;
 });
 
-const ring = async () => {
-  const v = await viewer();
-  const r = (await page.locator(".viewer-overlay").getAttribute("data-cluster-ring")).split(",").map(Number);
-  return { x: v.x + r[0], y: v.y + r[1], r: r[2] };
-};
-const tool = (name) => page.locator(".right .seg button", { hasText: name }).click();
+const ring = () => ringOf(page);
+const tool = (name) => pickTool(page, name);
+/** a second grader: open a hand-off pack from the start screen with the demo slides */
+async function openPack(pack, saveAs) {
+  await dialog(pack, path.join(ROOT, "images"), saveAs);
+  await page.getByRole("button", { name: "Got work from another grader?" }).click();
+  await page.locator(".topbar").waitFor({ timeout: 30000 });
+}
 
 await step("polygon: right-click corners, Enter closes → grade menu", async () => {
   await page.keyboard.press("f");
@@ -606,11 +608,8 @@ await step("hand off: host splits work, guest grades the pack, host merges resul
   expect(opts.some((o) => o.includes("→ Jamie")), "task list doesn't show the handed-off image");
 
   // guest: open the pack, grade everything, send results
-  await page.locator('button[title="Save and close session"]').click();
-  await page.locator(".startup").waitFor();
-  await dialog(PACK, path.join(ROOT, "images"), GUEST);
-  await page.getByRole("button", { name: "Got work from another grader?" }).click();
-  await page.locator(".topbar").waitFor({ timeout: 30000 });
+  await closeSession(page);
+  await openPack(PACK, GUEST);
   await waitTiles();
   const gopts = await page.locator(".topbar select option").allInnerTexts();
   expect(gopts.length === 1 && cardLabel.startsWith(gopts[0].split(" (")[0].trim()), `guest sees ${gopts.join(" | ")} (expected ${cardLabel})`);
@@ -628,11 +627,8 @@ await step("hand off: host splits work, guest grades the pack, host merges resul
   expect(fs.existsSync(RESULT), "results file not written");
 
   // host: reopen and merge
-  await page.locator('button[title="Save and close session"]').click();
-  await page.locator(".startup").waitFor();
-  await dialog(SESSION);
-  await page.getByRole("button", { name: "Open session…" }).click();
-  await page.locator(".topbar").waitFor({ timeout: 30000 });
+  await closeSession(page);
+  await openSession(page, dialog, SESSION);
   await page.getByRole("button", { name: "Hand off" }).click();
   await dialog(RESULT);
   await page.getByRole("button", { name: "Import results…" }).click();
@@ -697,11 +693,8 @@ await step("grade twice: blind overlap with a guest, disagreements settled", asy
   expect(hostGraded > 0, `host graded ${hostGraded} overlap pins on ${label} (${onKim} planned there)`);
 
   // guest: grade everything correct, send results
-  await page.locator('button[title="Save and close session"]').click();
-  await page.locator(".startup").waitFor();
-  await dialog(PACK, path.join(ROOT, "images"), GUEST);
-  await page.getByRole("button", { name: "Got work from another grader?" }).click();
-  await page.locator(".topbar").waitFor({ timeout: 30000 });
+  await closeSession(page);
+  await openPack(PACK, GUEST);
   await waitTiles();
   const sendBtn = page.getByRole("button", { name: /Send results/ }).first();
   const total = (await sendBtn.innerText()).match(/\/(\d+)/)[1];
@@ -715,11 +708,8 @@ await step("grade twice: blind overlap with a guest, disagreements settled", asy
   await page.waitForTimeout(800);
 
   // host: import → disagreements → settle with Kim's grades
-  await page.locator('button[title="Save and close session"]').click();
-  await page.locator(".startup").waitFor();
-  await dialog(SESSION);
-  await page.getByRole("button", { name: "Open session…" }).click();
-  await page.locator(".topbar").waitFor({ timeout: 30000 });
+  await closeSession(page);
+  await openSession(page, dialog, SESSION);
   await page.getByRole("button", { name: "Hand off" }).click();
   await dialog(RESULT);
   await page.getByRole("button", { name: "Import results…" }).click();

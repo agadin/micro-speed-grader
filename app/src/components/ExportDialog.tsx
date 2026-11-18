@@ -1,4 +1,5 @@
 import { useMemo, useState } from "react";
+import { Modal } from "./Modal";
 import { open } from "@tauri-apps/plugin-dialog";
 import type { Session } from "../lib/types";
 import { useSettings } from "../lib/settings";
@@ -80,8 +81,7 @@ export function ExportDialog({ session, onClose }: { session: Session; onClose: 
   const shownRows = table.slice(1, 7);
 
   return (
-    <div className="modal-backdrop" onMouseDown={onClose}>
-      <div className="modal export-modal" data-help="export" onMouseDown={(e) => e.stopPropagation()}>
+    <Modal className="export-modal" help="export" onClose={onClose}>
         <div className="ex-head">
           <h2>Export grades</h2>
           <div className="seg">
@@ -270,7 +270,6 @@ export function ExportDialog({ session, onClose }: { session: Session; onClose: 
             </button>
           )}
         </div>
-      </div>
-    </div>
+    </Modal>
   );
 }

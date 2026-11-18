@@ -65,6 +65,9 @@ export interface Hit {
   score: number;
 }
 
+/** where a search hit points: "article" or "article/section" */
+export const hitRef = (h: Hit) => (h.anchor ? `${h.id}/${h.anchor}` : h.id);
+
 /** Search titles, headings and text. Every word must appear somewhere in the article. */
 export function searchHelp(q: string, limit = 12): Hit[] {
   const words = q.toLowerCase().split(/\s+/).filter(Boolean);

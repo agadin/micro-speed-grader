@@ -143,18 +143,31 @@ export async function installShim(context) {
   return issues;
 }
 
-export async function launch({ url = "http://localhost:1420/", headless = true, viewport = { width: 1440, height: 900 } } = {}) {
+/**
+ * Open the app in a test browser with the Tauri stand-in.
+ *   browser: "chromium" | "webkit" (default: $UI_BROWSER, else webkit)
+ *   initScripts: extra scripts run before the app (e.g. media-kit's drawn cursor)
+ */
+export async function launch({
+  url = "http://localhost:1420/",
+  headless = true,
+  viewport = { width: 1440, height: 900 },
+  browser: which = process.env.UI_BROWSER,
+  initScripts = [],
+} = {}) {
   await waitFor(url, 30000);
-  // UI_BROWSER=chromium renders backdrop blur in headless mode (WebKit headless does not)
-  const browser = await (process.env.UI_BROWSER === "chromium" ? chromium : webkit).launch({ headless });
+  // chromium renders backdrop blur in headless mode (WebKit headless does not)
+  const browser = await (which === "chromium" ? chromium : webkit).launch({ headless });
   const context = await browser.newContext({ viewport, deviceScaleFactor: 1 });
   const issues = await installShim(context);
+  for (const sc of initScripts) await context.addInitScript(sc);
   const page = await context.newPage();
   page.on("pageerror", (e) => issues.push(`pageerror: ${e.message}\n${(e.stack ?? "").split("\n").slice(0, 6).join("\n")}`));
   page.on("console", (m) => m.type() === "error" && issues.push(`console: ${m.text()}`));
   page.on("requestfailed", (r) => issues.push(`requestfailed: ${r.url()} ${r.failure()?.errorText}`));
   return {
     browser,
+    context,
     page,
     issues,
     /** queue answers for the next file dialogs */
@@ -162,3 +175,64 @@ export async function launch({ url = "http://localhost:1420/", headless = true, 
     emit: (event, payload) => page.evaluate(([e, p]) => window.__emit(e, p), [event, payload]),
   };
 }
+
+/**
+ * Fresh start, then the New grading session wizard on the demo class, and Start grading.
+ * `beforeStart(page)` runs with the wizard filled in (e.g. to screenshot it).
+ */
+export async function newDemoSession(page, dialog, { save, slides = path.join(ROOT, "images"), beforeStart } = {}) {
+  await page.goto("http://localhost:1420/");
+  await page.evaluate(() => localStorage.clear());
+  await page.reload();
+  await page.getByText("New grading session…").click();
+  await dialog(path.join(ROOT, "demo/exam.json"));
+  await page.getByText("Choose exam PDF / JSON…").click();
+  await page.waitForTimeout(400);
+  await dialog(path.join(ROOT, "demo/submissions"));
+  await page.locator(".step").nth(1).getByRole("button").click();
+  await page.waitForTimeout(600);
+  await dialog(slides);
+  await page.locator(".step").nth(2).getByRole("button").click();
+  await page.waitForTimeout(600);
+  await dialog(save);
+  await page.locator(".step").nth(3).getByRole("button").click();
+  await page.waitForTimeout(300);
+  await beforeStart?.(page);
+  await page.getByText("Start grading →").click();
+  await page.locator(".topbar").waitFor({ timeout: 30000 });
+  await page.waitForTimeout(2500); // tiles settle
+}
+
+/** Save and close the open session, back to the start screen. */
+export async function closeSession(page) {
+  await page.locator('button[title="Save and close session"]').click();
+  await page.locator(".startup").waitFor();
+}
+
+/** From the start screen, open a session file. */
+export async function openSession(page, dialog, file) {
+  await dialog(file);
+  await page.getByRole("button", { name: "Open session…" }).click();
+  await page.locator(".topbar").waitFor({ timeout: 30000 });
+}
+
+// ---- reading the slide overlay (the viewer exposes where it drew things for tests) ----
+const overlay = (page) => page.locator(".viewer-overlay");
+/** the current cluster's ring in page coordinates */
+export async function ringOf(page) {
+  const v = await overlay(page).boundingBox();
+  const r = (await overlay(page).getAttribute("data-cluster-ring")).split(",").map(Number);
+  return { x: v.x + r[0], y: v.y + r[1], r: r[2] };
+}
+/** drawn pins in page coordinates */
+export async function pinsOf(page) {
+  const v = await overlay(page).boundingBox();
+  const s = (await overlay(page).getAttribute("data-pins")) || "";
+  return s
+    .split(";")
+    .filter(Boolean)
+    .map((p) => p.split(",").map(Number))
+    .map(([x, y]) => ({ x: v.x + x, y: v.y + y }));
+}
+/** pick a selection tool in the right panel */
+export const pickTool = (page, name) => page.locator(".right .seg button", { hasText: name }).click();

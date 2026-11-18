@@ -117,7 +117,6 @@ svg {
 }
 
 /* the frosted panel */
-.glass,
 .topbar,
 .right,
 .ledger,
@@ -584,13 +583,6 @@ input[type="color"]::-webkit-color-swatch {
   white-space: nowrap;
   font-variant-numeric: tabular-nums;
 }
-.ctag {
-  font: 700 11px/1 var(--mono);
-  color: #151515;
-  background: #f6f1e7;
-  padding: 3px 5px;
-  border-radius: 4px;
-}
 .cnav .of {
   color: var(--tx-3);
 }
@@ -926,35 +918,6 @@ button.phead:hover:not(:disabled) {
 }
 .plabel {
   color: var(--tx-2);
-}
-.selbox {
-  margin-top: 10px;
-  border-radius: 16px;
-  background: var(--well);
-  padding: 10px;
-}
-.selline {
-  display: flex;
-  align-items: baseline;
-  justify-content: space-between;
-  margin-bottom: 10px;
-}
-.selline .big {
-  font: 600 24px/1 var(--sans);
-  color: var(--sel);
-}
-.selline .big small {
-  font: 400 12.5px var(--sans);
-  color: var(--tx-2);
-  margin-left: 6px;
-}
-.selline .hint {
-  color: var(--tx-3);
-  font-size: 11.5px;
-  white-space: nowrap;
-}
-.selline .big {
-  white-space: nowrap;
 }
 .grade {
   display: grid;
@@ -1490,17 +1453,6 @@ button.phead:hover:not(:disabled) {
 .help.pad {
   padding-top: 10px;
   line-height: 2.1;
-}
-.student-sees {
-  margin-top: 14px;
-}
-.student-sees pre {
-  margin: 0;
-  padding: 12px 14px;
-  border-radius: 10px;
-  background: #f6f3ee;
-  color: #1c1c1c;
-  font: 400 12px/1.55 var(--mono);
 }
 .prefs-foot {
   height: 54px;
@@ -2109,14 +2061,6 @@ button.preview-strip:hover .pl {
 }
 .col-list li.off .hdr {
   opacity: 0.45;
-}
-.col-list .mv {
-  display: flex;
-}
-.col-list .mv .btn {
-  width: 22px;
-  height: 22px;
-  padding: 0;
 }
 .ex-opts {
   display: flex;
@@ -2792,7 +2736,8 @@ body.drag-sorting * {
 }
 .hp-bar {
   display: grid;
-  grid-template-columns: 26px 1fr 26px;
+  grid-template-columns: auto auto minmax(0, 1fr) auto;
+  gap: 2px;
   align-items: center;
   height: 34px;
   padding: 0 6px;
@@ -2800,14 +2745,6 @@ body.drag-sorting * {
   background: rgba(255, 255, 255, 0.04);
   cursor: grab;
   user-select: none;
-}
-.hp-title {
-  text-align: center;
-  font: 600 12.5px var(--sans);
-  color: var(--tx-2);
-  overflow: hidden;
-  text-overflow: ellipsis;
-  white-space: nowrap;
 }
 .hp-ic {
   width: 24px;
@@ -2835,15 +2772,20 @@ body.drag-sorting * {
   line-height: 1.5;
   color: var(--tx-2);
 }
-.hp-article h3 {
-  font: 700 18px/1.25 var(--sans);
+.hp-article h2 {
+  font: 700 19px/1.25 var(--sans);
   color: var(--tx-1);
   margin-bottom: 2px;
 }
-.hp-article h4 {
-  font: 650 13.5px var(--sans);
+.hp-article h3 {
+  font: 650 14px var(--sans);
   color: var(--tx-1);
-  margin-top: 10px;
+  margin-top: 12px;
+}
+.hp-article h4 {
+  font: 650 13px var(--sans);
+  color: var(--tx-1);
+  margin-top: 6px;
 }
 .hp-article b {
   color: var(--tx-1);
@@ -2855,33 +2797,6 @@ body.drag-sorting * {
   padding: 1px 5px;
   border-radius: 4px;
   background: var(--fill-1);
-}
-.hp-lede {
-  font-size: 13.5px;
-  color: var(--tx-1);
-}
-.hp-flow {
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  gap: 6px;
-  padding: 10px;
-  border-radius: 10px;
-  background: var(--well);
-  font-size: 12px;
-}
-.hp-flow span {
-  padding: 2px 8px;
-  border-radius: 6px;
-  background: var(--fill-2);
-  color: var(--tx-1);
-  font-weight: 600;
-}
-.hp-flow i {
-  font: normal 10px/1.1 var(--mono);
-  text-align: center;
-  white-space: nowrap;
-  color: var(--accent);
 }
 .hp-steps {
   list-style: none;
@@ -2982,10 +2897,6 @@ body.drag-sorting * {
 }
 
 /* ---------- help browser ---------- */
-.hp-bar {
-  grid-template-columns: auto auto minmax(0, 1fr) auto !important;
-  gap: 2px;
-}
 .hp-search {
   display: flex;
   align-items: center;
@@ -3012,23 +2923,8 @@ body.drag-sorting * {
   color: var(--tx-1);
   font: 12.5px var(--sans);
 }
-.hp-home {
-  font-size: 14px !important;
-}
-.hp-article h2 {
-  font: 700 19px/1.25 var(--sans);
-  color: var(--tx-1);
-  margin-bottom: 2px;
-}
-.hp-article h3 {
-  font: 650 14px var(--sans) !important;
-  margin-top: 12px;
-  margin-bottom: 0 !important;
-}
-.hp-article h4 {
-  font: 650 13px var(--sans);
-  color: var(--tx-1);
-  margin-top: 6px;
+.hp-ic.hp-home {
+  font-size: 14px;
 }
 .hp-article p,
 .hp-article li {
@@ -3163,8 +3059,8 @@ body.drag-sorting * {
 .hp-article .hp-sub {
   margin-top: 4px;
 }
-.hp-more {
-  margin-top: 6px !important;
+.hp-article .hp-more {
+  margin-top: 6px;
 }
 
 /* ---------- preferences: search, pane help, about ---------- */

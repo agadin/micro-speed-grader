@@ -59,10 +59,11 @@ export const cursorScript = () => {
 };
 
 /**
- * Record `fn` as a GIF cropped to `crop` ({x,y,width,height} in CSS px, viewport scale 1).
- * `width` is the GIF's output width.
+ * Record `fn` as a GIF from Chrome's screencast (lossless frames with their real timing).
+ *   crop: {x,y,width,height} in CSS px at scale 1 (omit for the whole page)
+ *   width / fps / colors: output size, frame rate and palette size
  */
-export async function recordGif(context, page, { file, crop, work, width = 640, fps = 12 }, fn) {
+export async function recordGif(context, page, { file, crop, work, width = 640, fps = 12, colors = 160, lead = 500, tail = 900 }, fn) {
   const frames = [];
   const cdp = await context.newCDPSession(page);
   cdp.on("Page.screencastFrame", (f) => {
@@ -71,9 +72,9 @@ export async function recordGif(context, page, { file, crop, work, width = 640, 
   });
   const vp = page.viewportSize();
   await cdp.send("Page.startScreencast", { format: "png", maxWidth: vp.width, maxHeight: vp.height, everyNthFrame: 1 });
-  await page.waitForTimeout(500);
+  await page.waitForTimeout(lead);
   await fn();
-  await page.waitForTimeout(900);
+  await page.waitForTimeout(tail);
   await cdp.send("Page.stopScreencast");
   await cdp.detach();
   const dir = path.join(work, path.basename(file, ".gif"));
@@ -86,10 +87,45 @@ export async function recordGif(context, page, { file, crop, work, width = 640, 
     const dur = i + 1 < frames.length ? frames[i + 1].t - f.t : 1.5;
     list.push(`file '${fp}'`, `duration ${dur.toFixed(3)}`);
   });
-  list.push(list[list.length - 2]);
+  list.push(list[list.length - 2]); // the concat demuxer needs the last file repeated
   fs.writeFileSync(path.join(dir, "frames.txt"), list.join("\n"));
-  const c = { x: Math.round(crop.x), y: Math.round(crop.y), w: Math.round(crop.width) & ~1, h: Math.round(crop.height) & ~1 };
-  const vf = `crop=${c.w}:${c.h}:${c.x}:${c.y},fps=${fps},scale=${width}:-1:flags=lanczos,split[a][b];[a]palettegen=max_colors=160:stats_mode=diff[p];[b][p]paletteuse=dither=bayer:bayer_scale=4:diff_mode=rectangle`;
+  const c = crop && { x: Math.round(crop.x), y: Math.round(crop.y), w: Math.round(crop.width) & ~1, h: Math.round(crop.height) & ~1 };
+  const vf = `${c ? `crop=${c.w}:${c.h}:${c.x}:${c.y},` : ""}fps=${fps},scale=${width}:-1:flags=lanczos,split[a][b];[a]palettegen=max_colors=${colors}:stats_mode=diff[p];[b][p]paletteuse=dither=bayer:bayer_scale=4:diff_mode=rectangle`;
   execFileSync("ffmpeg", ["-y", "-f", "concat", "-safe", "0", "-i", path.join(dir, "frames.txt"), "-vf", vf, "-loop", "0", file], { stdio: "ignore" });
-  return { frames: frames.length, kb: Math.round(fs.statSync(file).size / 1e3) };
+  const secs = frames.length ? frames[frames.length - 1].t - frames[0].t : 0;
+  return { frames: frames.length, kb: Math.round(fs.statSync(file).size / 1e3), secs };
+}
+
+/** Smooth, human-looking mouse moves and key presses for recordings. */
+export function motion(page, start = { x: 640, y: 400 }) {
+  let mx = start.x, my = start.y;
+  const wait = (ms) => page.waitForTimeout(ms);
+  /** ease the pointer to (x, y) over `ms` */
+  async function glide(x, y, ms = 450) {
+    const n = Math.max(2, Math.round(ms / 25));
+    const x0 = mx, y0 = my;
+    for (let i = 1; i <= n; i++) {
+      const t = i / n, e = t < 0.5 ? 2 * t * t : 1 - (-2 * t + 2) ** 2 / 2;
+      await page.mouse.move(x0 + (x - x0) * e, y0 + (y - y0) * e);
+      await wait(25);
+    }
+    mx = x;
+    my = y;
+  }
+  /** press, drag through points, release */
+  async function drag(points, button = "right", stepMs = 30) {
+    await glide(points[0][0], points[0][1]);
+    await page.mouse.down({ button });
+    for (const [x, y] of points.slice(1)) {
+      await page.mouse.move(x, y, { steps: 3 });
+      mx = x;
+      my = y;
+      await wait(stepMs);
+    }
+    await page.mouse.up({ button });
+  }
+  const key = async (k, after = 500) => (await page.keyboard.press(k), wait(after));
+  /** the pointer's position (after glides) */
+  const at = (x, y) => ((mx = x), (my = y));
+  return { glide, drag, key, wait, at, pos: () => ({ x: mx, y: my }) };
 }

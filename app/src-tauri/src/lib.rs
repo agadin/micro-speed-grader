@@ -98,15 +98,29 @@ fn write_text(path: String, contents: String, keep_backup: Option<bool>) -> Resu
 /// shared with the main window through localStorage.
 #[tauri::command]
 fn open_preferences<R: tauri::Runtime>(app: tauri::AppHandle<R>) -> Result<(), String> {
-    if let Some(w) = app.get_webview_window("preferences") {
+    show_window(&app, "preferences", "index.html?window=preferences", false, |b| {
+        b.title("Preferences").inner_size(900.0, 680.0).min_inner_size(760.0, 480.0)
+    })
+}
+
+/// Bring a secondary window to the front, or create it. When it's already open and `reload`
+/// is set, it navigates to `url` (e.g. a different help topic).
+fn show_window<R: tauri::Runtime>(
+    app: &tauri::AppHandle<R>,
+    label: &str,
+    url: &str,
+    reload: bool,
+    build: impl FnOnce(tauri::WebviewWindowBuilder<'_, R, tauri::AppHandle<R>>) -> tauri::WebviewWindowBuilder<'_, R, tauri::AppHandle<R>>,
+) -> Result<(), String> {
+    if let Some(w) = app.get_webview_window(label) {
+        if reload {
+            let _ = w.eval(&format!("location.replace({url:?})"));
+        }
         let _ = w.unminimize();
         let _ = w.show();
         return w.set_focus().map_err(|e| e.to_string());
     }
-    tauri::WebviewWindowBuilder::new(&app, "preferences", tauri::WebviewUrl::App("index.html?window=preferences".into()))
-        .title("Preferences")
-        .inner_size(900.0, 680.0)
-        .min_inner_size(760.0, 480.0)
+    build(tauri::WebviewWindowBuilder::new(app, label, tauri::WebviewUrl::App(url.into())))
         .build()
         .map(|_| ())
         .map_err(|e| e.to_string())
@@ -120,25 +134,19 @@ fn open_help<R: tauri::Runtime>(app: tauri::AppHandle<R>, topic: String) -> Resu
     let ok = topic.len() <= 80 && topic.chars().all(|c| c.is_ascii_lowercase() || c.is_ascii_digit() || c == '-' || c == '/');
     let topic = if ok { topic } else { String::new() };
     let url = format!("index.html?window=help&topic={topic}");
-    if let Some(w) = app.get_webview_window("help") {
-        let _ = w.eval(&format!("location.replace({url:?})"));
-        let _ = w.unminimize();
-        let _ = w.show();
-        return w.set_focus().map_err(|e| e.to_string());
-    }
-    let mut b = tauri::WebviewWindowBuilder::new(&app, "help", tauri::WebviewUrl::App(url.into()))
-        .title("Micro Speed Grader Help")
-        .inner_size(420.0, 680.0)
-        .min_inner_size(320.0, 360.0);
     // open beside the main window when there's room
-    if let Some(m) = app.get_webview_window("main") {
-        if let (Ok(pos), Ok(size), Ok(scale)) = (m.outer_position(), m.outer_size(), m.scale_factor()) {
-            let p = pos.to_logical::<f64>(scale);
-            let s = size.to_logical::<f64>(scale);
-            b = b.position((p.x + s.width - 400.0).max(0.0), p.y + 60.0);
+    let beside = app.get_webview_window("main").and_then(|m| {
+        let (pos, size, scale) = (m.outer_position().ok()?, m.outer_size().ok()?, m.scale_factor().ok()?);
+        let (p, s) = (pos.to_logical::<f64>(scale), size.to_logical::<f64>(scale));
+        Some(((p.x + s.width - 400.0).max(0.0), p.y + 60.0))
+    });
+    show_window(&app, "help", &url, true, |b| {
+        let b = b.title("Micro Speed Grader Help").inner_size(420.0, 680.0).min_inner_size(320.0, 360.0);
+        match beside {
+            Some((x, y)) => b.position(x, y),
+            None => b,
         }
-    }
-    b.build().map(|_| ()).map_err(|e| e.to_string())
+    })
 }
 
 #[tauri::command]
@@ -147,15 +155,7 @@ fn path_exists(path: String) -> bool {
 }
 
 fn tile_response(reg: &SlideRegistry, uri_path: &str) -> Response<Vec<u8>> {
-    // /<id>/<level>/<x>_<y>.jpg
-    let parts: Vec<&str> = uri_path.trim_start_matches('/').split('/').collect();
-    let parsed = (|| {
-        let id: u32 = parts.first()?.parse().ok()?;
-        let level: u32 = parts.get(1)?.parse().ok()?;
-        let file = parts.get(2)?.trim_end_matches(".jpg");
-        let (x, y) = file.split_once('_')?;
-        Some((id, level, x.parse::<u32>().ok()?, y.parse::<u32>().ok()?))
-    })();
+    let parsed = slide::parse_tile_path(uri_path);
     let not_found = |msg: String| {
         Response::builder()
             .status(StatusCode::NOT_FOUND)

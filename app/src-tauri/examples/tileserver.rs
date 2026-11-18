@@ -9,7 +9,7 @@ use std::io::{BufRead, BufReader, Write};
 use std::net::{TcpListener, TcpStream};
 use std::sync::Arc;
 
-use app_lib::slide::SlideRegistry;
+use app_lib::slide::{parse_tile_path, SlideRegistry};
 
 fn unescape(s: &str) -> String {
     let b = s.as_bytes();
@@ -79,11 +79,7 @@ fn handle(reg: &SlideRegistry, s: TcpStream) {
             Err(e) => reply(s, "500 Error", "text/plain", e.as_bytes()),
         }
     } else if let Some(p) = target.strip_prefix("/tile/") {
-        let parts: Vec<&str> = p.split('/').collect();
-        let parsed = (|| {
-            let (x, y) = parts.get(2)?.trim_end_matches(".jpg").split_once('_')?;
-            Some((parts[0].parse().ok()?, parts[1].parse().ok()?, x.parse().ok()?, y.parse().ok()?))
-        })();
+        let parsed = parse_tile_path(p);
         match parsed.and_then(|(id, l, x, y)| reg.get(id).map(|sl| sl.render_tile(l, x, y, 85))) {
             Some(Ok(jpg)) => reply(s, "200 OK", "image/jpeg", &jpg),
             Some(Err(e)) => reply(s, "404 Not Found", "text/plain", e.as_bytes()),

@@ -4,7 +4,6 @@ import type { Question } from "./types";
 import { readBytes, readText } from "./backend";
 import { parseQuestionsFromText } from "./examParse";
 
-export { parseQuestionsFromText };
 
 pdfjs.GlobalWorkerOptions.workerSrc = workerUrl;
 

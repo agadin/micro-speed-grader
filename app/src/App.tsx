@@ -1,6 +1,6 @@
 import { useEffect, useState } from "react";
 import { UpdateBanner } from "./components/UpdateBanner";
-import { openHelpWindow, openPreferencesWindow } from "./lib/backend";
+import { openPreferencesWindow } from "./lib/backend";
 import { getCurrentWindow, LogicalSize } from "@tauri-apps/api/window";
 import { listen } from "@tauri-apps/api/event";
 import { useStore } from "./lib/store";
@@ -44,15 +44,8 @@ export default function App() {
       .catch(() => setPrefsFallback(true));
   }, [settingsOpen, set]);
 
-  // Help opens in its own window; outside Tauri (UI tests) it floats inside the page
+  // Help opens in its own window (lib/backend showHelp); outside Tauri (UI tests) it floats inside the page
   const help = useStore((s) => s.help);
-  const [helpFallback, setHelpFallback] = useState(false);
-  useEffect(() => {
-    if (help === null || helpFallback) return;
-    openHelpWindow(help)
-      .then(() => set({ help: null }))
-      .catch(() => setHelpFallback(true));
-  }, [help, helpFallback, set]);
 
   // native menu bar (Micro Speed Grader ▸ Preferences…, File ▸ …)
   useEffect(() => {
@@ -82,7 +75,7 @@ export default function App() {
     <>
       {session ? <Grader session={session} /> : <Startup />}
       <UpdateBanner />
-      {helpFallback && <HelpPanel />}
+      {help !== null && <HelpPanel />}
       <HelpTips />
       {settingsOpen && prefsFallback && <SettingsDialog onClose={() => set({ settingsOpen: false })} />}
     </>

@@ -5,6 +5,8 @@ import { activeTool, keyLabel, SELECT_TOOLS, useSettings, type SelectTool } from
 const TOOL_LABEL: Record<SelectTool, string> = { lasso: "Lasso", brush: "Brush", polygon: "Polygon" };
 import { useStore } from "../lib/store";
 import { IconBrush, IconChevL, IconChevR, IconLasso, IconPolygon, IconTri } from "./icons";
+import { SliderRow } from "./controls";
+import { BRUSH_MAX, BRUSH_MIN } from "../lib/settings";
 
 export interface Progress {
   taskTotal: number;
@@ -19,15 +21,10 @@ interface Props {
   task: Task;
   question: Question | undefined;
   clusters: Cluster[];
-  clusterIndex: number;
-  /** the current cluster as shown (may have been dragged/resized) */
-  current: Cluster | null;
   selectionCount: number;
   progress: Progress;
   reasons: { text: string; pins: number }[];
   onPickReason: (text: string) => void;
-  onPrevCluster: () => void;
-  onNextCluster: () => void;
   /** clusters that are real groups (the rest are single pins) */
   realClusters: number;
   onSingles: boolean;
@@ -87,32 +84,6 @@ function Panel({ id, title, meta, children, fixed }: { id: string; title: string
   );
 }
 
-/** slim slider + numeric field with unit */
-export function SliderRow(p: { label: string; value: number; min: number; max: number; unit: string; onChange: (v: number) => void }) {
-  return (
-    <div className="prow">
-      <span className="plabel">{p.label}</span>
-      <input
-        type="range"
-        min={p.min}
-        max={p.max}
-        value={p.value}
-        onChange={(e) => p.onChange(Number(e.target.value))}
-        style={{ ["--fill" as string]: `${((p.value - p.min) / (p.max - p.min)) * 100}%` }}
-      />
-      <label className="num">
-        <input
-          type="number"
-          min={p.min}
-          max={p.max}
-          value={p.value}
-          onChange={(e) => e.target.value !== "" && p.onChange(Math.max(p.min, Math.min(p.max, Number(e.target.value))))}
-        />
-        <u>{p.unit}</u>
-      </label>
-    </div>
-  );
-}
 
 export function RightPanel(p: Props) {
   const { s, set } = useSettings();
@@ -166,7 +137,7 @@ export function RightPanel(p: Props) {
           </div>
         )}
         {tool === "brush" && (
-          <SliderRow label="Brush" value={s.brushPx} min={6} max={200} unit="px" onChange={(v) => set({ brushPx: v })} />
+          <SliderRow label="Brush" value={s.brushPx} min={BRUSH_MIN} max={BRUSH_MAX} unit="px" onChange={(v) => set({ brushPx: v })} />
         )}
         {s.pinByPin && (
           <label className="drow" title="Grade one pin at a time; only that pin is shown (O)">

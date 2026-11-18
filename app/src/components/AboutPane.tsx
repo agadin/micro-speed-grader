@@ -2,18 +2,10 @@ import { useEffect, useState } from "react";
 import iconUrl from "../../../docs/icon.png";
 import pkg from "../../package.json";
 import { emit } from "@tauri-apps/api/event";
-import { showHelp } from "../lib/backend";
+import { openExternal, showHelp } from "../lib/backend";
 
 const REPO = "https://github.com/agadin/micro-speed-grader";
 
-const openExternal = async (url: string) => {
-  try {
-    const { openUrl } = await import("@tauri-apps/plugin-opener");
-    await openUrl(url);
-  } catch {
-    window.open(url, "_blank", "noopener");
-  }
-};
 
 /** Preferences ▸ About: version, help, updates, credits. */
 export function AboutPane() {

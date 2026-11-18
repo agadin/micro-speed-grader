@@ -5,16 +5,14 @@ import type { Question, Session, SlideRef } from "../lib/types";
 import { emptyGrades } from "../lib/types";
 import { loadExam } from "../lib/exam";
 import { scanSlides, scanSubmissions } from "../lib/loader";
-import { basename, dirname, joinPath, listFiles, pathExists, readText } from "../lib/backend";
+import { basename, dirname, joinPath, listFiles, pathExists, readText, withExt, writeText } from "../lib/backend";
 import { forgetRecent, recentSessions, rememberRecent, useStore, type Recent } from "../lib/store";
 import { guestSession, parsePack } from "../lib/handoff";
-import { writeText } from "../lib/backend";
+import { parseTaskId } from "../lib/grading";
 
-export async function openSessionFile(path: string): Promise<Session> {
-  let raw: string;
+async function openSessionFile(path: string): Promise<Session> {
   try {
-    raw = await readText(path);
-    return JSON.parse(raw) as Session;
+    return JSON.parse(await readText(path)) as Session;
   } catch (e) {
     // fall back to the backup written before the last save
     if (await pathExists(path + ".bak")) return JSON.parse(await readText(path + ".bak")) as Session;
@@ -121,7 +119,7 @@ export function Startup() {
       const d = await open({ directory: true, title: `Choose your slides folder for “${pack.session.name}”` });
       if (typeof d !== "string") return;
       const slides = await scanSlides(d);
-      const needed = new Set(pack.taskIds.map((t) => t.split("|")[1] ?? "").filter(Boolean));
+      const needed = new Set(pack.taskIds.map((t) => parseTaskId(t).slide).filter(Boolean));
       const missing = pack.session.slides.filter((x) => (needed.size ? needed.has(x.id) : true) && !slides.some((r) => r.id === x.id));
       if (missing.length) {
         setErr(`That folder is missing ${missing.map((m) => m.file).join(", ")}. Choose the folder that has the course slides.`);
@@ -132,7 +130,7 @@ export function Startup() {
         filters: [{ name: "Grading session", extensions: ["msgrade"] }],
       });
       if (!target) return;
-      const path = target.endsWith(".msgrade") ? target : `${target}.msgrade`;
+      const path = withExt(target, "msgrade");
       const s = guestSession(pack, slides, path, d);
       await writeText(path, JSON.stringify(s), true);
       rememberRecent(path, s.name);
@@ -261,7 +259,7 @@ function NewSession({ onCancel }: { onCancel: () => void }) {
       defaultPath: sessionPath || `${name || "grading"}.msgrade`,
       filters: [{ name: "Grading session", extensions: ["msgrade"] }],
     });
-    if (p) setSessionPath(p.endsWith(".msgrade") ? p : p + ".msgrade");
+    if (p) setSessionPath(withExt(p, "msgrade"));
   };
 
   const included = questions.filter((q) => q.include);

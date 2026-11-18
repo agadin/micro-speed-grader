@@ -1,5 +1,7 @@
 import { useMemo } from "react";
+import { Modal } from "./Modal";
 import type { Session, Task } from "../lib/types";
+import { pinMap, taskIdLabel } from "../lib/grading";
 import { useStore } from "../lib/store";
 import { agreement, graderLabel, resolveWith, type Verdict } from "../lib/handoff";
 
@@ -9,9 +11,8 @@ import { agreement, graderLabel, resolveWith, type Verdict } from "../lib/handof
  */
 export function ConflictsDialog({ session, tasks, onClose }: { session: Session; tasks: Task[]; onClose: () => void }) {
   const applyResult = useStore((s) => s.applyResult);
-  const set = useStore((s) => s.set);
-  const focusPins = useStore((s) => s.focusPins);
-  const pins = useMemo(() => new Map(session.pins.map((p) => [p.id, p])), [session.pins]);
+  const showPins = useStore((s) => s.showPins);
+  const pins = useMemo(() => pinMap(session.pins), [session.pins]);
   const g = session.grades;
 
   const rows = useMemo(() => {
@@ -30,19 +31,11 @@ export function ConflictsDialog({ session, tasks, onClose }: { session: Session;
   const stats = useMemo(() => agreement(g), [g]);
   const total = rows.reduce((a, r) => a + r.pinIds.length, 0);
 
-  const label = (taskId: string) => {
-    const t = tasks.find((x) => x.id === taskId);
-    return t ? `Q${t.q} · ${t.slide}${t.slideCount > 1 ? ` (${t.slideIndex + 1}/${t.slideCount})` : ""}` : taskId.replace("|", " · ");
-  };
+  const label = (id: string) => taskIdLabel(id, tasks);
   const use = (pinIds: string[], by: string) => applyResult(resolveWith(g, pinIds, by, pins), session.handoffs ?? []);
   const gradeMyself = (taskId: string, pinIds: string[]) => {
-    const i = tasks.findIndex((t) => t.id === taskId);
-    if (i >= 0 && i !== session.taskIndex) useStore.getState().setTask(i);
     onClose();
-    setTimeout(() => {
-      set({ selection: pinIds });
-      focusPins(pinIds);
-    }, 50);
+    showPins(tasks.findIndex((t) => t.id === taskId), pinIds);
   };
   const studentOf = (pinId: string) => {
     const p = pins.get(pinId);
@@ -50,8 +43,7 @@ export function ConflictsDialog({ session, tasks, onClose }: { session: Session;
   };
 
   return (
-    <div className="modal-backdrop" onMouseDown={onClose}>
-      <div className="modal conflicts-modal" data-help="handoff/settle-disagreements" onMouseDown={(e) => e.stopPropagation()}>
+    <Modal className="conflicts-modal" help="handoff/settle-disagreements" onClose={onClose}>
         <h2>Disagreements</h2>
         <p className="muted small">
           Pins two graders marked differently. They stay ungraded until you choose whose grade to keep or grade them
@@ -132,7 +124,6 @@ export function ConflictsDialog({ session, tasks, onClose }: { session: Session;
             Done
           </button>
         </div>
-      </div>
-    </div>
+    </Modal>
   );
 }

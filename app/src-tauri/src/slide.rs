@@ -11,7 +11,7 @@ use image::{codecs::jpeg::JpegEncoder, imageops::FilterType, RgbImage};
 use libloading::Library;
 use serde::Serialize;
 
-pub const TILE_SIZE: u32 = 256;
+const TILE_SIZE: u32 = 256;
 /// Largest region read from one pyramid level for a single tile. Coarse Deep-Zoom tiles of a
 /// normal slide read the whole coarsest level (a few megapixels); this only stops slides with no
 /// usable low-resolution level from asking for gigabytes (or an overflowed size).
@@ -160,6 +160,25 @@ pub struct SlideInfo {
     pub max_level: u32,
 }
 
+/// Copy a C string returned by OpenSlide into a Rust String.
+/// Safety: `p` must be a valid, NUL-terminated string that outlives the call.
+unsafe fn cstr(p: *const c_char) -> String {
+    unsafe { CStr::from_ptr(p) }.to_string_lossy().into_owned()
+}
+
+/// A tile path, "<slide id>/<level>/<x>_<y>.jpg" (leading "/" allowed) → (id, level, x, y).
+/// Shared by the app's slide:// protocol and the UI-test tile server.
+pub fn parse_tile_path(p: &str) -> Option<(u32, u32, u32, u32)> {
+    let mut parts = p.trim_start_matches('/').split('/');
+    let id = parts.next()?.parse().ok()?;
+    let level = parts.next()?.parse().ok()?;
+    let (x, y) = parts.next()?.strip_suffix(".jpg")?.split_once('_')?;
+    if parts.next().is_some() {
+        return None;
+    }
+    Some((id, level, x.parse().ok()?, y.parse().ok()?))
+}
+
 impl Slide {
     fn open(id: u32, path: &str) -> Result<Slide, String> {
         let a = api()?;
@@ -170,7 +189,7 @@ impl Slide {
         }
         let err = unsafe { (a.get_error)(osr) };
         if !err.is_null() {
-            let msg = unsafe { CStr::from_ptr(err) }.to_string_lossy().into_owned();
+            let msg = unsafe { cstr(err) };
             unsafe { (a.close)(osr) };
             return Err(msg);
         }
@@ -180,7 +199,7 @@ impl Slide {
             if v.is_null() {
                 None
             } else {
-                Some(unsafe { CStr::from_ptr(v) }.to_string_lossy().into_owned())
+                Some(unsafe { cstr(v) })
             }
         };
         let n = unsafe { (a.get_level_count)(osr) };
@@ -245,7 +264,7 @@ impl Slide {
         unsafe { (a.read_region)(self.osr, buf.as_mut_ptr(), l0x, l0y, best as i32, rw, rh) };
         let err = unsafe { (a.get_error)(self.osr) };
         if !err.is_null() {
-            return Err(unsafe { CStr::from_ptr(err) }.to_string_lossy().into_owned());
+            return Err(unsafe { cstr(err) });
         }
         // premultiplied ARGB -> RGB over white
         let mut rgb = RgbImage::new(rw as u32, rh as u32);
@@ -303,19 +322,29 @@ impl SlideRegistry {
 #[cfg(test)]
 mod tests {
     use super::*;
+
     #[test]
+    fn tile_paths() {
+        assert_eq!(parse_tile_path("/3/12/4_7.jpg"), Some((3, 12, 4, 7)));
+        assert_eq!(parse_tile_path("3/12/4_7.jpg"), Some((3, 12, 4, 7)));
+        assert_eq!(parse_tile_path("/3/12/4_7.png"), None);
+        assert_eq!(parse_tile_path("/3/12/4_7.jpg/x"), None);
+        assert_eq!(parse_tile_path("/a/12/4_7.jpg"), None);
+        assert_eq!(parse_tile_path("/3/12/-4_7.jpg"), None);
+    }
+
+    /// Renders a full-resolution and a thumbnail tile from a real slide, when one is present
+    /// (`cargo test -- --ignored`; needs images/VMS109.ndpi).
+    #[test]
+    #[ignore]
     fn renders_real_slide_tile() {
-        let p = concat!(env!("CARGO_MANIFEST_DIR"), "/../../images/VMS146.ndpi");
-        if !Path::new(p).exists() { return; }
+        let p = concat!(env!("CARGO_MANIFEST_DIR"), "/../../images/VMS109.ndpi");
+        assert!(Path::new(p).exists(), "needs {p}");
         let reg = SlideRegistry::default();
         let info = reg.open(p).expect("open");
         let s = reg.get(info.id).unwrap();
-        let t0 = std::time::Instant::now();
-        // full-res tile around the Exam1 Q9 key pin (~7453, 7711)
-        let jpg = s.render_tile(info.max_level, 7453 / 256, 7711 / 256, 85).unwrap();
-        std::fs::write(std::env::temp_dir().join("msg_tile_full.jpg"), &jpg).unwrap();
+        let full = s.render_tile(info.max_level, 10, 10, 85).unwrap();
         let thumb = s.render_tile(8, 0, 0, 85).unwrap();
-        std::fs::write(std::env::temp_dir().join("msg_tile_thumb.jpg"), &thumb).unwrap();
-        eprintln!("max_level={} took {:?}", info.max_level, t0.elapsed());
+        assert!(full.starts_with(&[0xFF, 0xD8]) && thumb.starts_with(&[0xFF, 0xD8]), "not JPEG");
     }
 }

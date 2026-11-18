@@ -35,12 +35,11 @@ export interface ViewerProps {
   settings: Settings;
   studentName: (id: string) => string;
   focus: { pinIds: string[]; nonce: number } | null;
-  onLasso: (pinIds: string[], inverse: boolean, clientX: number, clientY: number) => void;
+  onLasso: (pinIds: string[], clientX: number, clientY: number) => void;
   /** brush with ⇧/⌥: refine the selection without opening the menu */
   onSelect: (pinIds: string[]) => void;
   onPinClick: (pinId: string, clientX: number, clientY: number) => void;
   onEmptyRightClick: (clientX: number, clientY: number) => void;
-  onEmptyClick: () => void;
   /** the user dragged/resized the cluster circle; ids = ungraded pins now inside it */
   onClusterAdjust: (cx: number, cy: number, radiusNm: number, pinIds: string[]) => void;
   homeNonce: number;
@@ -273,7 +272,7 @@ export function SlideViewer(props: ViewerProps) {
       })
       .map((pin) => pin.id);
     if (o.add) p.onSelect([...new Set([...p.selection, ...ids])]);
-    else p.onLasso(ids, o.inverse, clientX, clientY);
+    else p.onLasso(ids, clientX, clientY);
   };
   const closePolygon = (clientX = 0, clientY = 0) => {
     const PG = polyRef.current;
@@ -761,7 +760,7 @@ export function SlideViewer(props: ViewerProps) {
       if (hit) {
         e.preventDefaultAction = true;
         clickPin(hit, oe.metaKey || oe.ctrlKey, oe.clientX, oe.clientY);
-      } else propsRef.current.onEmptyClick();
+      }
     });
 
     // right-button lasso (captured before OpenSeadragon sees it)
@@ -965,7 +964,7 @@ export function SlideViewer(props: ViewerProps) {
         L.brush && (travelled >= 6 || L.painted.size > 1 || (L.brushMode !== "replace" && L.painted.size > 0));
       if (brushStroke) {
         const ids = [...liveSelection(L)];
-        if (L.brushMode === "replace") propsRef.current.onLasso(ids, false, e.clientX, e.clientY);
+        if (L.brushMode === "replace") propsRef.current.onLasso(ids, e.clientX, e.clientY);
         else propsRef.current.onSelect(ids);
         requestDraw();
         return;
@@ -973,8 +972,7 @@ export function SlideViewer(props: ViewerProps) {
       if (travelled < 6) {
         const hit = hitTest(p.x, p.y);
         if (hit) clickPin(hit, L.add, e.clientX, e.clientY);
-        else if (selBtn() === 0) propsRef.current.onEmptyClick();
-        else propsRef.current.onEmptyRightClick(e.clientX, e.clientY);
+        else if (selBtn() !== 0) propsRef.current.onEmptyRightClick(e.clientX, e.clientY);
         requestDraw();
         return;
       }

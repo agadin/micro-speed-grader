@@ -66,10 +66,21 @@ In the app: **New grading session** → `demo/exam.json`, `demo/submissions`, `i
 
 ## Tests
 
+Both need the demo class (see above). The UI tests also need the slides in `images/`; they start a small tile server themselves (Rust toolchain), and the app's dev server (`npm run dev`) must be running.
+
 ```
 cd app
-npm run test:logic     # parsing, clustering, grading rules
-npm run test:ui        # clicks through the real UI in a headless browser (dev server must be running)
+npm run test:logic     # parsing, clustering, grading rules, hand-off, help links
+npm run test:ui        # clicks through the real UI in a headless browser
+(cd src-tauri && cargo test)   # Rust: tile paths (add -- --ignored to render a real slide)
+```
+
+Help images and GIFs are recorded from the demo class (needs `ffmpeg`; dev server running):
+
+```
+node tests/ui/record-gif.mjs             # docs/demo.gif (the README animation)
+node tests/ui/record-help-gifs.mjs       # selection-tool clips in docs/help/img
+node tests/ui/record-wiki-media.mjs      # wiki screenshots; pass file names to redo only those
 ```
 
 ## Releasing (macOS)

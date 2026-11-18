@@ -89,6 +89,10 @@ export interface Settings {
   };
 }
 
+/** paint brush size range, px */
+export const BRUSH_MIN = 6;
+export const BRUSH_MAX = 200;
+
 export const defaultSettings: Settings = {
   pinStyle: "flag",
   pinSize: 14,

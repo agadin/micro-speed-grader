@@ -10,7 +10,8 @@
  * the grade, disagreements are left ungraded and flagged for the host to resolve.
  */
 import type { GradeState, Group, Pin, Session, SlideRef, Task } from "./types";
-import { doublePinIds, pinsForTask } from "./grading";
+import { cloneGrades, detach, doublePinIds, pinMap, pinsForTask } from "./grading";
+import { uid } from "./util";
 
 /** the host's name inside checks and verdicts (shown as "You") */
 export const HOST = "@host";
@@ -87,8 +88,6 @@ export interface ResultFile {
   assign: Record<string, number>;
 }
 
-const uid = () => Math.random().toString(36).slice(2, 10) + Date.now().toString(36).slice(-4);
-
 /** Pins the host can't grade right now because they are out with a guest (and the host isn't one of their graders). */
 export function awayPins(s: Session): Set<string> {
   const out = new Set<string>();
@@ -158,9 +157,6 @@ export function splitWeighted(items: { id: string; n: number }[], weights: numbe
   }
   return out;
 }
-
-/** Split items evenly (by pin count) across `k` people, keeping each item whole. */
-export const splitEven = (items: { id: string; n: number }[], k: number) => splitWeighted(items, new Array(Math.max(0, k)).fill(1));
 
 /** a small seeded random generator, so a plan is repeatable (tests) */
 export function seeded(seed: number) {
@@ -337,21 +333,6 @@ export function sameReason(a: string, b: string) {
 
 export const sameVerdict = (a: Verdict, b: Verdict) => a.status === b.status && (a.status === "correct" || sameReason(a.text, b.text));
 
-/** remove pins from whatever group they're in */
-function detach(g: GradeState, pinIds: string[]) {
-  const set = new Set(pinIds);
-  for (const id of pinIds) {
-    const gid = g.pinGroup[id];
-    if (!gid) continue;
-    delete g.pinGroup[id];
-    const grp = g.groups[gid];
-    if (!grp) continue;
-    const rest = grp.pinIds.filter((p) => !set.has(p));
-    if (rest.length) g.groups[gid] = { ...grp, pinIds: rest };
-    else delete g.groups[gid];
-  }
-}
-
 /** give pins a grade, as one group per (task, status, text, by) */
 function applyVerdicts(g: GradeState, items: { pinId: string; taskId: string; v: Omit<Verdict, "at">; assignQ?: number; pin?: Pin }[]) {
   const byKey = new Map<string, Group>();
@@ -409,7 +390,7 @@ export function reconcile(g: GradeState, pinIds: Iterable<string>, pins: Map<str
 
 /** A guest's pack was recalled: they no longer count as a grader on its pins that are graded twice. */
 export function recallChecks(g: GradeState, guest: string, pinIds: string[], pins: Map<string, Pin>): GradeState {
-  const next: GradeState = { ...g, groups: { ...g.groups }, pinGroup: { ...g.pinGroup }, assign: { ...g.assign }, checks: { ...(g.checks ?? {}) } };
+  const next: GradeState = { ...cloneGrades(g), checks: { ...(g.checks ?? {}) } };
   const touched: string[] = [];
   for (const id of pinIds) {
     const c = next.checks![id];
@@ -456,7 +437,7 @@ export const conflictPins = (g: GradeState) => Object.entries(g.checks ?? {}).fi
 
 /** Resolve disagreements by taking one grader's verdict. */
 export function resolveWith(g: GradeState, pinIds: string[], by: string, pins: Map<string, Pin>): GradeState {
-  const next: GradeState = { ...g, groups: { ...g.groups }, pinGroup: { ...g.pinGroup }, assign: { ...g.assign }, checks: { ...(g.checks ?? {}) } };
+  const next: GradeState = { ...cloneGrades(g), checks: { ...(g.checks ?? {}) } };
   const items: Parameters<typeof applyVerdicts>[1] = [];
   for (const id of pinIds) {
     const c = next.checks![id];
@@ -485,13 +466,8 @@ export function mergeResult(
   const h = hs.find((x) => x.id === r.packId);
   if (!h) throw new Error("These results are for a pack that wasn't made from this session.");
   const allowed = new Set(h.pinIds);
-  const g: GradeState = {
-    groups: { ...s.grades.groups },
-    pinGroup: { ...s.grades.pinGroup },
-    assign: { ...s.grades.assign },
-    checks: { ...(s.grades.checks ?? {}) },
-  };
-  const pinById = new Map(s.pins.map((p) => [p.id, p] as [string, Pin]));
+  const g: GradeState = { ...cloneGrades(s.grades), checks: { ...(s.grades.checks ?? {}) } };
+  const pinById = pinMap(s.pins);
   const fresh: Parameters<typeof applyVerdicts>[1] = [];
   const touched = new Set<string>();
   let merged = 0, updated = 0, skipped = 0;

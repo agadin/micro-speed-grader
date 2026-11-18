@@ -11,7 +11,7 @@ import { isPainted, pinsInPaint, type PaintOp } from "../src/lib/paint";
 import { exportTable, kr20, parseStudentName, EXPORT_PRESETS, testStats, safeFileName, uniqueFileNames, textCell, toCsv, type ExportRow } from "../src/lib/exportCsv";
 import { MAX_ANNOTATIONS } from "../src/lib/ndpa";
 import { parseMarkdown, slug } from "../src/lib/markdown";
-import { splitWeighted, HOST, agreement, conflictPins, hostGraded, planOverlap, recallChecks, resolveWith, sameReason, seeded, awayPins, splitEven, guestSession, makePack, makeResult, mergeResult, parsePack, parseResult, remainingByTask } from "../src/lib/handoff";
+import { HOST, agreement, conflictPins, hostGraded, planOverlap, recallChecks, resolveWith, sameReason, seeded, awayPins, splitWeighted, guestSession, makePack, makeResult, mergeResult, parsePack, parseResult, remainingByTask } from "../src/lib/handoff";
 import type { GradeState, Pin, Session } from "../src/lib/types";
 import { emptyGrades } from "../src/lib/types";
 
@@ -190,6 +190,7 @@ ok(!!dbl && studentResults(session, dbl, defaultSettings)[0].text === defaultSet
   const ts = buildTasks(hs.questions, new Set(["A", "B"]));
   const rem = remainingByTask(hs, ts);
   ok(rem.map((r) => r.pinIds.length).join() === "2,3,2", `remaining per task ${rem.map((r) => r.pinIds.length)}`);
+  const splitEven = (items: { id: string; n: number }[], k: number) => splitWeighted(items, new Array(Math.max(0, k)).fill(1));
   const sum = (m: Map<string, number>, items: { id: string; n: number }[], who: number) =>
     items.filter((x) => m.get(x.id) === who).reduce((t, x) => t + x.n, 0);
   const it3 = [{ id: "a", n: 10 }, { id: "b", n: 5 }, { id: "c", n: 5 }];
