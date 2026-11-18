@@ -1015,10 +1015,13 @@ await step("wizard: things to check before Start", async () => {
   const text = await page.locator(".scan-modal").innerText();
   await snap("things-to-check");
   expect(kinds.length === 8, `groups: ${kinds.join(", ")}`);
-  expect(/Rename the file so it includes the slide ID/.test(text) && text.includes("my answers.ndpa") && text.includes("“Q9”"), "explanations or file names missing");
+  expect(/Choose the slide each file is for/.test(text) && text.includes("my answers.ndpa") && text.includes("“Q9”"), "explanations or file names missing");
   // fix one in the app: the badly named file is for VMS109 (the file itself isn't changed)
   await page.locator('.scan-modal .sp-group[data-kind="no-slide-id"] select.sp-slide').selectOption("VMS109");
   await page.locator(".scan-modal .sp-fixed").waitFor({ timeout: 10000 });
+  // the folder is read again with that choice
+  await page.locator(".scan-modal .sp-counts", { hasText: "8 found" }).waitFor({ timeout: 10000 });
+  expect((await page.locator('.scan-modal .sp-group[data-kind="no-slide-id"]').count()) === 0, "the fixed file is still listed");
   const counts1 = await page.locator(".scan-modal .sp-counts").innerText();
   expect(/8 found/.test(counts1) && /1 fixed/.test(counts1) && /7 left/.test(counts1), `after choosing a slide: ${counts1}`);
   expect(fs.existsSync(path.join(noId, "my answers.ndpa")), "the file was changed or removed");
