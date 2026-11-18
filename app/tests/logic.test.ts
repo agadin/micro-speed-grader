@@ -16,6 +16,7 @@ import { parseMarkdown, slug } from "../src/lib/markdown";
 import { applyPlan, emptyKey, makeKeyFile, matchPin, newMark, parseKeyFile, planKey, type AnswerKey } from "../src/lib/answerKey";
 import { canCarry, carryOver, dismissRows, mergeRescan, rescanMessage, restorePins, reviewPinIds, reviewRows } from "../src/lib/rescan";
 import { KEY, HOST, agreement, conflictPins, hostGraded, planOverlap, recallChecks, resolveWith, sameReason, seeded, awayPins, splitWeighted, guestSession, makePack, makeResult, mergeResult, parsePack, parseResult, remainingByTask } from "../src/lib/handoff";
+import { AUTO, autoRows, filterGroups, findStudents, graderOptions, isFiltered, noFilter, rowPasses, studentLabel, studentSummary, type LedgerFilter } from "../src/lib/review";
 import type { GradeState, Pin, Session } from "../src/lib/types";
 import { emptyGrades } from "../src/lib/types";
 
@@ -567,6 +568,67 @@ ok(!!dbl && studentResults(session, dbl, defaultSettings)[0].text === defaultSet
   ok(planKey(s2, keyAll, 4).grade.length === 0, "the answer key never grades a retired pin");
   const oldFile = JSON.parse(JSON.stringify(s)) as Session;
   ok(oldFile.retired === undefined && reviewRows(oldFile).length === 0 && mergeRescan(oldFile, scan).retired.length === 4, "old session files (no retired pins) load and rescan");
+// ---- review: one student across the exam; ledger search and filters ----
+{
+  const S = { ...session, grades: { groups: { ...g.groups }, pinGroup: { ...g.pinGroup }, assign: {} } } as Session;
+  // the earlier test grade: a student in the big Q1 cluster is correct on Q1
+  const sum = studentSummary(S, stu, defaultSettings);
+  const a1 = sum.answers[0];
+  ok(sum.answers.length === questions.length && sum.answers.map((a) => a.q).join() === [...questions].map((q: any) => q.num).sort((x: number, y: number) => x - y).join(), "student view lists every included question in order");
+  ok(a1.kind === "correct" && a1.label === "Correct" && a1.by === "You" && a1.pins.length === 1 && a1.pins[0].taskId === t9.id, `Q1 correct by You with its pin (${a1.kind}, ${a1.by})`);
+  ok(sum.score === 1 && sum.total === questions.length && sum.feedback === feedbackText(studentResults(S, stu, defaultSettings), defaultSettings).text, "score and feedback match the export");
+  ok(sum.answers.slice(1).every((a) => a.kind !== "correct"), "other questions not correct yet");
+  ok(sum.name === `${parseStudentName(stu.folder).surname}, ${parseStudentName(stu.folder).first}` && sum.uid === parseStudentName(stu.folder).uid, `name and UID: ${sum.name} ${sum.uid}`);
+  // a double-pin student: AUTO wrong, both pins listed
+  const d1 = studentSummary(S, dbl, defaultSettings).answers[0];
+  ok(d1.kind === "double" && d1.by === "AUTO" && d1.pins.length > 1 && d1.reason === defaultSettings.doubleMessage, `double pins: ${d1.label}`);
+  // a student with no pin for a question
+  const none = students.find((s) => !pins.some((p) => p.studentId === s.id && (p.q === q1 || p.candidates.includes(q1))));
+  if (none) ok(studentSummary(S, none, defaultSettings).answers[0].kind === "none", "no pin → No answer");
+  // out with a guest; then a disagreement
+  const p0 = a1.pins[0].pin.id;
+  const S2 = { ...S, grades: { ...S.grades, groups: {}, pinGroup: {} }, handoffs: [{ id: "h", guest: "Jamie", createdAt: 0, taskIds: [t9.id], pinIds: [p0], status: "out" as const }] };
+  const aw = studentSummary(S2, stu, defaultSettings).answers[0];
+  ok(aw.kind === "away" && aw.label === "With Jamie" && aw.pins[0].away === "Jamie", `pin out with a guest: ${aw.label}`);
+  const S3 = { ...S2, handoffs: [], grades: { ...S2.grades, checks: { [p0]: { taskId: t9.id, graders: ["Jamie", HOST], verdicts: [], state: "conflict" as const } } } };
+  ok(studentSummary(S3, stu, defaultSettings).answers[0].kind === "conflict", "disagreement shown");
+  // an unlabelled pin shows on each question it could answer
+  const amb = pins.find((p) => p.q === null && p.candidates.length > 1);
+  if (amb) {
+    const as = studentSummary(S, students.find((s) => s.id === amb.studentId)!, defaultSettings).answers;
+    ok(amb.candidates.every((q) => as.find((a) => a.q === q)!.pins.some((p) => p.pin.id === amb.id && p.unlabelled)), "unlabelled pin listed under each possible question");
+  }
+  // finding students: by surname, first name or UID, sorted by surname
+  const uid = parseStudentName(stu.folder).uid;
+  ok(findStudents(students, uid).map((s) => s.id).join() === stu.id, `find by UID ${uid}`);
+  const sur = parseStudentName(stu.folder).surname;
+  const bySur = findStudents(students, sur.toLowerCase());
+  ok(bySur.some((s) => s.id === stu.id) && bySur.every((s) => s.folder.toLowerCase().includes(sur.toLowerCase())), `find by surname ${sur}: ${bySur.length}`);
+  const sorted = findStudents(students, "").map((s) => studentLabel(s).name);
+  ok(sorted.length === students.length && sorted.every((n, i) => i === 0 || sorted[i - 1].localeCompare(n) <= 0), "all students sorted by surname");
+  ok(findStudents(students, "zzzz-nobody").length === 0, "no match");
+
+  // ledger filters
+  const G = (id: string, status: "correct" | "wrong", text: string, pinIds: string[], by?: string) => ({ id, taskId: t9.id, status, text, pinIds, createdAt: 1, ...(by ? { by } : {}) });
+  const gs = [G("a", "wrong", "Neutrophil", ["p1"]), G("b", "correct", "", ["p2"]), G("c", "wrong", "Mast cell", ["p3"], "Jamie"), G("d", "correct", "borderline", ["p4"], "Jamie & Sam")];
+  const nm = (id: string) => ({ p1: "Okafor, Hana", p2: "Smith, Jo", p3: "Lee, Ann", p4: "Brown, Isla" })[id] ?? "";
+  const ids = (f: Partial<LedgerFilter>) => filterGroups(gs, { ...noFilter, ...f }, nm).map((x) => x.id).join();
+  ok(ids({}) === "a,b,c,d" && !isFiltered(noFilter), "no filter: everything");
+  ok(ids({ status: "wrong" }) === "a,c" && ids({ status: "correct" }) === "b,d", "wrong only / correct only");
+  ok(ids({ grader: HOST }) === "a,b" && ids({ grader: "Jamie" }) === "c" && ids({ grader: "Jamie & Sam" }) === "d", "by grader");
+  ok(ids({ query: "neutro" }) === "a" && ids({ query: "MAST" }) === "c" && ids({ query: "border" }) === "d", "search reasons (any case)");
+  ok(ids({ query: "okafor" }) === "a" && ids({ query: "isla" }) === "d", "search student names");
+  ok(ids({ query: "correct" }) === "b,d", "search 'correct' finds correct rows");
+  ok(ids({ query: "lee mast", status: "wrong", grader: "Jamie" }) === "c" && ids({ query: "lee", status: "correct" }) === "", "filters combine");
+  const opts = graderOptions(gs, true);
+  ok(opts.map((o) => o.label).join() === "You,Jamie,Jamie & Sam,AUTO (double pins)" && opts.at(-1)!.key === AUTO, `grader options: ${opts.map((o) => o.label)}`);
+  ok(graderOptions([gs[2]], false).map((o) => o.label).join() === "Jamie", "only graders present");
+  ok(rowPasses({ ...noFilter, grader: AUTO }, { status: "wrong", grader: AUTO, text: "x", names: [] }) && !rowPasses({ ...noFilter, grader: HOST }, { status: "wrong", grader: AUTO, text: "x", names: [] }), "AUTO rows follow the grader filter");
+  ok(!rowPasses({ ...noFilter, status: "correct" }, { status: "wrong", grader: AUTO, text: "x", names: [] }), "AUTO rows count as wrong");
+  // AUTO rows: one per image, ungraded double pins only
+  const ar = autoRows(S, tasks);
+  ok(ar.length > 0 && ar.every((r) => r.pins.every((p) => p.slide === r.task.slide && !S.grades.pinGroup[p.id] && doublePinIds(pins, r.task.q, S.grades).has(p.id))), `AUTO rows on ${ar.length} images`);
+  ok(ar.find((r) => r.task.id === t9.id)!.pins.length === [...doublePinIds(pins, q1, g)].filter((id) => pins.find((p) => p.id === id)!.slide === t9.slide).length, "AUTO row for this image matches the double pins");
 }
 
 // ---- help wiki (docs/help): parses, nested lists survive, every link/anchor/image exists ----

@@ -132,6 +132,16 @@ const SHIM = (tile) => {
 export async function installShim(context) {
   await context.addInitScript(SHIM, `${TILE}/tile`);
   const issues = [];
+  // a shared tile server only allows the default dev origin: on another port, relay its tiles
+  if (process.env.MSG_APP_URL)
+    await context.route(`${TILE}/tile/**`, async (route) => {
+      try {
+        const r = await route.fetch();
+        await route.fulfill({ response: r, headers: { ...r.headers(), "access-control-allow-origin": new URL(APP_URL).origin } });
+      } catch {
+        await route.abort().catch(() => {});
+      }
+    });
   await context.route("**/__invoke/**", async (route) => {
     const cmd = route.request().url().split("/__invoke/")[1];
     const args = JSON.parse(route.request().postData() || "{}");

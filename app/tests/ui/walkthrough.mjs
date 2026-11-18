@@ -538,7 +538,7 @@ await step("autosave + resume after reload", async () => {
   await waitTiles();
   await snap("resumed");
   const rows = await page.locator(".lrow").count();
-  await page.locator(".ledger .phead input").check().catch(() => {});
+  await page.locator(".ledger .phead input[type=checkbox]").check().catch(() => {});
   await page.waitForTimeout(300);
   const all = await page.locator(".lrow").count();
   expect(all >= before, `ledger shows ${all} rows after resume, session has ${before} groups`);
@@ -971,6 +971,85 @@ await step("help: styled tooltip → ? → article; help search; preferences sea
   expect(/Version \d+\.\d+\.\d+/.test(about), `about: ${about.slice(0, 80)}`);
   await page.keyboard.press("Escape");
   return `tooltip "${tipText}" → ${art.split("\n")[0]}; ${hits.length} hits for kr-20; ${topics} topics`;
+});
+
+await step("ledger search + wrong only; student panel from a chip; regrade an answer; / finds a student", async () => {
+  const ledger = page.locator(".ledger");
+  await ledger.locator(".phead input[type=checkbox]").check();
+  const total = await ledger.locator(".lrow").count();
+  // search a wrong reason that's in the session
+  const wrongs = groups().filter((g) => g.status === "wrong" && g.text.length > 3);
+  expect(wrongs.length > 0, "no wrong grades with a reason to search for");
+  const word = wrongs[0].text.slice(0, 4).toLowerCase();
+  await ledger.locator(".lsearch input").fill(word);
+  await ledger.locator(".lstatus button", { hasText: "Wrong only" }).click();
+  await page.waitForTimeout(300);
+  const shown = await ledger.locator(".lrow").count();
+  const meta = await ledger.locator(".lmeta").innerText();
+  expect(shown > 0 && shown < total, `filter shows ${shown} of ${total} rows`);
+  expect(new RegExp(`^${shown} of ${total} groups`).test(meta), `header: ${meta}`);
+  expect((await ledger.locator(".lrow .badge.ok").count()) === 0, "a correct row shows with Wrong only");
+  const reasons = await ledger.locator(".lrow .reason").allInnerTexts();
+  expect(reasons.every((r) => r.toLowerCase().includes(word)), `rows not matching "${word}": ${reasons.join(" | ")}`);
+  await snap("ledger-filtered");
+
+  // a student chip opens their answers at that question
+  await ledger.locator(".lrow .caret").first().click();
+  const chip = ledger.locator(".chip > span").first();
+  const name = await chip.innerText();
+  await chip.click();
+  const panel = page.locator(".student-panel");
+  await panel.waitFor({ timeout: 3000 });
+  const card = panel.locator(".sv-q.focus");
+  const q = Number(await card.getAttribute("data-q"));
+  expect((await card.locator(".sv-label").innerText()) === "Wrong", `Q${q} card: ${await card.innerText()}`);
+  const s0 = session();
+  const stu = s0.students.find((s) => s.name === name);
+  const pin = s0.pins.find((p) => p.studentId === stu.id && (p.q ?? s0.grades.assign[p.id]) === q);
+  const before = s0.grades.groups[s0.grades.pinGroup[pin.id]];
+  expect(before?.status === "wrong", `pin was ${before?.status}`);
+  // Show lands on the pin
+  await card.getByRole("button", { name: "Show" }).first().click();
+  await page.waitForTimeout(800);
+  expect((await page.locator(".vtool .selcount").innerText()).startsWith("1"), "Show didn't select the pin");
+  // regrade correct: one undo step, saved to the session file
+  await card.getByRole("button", { name: "Correct" }).click();
+  await page.waitForTimeout(1200);
+  const s1 = session();
+  const after = s1.grades.groups[s1.grades.pinGroup[pin.id]];
+  expect(after?.status === "correct" && after.pinIds.length === 1, `after regrade: ${JSON.stringify(after)}`);
+  expect(s1.grades.groups[before.id]?.status === "wrong" || !s1.grades.groups[before.id], "the rest of the group changed");
+  const label = await panel.locator(".sv-q.focus .sv-label").innerText();
+  const score = await panel.locator(".sv-total").innerText();
+  const fb = await panel.locator(".sv-fb pre").innerText();
+  expect(label === "Correct" && fb.includes(`Q${q}: Correct`), `panel after regrade: ${label} / ${fb}`);
+  await snap("student-view");
+  // ⌘Z puts it back in one step
+  await page.keyboard.press("ControlOrMeta+z");
+  await page.waitForTimeout(1200);
+  const s2 = session();
+  expect(s2.grades.pinGroup[pin.id] === before.id, "undo didn't restore the old grade in one step");
+  await page.keyboard.press("ControlOrMeta+Shift+z");
+  await page.waitForTimeout(300);
+
+  // Esc closes; / opens the search; a UID finds the student; ↵ opens them
+  await page.keyboard.press("Escape");
+  expect((await panel.count()) === 0, "Esc didn't close the student panel");
+  await page.keyboard.press("/");
+  await panel.locator(".sv-search input").waitFor({ timeout: 2000 });
+  const uid = stu.folder.match(/\d{5,}/)?.[0] ?? stu.name;
+  await page.keyboard.type(uid);
+  await page.waitForTimeout(200);
+  const hits = await panel.locator(".sv-hit").count();
+  await page.keyboard.press("Enter");
+  await panel.locator(".sv-who").waitFor({ timeout: 2000 });
+  const who = await panel.locator(".sv-big").innerText();
+  await panel.getByRole("button", { name: "Close" }).click();
+  await ledger.getByRole("button", { name: "Clear" }).click();
+  await ledger.locator(".phead input[type=checkbox]").uncheck();
+  const back = await ledger.locator(".lmeta").innerText();
+  expect(/groups ·/.test(back), `after Clear: ${back}`);
+  return `"${word}" + Wrong only: ${meta}; ${name} Q${q} wrong → correct (${score}); "/" + ${uid}: ${hits} hit → ${who}`;
 });
 
 await step("wizard: things to check before Start", async () => {

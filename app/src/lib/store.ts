@@ -54,6 +54,8 @@ interface Store {
   keyMode: boolean;
   /** the "what should the key apply to?" dialog */
   keyApplyOpen: boolean;
+  /** the student panel: null = closed, id "" = pick a student; q = the question to point at */
+  studentView: { id: string; q?: number } | null;
   /** a one-line notice over the slide (e.g. "you replaced Jamie's grade") with optional undo */
   notice: { kind: "override" | "conflict" | "info"; text: string; undo?: boolean; review?: boolean; problems?: number } | null;
   /** File ▸ Rescan Submissions… (a request the grading screen acts on) */
@@ -68,8 +70,8 @@ interface Store {
   close: () => void;
   setTask: (i: number) => void;
   grade: (pinIds: string[], status: GradeStatus, text: string, taskId: string, assignQ: number) => void;
-  /** several grades as one undo step (e.g. painted pins correct + the rest wrong) */
-  gradeMany: (batches: { pinIds: string[]; status: GradeStatus; text: string }[], taskId: string, assignQ: number) => void;
+  /** several grades as one undo step (e.g. painted pins correct + the rest wrong); a batch may name its own image */
+  gradeMany: (batches: { pinIds: string[]; status: GradeStatus; text: string; taskId?: string }[], taskId: string, assignQ: number) => void;
   ungrade: (pinIds: string[]) => void;
   editGroup: (groupId: string, patch: Partial<Pick<Group, "status" | "text">>) => void;
   undo: () => void;
@@ -152,6 +154,7 @@ export const useStore = create<Store>((set, get) => {
     changesOpen: false,
     keyMode: false,
     keyApplyOpen: false,
+    studentView: null,
     notice: null,
     rescanAsk: 0,
     overrideQuiet: false,
@@ -159,8 +162,8 @@ export const useStore = create<Store>((set, get) => {
     startupIntent: null,
 
     load: (session) =>
-      set({ session, past: [], future: [], dirty: false, selection: [], clusterIndex: 0, menu: null, isolate: false, keyMode: false, keyApplyOpen: false, changesOpen: false }),
-    close: () => set({ session: null, past: [], future: [] }),
+      set({ session, past: [], future: [], dirty: false, selection: [], clusterIndex: 0, menu: null, isolate: false, keyMode: false, keyApplyOpen: false, changesOpen: false, studentView: null }),
+    close: () => set({ session: null, past: [], future: [], studentView: null }),
 
     setTask: (i) => {
       const s = get().session;
@@ -178,10 +181,10 @@ export const useStore = create<Store>((set, get) => {
       const g = cloneGrades(s.grades);
       const all = batches.flatMap((b) => b.pinIds);
       const others = othersOn(g, all);
-      for (const { pinIds, status, text } of batches) {
+      for (const { pinIds, status, text, taskId } of batches) {
         detach(g, pinIds);
         const id = uid();
-        g.groups[id] = { id, taskId: tId, status, text: text.trim(), pinIds: [...pinIds], createdAt: Date.now() };
+        g.groups[id] = { id, taskId: taskId ?? tId, status, text: text.trim(), pinIds: [...pinIds], createdAt: Date.now() };
         for (const p of pinIds) {
           g.pinGroup[p] = id;
           const pin = s.pins.find((x) => x.id === p);

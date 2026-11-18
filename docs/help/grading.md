@@ -14,7 +14,7 @@ You grade one **image** at a time: one question on one slide, with every student
 
 ![The grading screen](img/grading-overview.jpg)
 
-- **Top bar**: the session name, the image menu (*Q1 · VMS109*, with *image 2 of 5* below it), undo and redo, the save status, **Hand off**, **Export**, Preferences, help and close.
+- **Top bar**: the session name, the image menu (*Q1 · VMS109*, with *image 2 of 5* below it), undo and redo, the save status, **Find student** (see [Look up a student](students.md)), **Hand off**, **Export**, Preferences, help and close.
 - **The slide**, with the students' pins, the current cluster's dashed ring, a minimap (top left) and a scale bar.
 - **Bottom toolbar**: previous/next cluster, how many pins are selected, **Correct**, **Wrong…**, the **Whole slide / Cluster** zoom switch and **Shortcuts**.
 - **Right panel**: the question text, cluster settings, selection tools, display options, recent reasons and progress. Click a section's heading to fold it away.

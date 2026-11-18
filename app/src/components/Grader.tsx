@@ -31,6 +31,7 @@ import { ChangesDialog } from "./ChangesDialog";
 import { problemKey, scanSubmissions, type ScanProblem } from "../lib/loader";
 import { ScanProblemsDialog, thingsToCheck, type Resolve } from "./ScanProblemsDialog";
 import { ExportDialog } from "./ExportDialog";
+import { StudentPanel } from "./StudentPanel";
 import {
   IconCheck,
   IconChevL,
@@ -41,6 +42,7 @@ import {
   IconExport,
   IconHandoff,
   IconKey,
+  IconPerson,
   IconRedo,
   IconSliders,
   IconUndo,
@@ -122,6 +124,7 @@ function KeySheet({ tool, swap, pinByPin, onClose }: { tool: SelectTool; swap: b
         [["M"], "minimap"],
         [["I"], "isolate selection"],
         [["Click"], "grade one pin"],
+        [["/"], "find student"],
         [["?"], "this sheet"],
       ],
     ],
@@ -721,6 +724,7 @@ export function Grader({ session }: { session: Session }) {
       return setSettings({ brushPx: Math.min(BRUSH_MAX, settings.brushPx + 4) });
     if (k === "x") return invertSelection();
     if (k === "s") return jumpKind(onSingles ? "clusters" : "singles");
+    if (k === "/" && !guestPack) return (e.preventDefault(), st.set({ studentView: { id: "" } }));
     if (k === "?") return setSettings({ showKeyHints: !settings.showKeyHints });
     if (k === "Escape") return (setPaint([]), st.set({ isolate: false }));
     // editing the key: the side panel handles C / W; nothing here grades
@@ -845,6 +849,16 @@ export function Grader({ session }: { session: Session }) {
           )}
         </span>
         <span className="vsep" />
+        {!guestPack && (
+          <button
+            className={`btn ghost ${st.studentView ? "on" : ""}`}
+            onClick={() => st.set({ studentView: st.studentView ? null : { id: "" } })}
+            title="Look up a student: all their pins and grades ( / )"
+            data-help="students"
+          >
+            <IconPerson /> Find student
+          </button>
+        )}
         {guestPack ? (
           <button className={`btn ${allDone ? "light" : ""}`} onClick={sendResults} title={`Save the results file to send back (${guestPack.host})`} data-help="handoff/guest-grade-the-pack">
             <IconExport /> Send results · {gp.done}/{gp.total}
@@ -1214,7 +1228,6 @@ export function Grader({ session }: { session: Session }) {
             session={session}
             task={task}
             tasks={tasks}
-            doubles={doubles}
             settings={settings}
             studentName={studentName}
           />
@@ -1250,6 +1263,7 @@ export function Grader({ session }: { session: Session }) {
             hasNext={taskIndex < tasks.length - 1}
           />
         )}
+        {st.studentView && !guestPack && <StudentPanel session={session} tasks={tasks} settings={settings} />}
       </main>
 
       {st.menu && (
