@@ -3,9 +3,9 @@ name: CI
 on:
   push:
     branches: [main]
-    paths: ["app/**", "docs/help/**", ".github/workflows/ci.yml"]
+    paths: ["app/**", "docs/help/**", "demo-key/**", "tools/simulate.mjs", ".github/workflows/ci.yml"]
   pull_request:
-    paths: ["app/**", "docs/help/**", ".github/workflows/ci.yml"]
+    paths: ["app/**", "docs/help/**", "demo-key/**", "tools/simulate.mjs", ".github/workflows/ci.yml"]
 concurrency:
   group: ci-${{ github.ref }}
   cancel-in-progress: true
@@ -26,6 +26,9 @@ jobs:
           cache: npm
           cache-dependency-path: app/package-lock.json
       - run: npm ci
+      - name: Generate the demo class the tests read (no slides needed)
+        working-directory: .
+        run: node tools/simulate.mjs --key demo-key --spec demo-key/demo.json --out demo
       - name: Type check
         run: npx tsc --noEmit
       - name: Logic tests (grading, hand-off, answer key, rescan, timing, help links)
