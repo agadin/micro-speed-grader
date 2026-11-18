@@ -4,7 +4,8 @@ import { open, save } from "@tauri-apps/plugin-dialog";
 import type { Question, Session, SlideRef } from "../lib/types";
 import { emptyGrades } from "../lib/types";
 import { loadExam } from "../lib/exam";
-import { scanSlides, scanSubmissions } from "../lib/loader";
+import { scanSlides, scanSubmissions, startBlockers, type ScanProblem } from "../lib/loader";
+import { ScanProblemsDialog, ScanProblemsRow } from "./ScanProblemsDialog";
 import { basename, dirname, joinPath, listFiles, pathExists, readText, withExt, writeText } from "../lib/backend";
 import { forgetRecent, recentSessions, rememberRecent, useStore, type Recent } from "../lib/store";
 import { guestSession, parsePack } from "../lib/handoff";
@@ -267,7 +268,39 @@ function NewSession({ onCancel }: { onCancel: () => void }) {
   };
 
   const included = questions.filter((q) => q.include);
-  const ready = included.length > 0 && subDir && slidesDir && sessionPath;
+  const blockers = startBlockers({ examPath, questions, subDir, slidesDir, sessionPath });
+  const ready = blockers.length === 0;
+  const needs = blockers.length ? `Still needed: ${blockers.join(", ")}` : "";
+
+  // read the submissions as soon as the exam and folder are known, so problems show before Start
+  const [problems, setProblems] = useState<ScanProblem[] | null>(null);
+  const [checking, setChecking] = useState(false);
+  const [showProblems, setShowProblems] = useState(false);
+  const [recheck, setRecheck] = useState(0);
+  const scanKey = subDir && included.length ? JSON.stringify([subDir, questions.map((q) => [q.num, q.slides, q.include]), recheck]) : "";
+  useEffect(() => {
+    if (!scanKey) {
+      setProblems(null);
+      return;
+    }
+    let alive = true;
+    setChecking(true);
+    const t = window.setTimeout(async () => {
+      try {
+        const r = await scanSubmissions(subDir, questions);
+        if (alive) setProblems(r.problems);
+      } catch {
+        // Start reads the folder again and reports the error
+      }
+      if (alive) setChecking(false);
+    }, 250);
+    return () => {
+      alive = false;
+      clearTimeout(t);
+      setChecking(false);
+    };
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [scanKey]);
 
   const pickKey = async () => {
     const f = await open({ filters: [{ name: "Answer key", extensions: ["msgkey"] }] });
@@ -403,6 +436,8 @@ function NewSession({ onCancel }: { onCancel: () => void }) {
               </div>
             )}
             <div className="muted small">Expected: one folder per student containing their .ndpa files.</div>
+            {checking && <div className="muted small">Checking the files…</div>}
+            {!checking && problems && <ScanProblemsRow problems={problems} onReview={() => setShowProblems(true)} />}
           </div>
         </div>
 
@@ -464,12 +499,21 @@ function NewSession({ onCancel }: { onCancel: () => void }) {
         <div className="modal-actions">
           <button onClick={onCancel}>Cancel</button>
           <div className="grow" />
-          {busy && <span className="muted">{busy}</span>}
-          <button className="primary big" disabled={!ready || !!busy} onClick={start}>
-            Start grading →
-          </button>
+          {busy ? (
+            <span className="muted">{busy}</span>
+          ) : (
+            needs && <span className="muted small start-needs" data-help="getting-started/create-a-session">{needs}</span>
+          )}
+          <span title={busy ? undefined : needs || undefined}>
+            <button className="primary big" disabled={!ready || !!busy} onClick={start}>
+              Start grading →
+            </button>
+          </span>
         </div>
       </div>
+      {showProblems && problems && (
+        <ScanProblemsDialog problems={problems} onClose={() => setShowProblems(false)} onRecheck={() => setRecheck((n) => n + 1)} />
+      )}
     </div>
   );
 }

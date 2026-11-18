@@ -1,8 +1,10 @@
 // Headless check of parsing/clustering/feedback against demo data. Run: npm run test:logic
+import "./setup-window";
 import fs from "node:fs";
 import path from "node:path";
 import { JSDOM } from "jsdom";
-import { parseNdpa, matchTitle } from "../src/lib/ndpa";
+import { parseNdpa, matchTitle, namedQuestion } from "../src/lib/ndpa";
+import { groupProblems, scanSubmissions, startBlockers, MAX_NDPA_BYTES, type ScanIO } from "../src/lib/loader";
 import { parseQuestionsFromText } from "../src/lib/examParse";
 import { computeClusters } from "../src/lib/cluster";
 import { buildTasks, pinsForTask, doublePinIds, studentResults, feedbackText } from "../src/lib/grading";
@@ -509,6 +511,65 @@ ok(!!dbl && studentResults(session, dbl, defaultSettings)[0].text === defaultSet
   });
   ok(refs.size > 20 && badRefs.length === 0, `app help references resolve (${refs.size})${badRefs.length ? `: ${badRefs.join(", ")}` : ""}`);
   ok(slug("Mouse & keys") === "mouse--keys" && slug("**Bold** `x` title") === "bold-x-title", "GitHub-style heading ids");
+}
+
+// problems found while reading a submissions folder (a crafted copy of a few demo students)
+{
+  ok(namedQuestion("Q9") === 9 && namedQuestion("question #3 gland") === 3 && namedQuestion("VMS146") === null && namedQuestion("") === null, "namedQuestion");
+  const fix = path.resolve("tests/.out/scan-fixture");
+  fs.rmSync(fix, { recursive: true, force: true });
+  const demoStudents = fs.readdirSync(subDir).filter((f) => !f.startsWith(".")).slice(0, 8);
+  for (const s of demoStudents) fs.cpSync(path.join(subDir, s), path.join(fix, s), { recursive: true });
+  const [ok1, noId, big, empty, wrongQ, other, broken, many] = demoStudents.map((s) => path.join(fix, s));
+  fs.writeFileSync(path.join(noId, "my answers.ndpa"), fs.readFileSync(path.join(noId, "VMS109.ndpi.ndpa")));
+  fs.writeFileSync(path.join(big, "VMS133.ndpi.ndpa"), "x".repeat(MAX_NDPA_BYTES + 1));
+  fs.rmSync(empty, { recursive: true });
+  fs.mkdirSync(empty);
+  fs.writeFileSync(path.join(empty, "answers.pdf"), "pdf");
+  // a Q9 pin on VMS109 (which is for Q1 and Q2), and no VMS133 file at all
+  fs.writeFileSync(path.join(wrongQ, "VMS109.ndpi.ndpa"), fs.readFileSync(path.join(wrongQ, "VMS109.ndpi.ndpa"), "utf8").replace(/<title>[^<]*<\/title>/, "<title>Q9</title>"));
+  fs.rmSync(path.join(wrongQ, "VMS133.ndpi.ndpa"));
+  fs.copyFileSync(path.join(other, "VMS109.ndpi.ndpa"), path.join(other, "VMS999.ndpi.ndpa"));
+  fs.writeFileSync(path.join(broken, "VMS109.ndpi.ndpa"), "<annotations><ndpviewstate>");
+  const pin = (i: number) => `<ndpviewstate id="${i}"><title>Q3</title><annotation type="pin"><x>${i * 1000}</x><y>0</y></annotation></ndpviewstate>`;
+  fs.writeFileSync(path.join(many, "VMS133.ndpi.ndpa"), `<annotations>${Array.from({ length: 60 }, (_, i) => pin(i)).join("")}</annotations>`);
+  fs.writeFileSync(path.join(fix, "exam.pdf"), "a loose file next to the student folders is fine");
+
+  const walk = (d: string): string[] =>
+    fs.readdirSync(d, { withFileTypes: true }).flatMap((e) => (e.name.startsWith(".") ? [] : e.isDirectory() ? walk(path.join(d, e.name)) : [path.join(d, e.name)]));
+  const io: ScanIO = {
+    listFiles: async (d, suffixes = []) => walk(d).filter((f) => !suffixes.length || suffixes.some((s) => f.toLowerCase().endsWith(s))).sort(),
+    readText: async (f, max) => {
+      if (max != null && fs.statSync(f).size > max) throw new Error(`${f}: file is larger than ${max} bytes`);
+      return fs.readFileSync(f, "utf8");
+    },
+  };
+  const scan = await scanSubmissions(fix, questions, io);
+  const kinds = (k: string) => scan.problems.filter((p) => p.kind === k);
+  const nameOf = (dir: string) => path.basename(dir);
+  ok(kinds("no-slide-id").length === 1 && kinds("no-slide-id")[0].file === `${nameOf(noId)}/my answers.ndpa`, "file with no slide ID found");
+  ok(kinds("too-large").length === 1 && kinds("too-large")[0].student === nameOf(big), "oversized file found");
+  ok(kinds("no-submission").length === 1 && kinds("no-submission")[0].student === nameOf(empty) && /answers\.pdf/.test(kinds("no-submission")[0].detail), "folder with no .ndpa found");
+  const uq = kinds("unknown-question");
+  ok(uq.length === 1 && uq[0].student === nameOf(wrongQ) && /“Q9”/.test(uq[0].detail) && /there is no Q9/.test(uq[0].detail), `pin titled with a missing question found (${uq[0]?.detail})`);
+  ok(kinds("missing-slide").length === 1 && /VMS133 \(Q3, Q4, Q5\)/.test(kinds("missing-slide")[0].detail), `missing slide found (${kinds("missing-slide")[0]?.detail})`);
+  ok(kinds("other-slide").length === 1 && /VMS999/.test(kinds("other-slide")[0].detail), "file for a slide not in the exam found");
+  ok(kinds("unreadable").length === 1 && kinds("unreadable")[0].student === nameOf(broken), "unreadable file found");
+  ok(kinds("too-many-pins").length === 1 && scan.pins.filter((p) => p.studentId === scan.students.find((s) => s.folder === nameOf(many))!.id && p.slide === "VMS133").length === 50, "too many pins: capped at 50");
+  ok(scan.problems.length === 8 && !scan.problems.some((p) => p.student === nameOf(ok1)), `8 problems, none for the clean student (${scan.problems.map((p) => p.kind).join(", ")})`);
+  ok(groupProblems(scan.problems).map((g) => g.kind).join() === "no-submission,missing-slide,no-slide-id,other-slide,unknown-question,too-many-pins,too-large,unreadable", "problems grouped in order");
+  // a question left out on purpose: its slide's files are not problems, and nobody is "missing" it
+  const no133 = questions.map((q: any) => ({ ...q, include: !q.slides.includes("VMS133") }));
+  const scan2 = await scanSubmissions(fix, no133, io);
+  ok(!scan2.problems.some((p) => p.kind === "missing-slide" || p.kind === "too-many-pins" || p.kind === "too-large"), "left-out question's slide is not checked");
+  // the demo class itself reads cleanly
+  const demo = await scanSubmissions(subDir, questions, io);
+  ok(demo.problems.length === 0 && demo.students.length === students.length, `demo class: ${demo.problems.length} problems`);
+  // what Start grading → is waiting for
+  const w = { examPath: "", questions: [], subDir: "", slidesDir: "", sessionPath: "" };
+  ok(startBlockers(w).join() === "the exam,the submissions folder,the slides folder,a save location", "start blockers: everything");
+  ok(startBlockers({ ...w, examPath: "e", questions: no133.map((q: any) => ({ ...q, include: false })), subDir: "s", slidesDir: "i" }).join() === "at least one included question,a save location", "start blockers: no questions, no save path");
+  ok(startBlockers({ examPath: "e", questions: no133, subDir: "s", slidesDir: "i", sessionPath: "p" }).length === 0, "start blockers: ready");
 }
 
 process.exit(fails ? 1 : 0);
