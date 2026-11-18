@@ -75,6 +75,15 @@ Only pins that were in that pack are taken from the file. If you already graded 
 
 If a grader sends a second results file (say a partial one first, then the finished one), import the new file too. Their earlier grades are updated to match; anything you graded yourself in the meantime still keeps your grade.
 
+### Submissions that change while a pack is out
+
+If you [rescan](getting-started.md#new-and-changed-submissions) while a pack is out and a student has changed or removed a pin that's in it, the guest's grade for that pin can no longer count: it's for an answer the student no longer has.
+
+- The rescan message says how many changed pins are in a pack that's still out.
+- Under **Packs**, the pack shows **N pins changed since sent**.
+- The student's new pin is not in the pack: you grade it yourself.
+- When you import the results, the message says how many of the guest's grades were for pins that changed. Those grades are kept with the old pins in [Changed submissions](getting-started.md#review-changed-submissions), where **Carry grade over** gives the new pin the guest's grade and **Restore** brings a removed pin back with it.
+
 ### Who graded what
 
 Every grade remembers who gave it. In the [ledger](ledger.md), grades from other graders show their name beside the reason, for example **Jamie**. Pins two people agreed on show both names, such as **Jamie & Sam**. Grades with no name are yours.

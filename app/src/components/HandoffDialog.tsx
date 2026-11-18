@@ -4,7 +4,7 @@ import type { Session, Task } from "../lib/types";
 import { pinMap, taskLabel as label } from "../lib/grading";
 import { useStore } from "../lib/store";
 import { dirname, joinPath, readText, showHelp, withExt, writeText } from "../lib/backend";
-import { HOST, makePack, mergeResult, parseResult, planOverlap, recallChecks, remainingByTask, seeded, splitWeighted, type Check, type Handoff } from "../lib/handoff";
+import { HOST, changedSinceSent, makePack, mergeResult, parseResult, planOverlap, recallChecks, remainingByTask, seeded, splitWeighted, type Check, type Handoff } from "../lib/handoff";
 import { safeFileName } from "../lib/exportCsv";
 import { Modal } from "./Modal";
 
@@ -218,13 +218,16 @@ export function HandoffDialog({ session, tasks, onClose }: { session: Session; t
     try {
       const r = parseResult(await readText(p));
       const m = mergeResult(session, r);
-      applyResult(m.grades, m.handoffs, m.timeLog);
+      applyResult(m.grades, m.handoffs, m.timeLog, m.retired);
       const parts = [
         `Merged ${m.merged} grade${m.merged === 1 ? "" : "s"} from ${r.guest}.`,
         m.updated ? `${m.updated} of their earlier grades were updated.` : "",
         m.skipped ? `${m.skipped} pin${m.skipped === 1 ? "" : "s"} you had graded yourself kept your grade.` : "",
         m.waiting ? `${m.waiting} pin${m.waiting === 1 ? " is" : "s are"} graded twice and waiting for the other grader.` : "",
         m.conflicts ? `${m.conflicts} disagreement${m.conflicts === 1 ? "" : "s"} to resolve: see Disagreements in the top bar.` : "",
+        m.changed
+          ? `${m.changed} of their grade${m.changed === 1 ? " was for a pin" : "s were for pins"} the student changed or removed since the pack was sent. ${m.changed === 1 ? "It doesn't" : "They don't"} count, and ${m.changed === 1 ? "is" : "are"} kept with the old pin${m.changed === 1 ? "" : "s"} in Changed submissions.`
+          : "",
       ];
       setStatus({ ok: !m.conflicts, text: parts.filter(Boolean).join(" ") });
     } catch (e) {
@@ -241,6 +244,7 @@ export function HandoffDialog({ session, tasks, onClose }: { session: Session; t
   };
 
   const packs = [...(session.handoffs ?? [])].reverse();
+  const changedOut = useMemo(() => changedSinceSent(session), [session]);
   const busyGraders = graders.filter((_, i) => load[i + 1] > 0 || extra[i + 1] > 0);
   const missingName = busyGraders.some((g) => !g.name.trim());
   const packCount = busyGraders.length;
@@ -457,6 +461,12 @@ export function HandoffDialog({ session, tasks, onClose }: { session: Session; t
                 <span className="muted small">
                   {h.pinIds.length} pins{h.checkPins?.length ? ` (${h.checkPins.length} twice)` : ""} · {h.taskIds.length} images ·{" "}
                   {new Date(h.createdAt).toLocaleDateString()}
+                  {changedOut.get(h.id) ? (
+                    <span className="warn-text" title="A rescan found students changed or removed these pins after the pack was sent. The guest's grades for them won't count; they'll be listed in Changed submissions.">
+                      {" "}
+                      · {changedOut.get(h.id)} pin{changedOut.get(h.id) === 1 ? "" : "s"} changed since sent
+                    </span>
+                  ) : null}
                 </span>
                 <span className={`pill ${h.status}`}>
                   {h.status === "out" ? "out" : h.status === "returned" ? `returned · ${h.mergedCount ?? 0} merged` : "recalled"}

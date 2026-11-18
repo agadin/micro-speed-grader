@@ -13,7 +13,7 @@ import {
 } from "../lib/grading";
 import { computeClusters, type Cluster } from "../lib/cluster";
 import { openSlide, dirname, hasTauri, isMac, joinPath, showHelp, withExt, writeText } from "../lib/backend";
-import { awayPins, awayTasks, conflictPins, guestProgress, makeResult } from "../lib/handoff";
+import { awayPins, awayTasks, changedSinceSent, conflictPins, guestProgress, makeResult } from "../lib/handoff";
 import { safeFileName } from "../lib/exportCsv";
 import { save } from "@tauri-apps/plugin-dialog";
 import { HandoffDialog } from "./HandoffDialog";
@@ -236,7 +236,14 @@ export function Grader({ session }: { session: Session }) {
         grades = applyPlan(next, plan);
       }
       st.applyRescan(r, grades);
-      const msg = rescanMessage(r, grades);
+      // pins in packs still out that the students have since changed or removed
+      const was = changedSinceSent(session);
+      const now = changedSinceSent({ ...session, pins: r.pins });
+      const outNames = (session.handoffs ?? []).filter((h) => (now.get(h.id) ?? 0) > (was.get(h.id) ?? 0)).map((h) => h.guest);
+      const outN = [...now].reduce((n, [id, k]) => n + k - (was.get(id) ?? 0), 0);
+      const msg =
+        rescanMessage(r, grades) +
+        (outN ? ` ${outN} of these ${outN === 1 ? "is" : "are"} in a pack that's still out (${outNames.join(", ")}): the grader's grade${outN === 1 ? "" : "s"} for ${outN === 1 ? "it" : "them"} won't count.` : "");
       const pending = reviewRows({ ...session, students: r.students, pins: r.pins, retired: r.retired, grades }).length;
       st.set({ notice: { kind: "info", text: msg, review: pending > 0, ...(fresh.length ? { problems: fresh.length } : {}) } });
     } catch (e) {

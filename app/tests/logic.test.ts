@@ -18,7 +18,7 @@ import { activeSecs, fmtDuration, IDLE_CAP, timeCsv, timeReport } from "../src/l
 import { checkQuestions, examJson, nextNum, normSlide, planQuestionEdit, questionChanges, renumbered } from "../src/lib/examEdit";
 import { area, dist, fmtArea, fmtLength, measureLabel, perimeter } from "../src/lib/measure";
 import { canCarry, carryOver, dismissRows, mergeRescan, rescanMessage, restorePins, reviewPinIds, reviewRows } from "../src/lib/rescan";
-import { KEY, HOST, agreement, conflictPins, hostGraded, planOverlap, recallChecks, resolveWith, sameReason, seeded, awayPins, splitWeighted, guestSession, makePack, makeResult, mergeResult, parsePack, parseResult, remainingByTask } from "../src/lib/handoff";
+import { KEY, HOST, agreement, changedSinceSent, conflictPins, hostGraded, planOverlap, recallChecks, resolveWith, sameReason, seeded, awayPins, splitWeighted, guestSession, makePack, makeResult, mergeResult, parsePack, parseResult, remainingByTask } from "../src/lib/handoff";
 import { AUTO, autoRows, filterGroups, findStudents, graderOptions, isFiltered, noFilter, rowPasses, studentLabel, studentSummary, type LedgerFilter } from "../src/lib/review";
 import type { GradeState, Pin, Question, Session } from "../src/lib/types";
 import { emptyGrades } from "../src/lib/types";
@@ -368,6 +368,32 @@ ok(!!dbl && studentResults(session, dbl, defaultSettings)[0].text === defaultSet
     const m1 = mergeResult(s, result("b", "Ben", [{ ids: ["p6"], status: "correct", text: "" }]));
     const m2 = mergeResult({ ...s, grades: m1.grades, handoffs: m1.handoffs }, result("a", "Ana", [{ ids: ["p6"], status: "wrong", text: "Mast cell" }]));
     ok(m2.conflicts === 1 && m2.grades.checks!.p6.graders.join() === "Ben,Ana", "late results from a recalled pack become a disagreement");
+  }
+
+  // a rescan while a pack is out: the guest's grades for pins that changed since are kept aside
+  {
+    const s = base();
+    s.handoffs = [{ id: "pk", guest: "Ana", createdAt: 0, taskIds: [T], pinIds: ["p0", "p1", "p2"], status: "out" }];
+    // the files now: p1 is gone, p2 moved, the rest unchanged
+    const scan = {
+      students: s.students,
+      pins: s.pins.filter((p) => p.id !== "p1").map((p) => (p.id === "p2" ? { ...p, id: "x", xNm: 5000 } : p)),
+    };
+    const r = mergeRescan(s, scan);
+    const s1: Session = { ...s, students: r.students, pins: r.pins, retired: r.retired, grades: r.grades };
+    const np = r.replacements[0];
+    ok(changedSinceSent(s).size === 0 && changedSinceSent(s1).get("pk") === 2, `out pack: ${changedSinceSent(s1).get("pk")} pins changed since sent`);
+    ok(reviewRows(s1).length === 1 && reviewRows(s1)[0].kind === "removed", "before the results: only the removed pin is to review");
+    const m = mergeResult(s1, result("pk", "Ana", [{ ids: ["p0", "p1"], status: "correct", text: "" }, { ids: ["p2"], status: "wrong", text: "Mast cell" }]));
+    ok(m.merged === 1 && m.changed === 2 && !m.grades.pinGroup.p1 && !m.grades.pinGroup.p2 && !m.grades.pinGroup[np], `merged ${m.merged}, changed since sent ${m.changed}: not graded`);
+    const s2: Session = { ...s1, grades: m.grades, handoffs: m.handoffs, retired: m.retired };
+    const rows = reviewRows(s2);
+    const ch = rows.find((x) => x.kind === "changed")!;
+    ok(rows.length === 2 && ch.old.grade?.by === "Ana" && ch.old.grade.text === "Mast cell" && ch.newPin?.id === np, "the guest's grades are kept with the old pins, in Changed submissions");
+    const c = carryOver(s2, [ch]);
+    ok(c.grades.groups[c.grades.pinGroup[np]]?.by === "Ana" && c.grades.groups[c.grades.pinGroup[np]].text === "Mast cell", "carry over gives the new pin the guest's grade");
+    ok(changedSinceSent(s2).size === 0, "a returned pack no longer shows changes");
+    ok(mergeResult(s, result("pk", "Ana", [{ ids: ["p0"], status: "correct", text: "" }])).retired === undefined, "nothing changed: retired pins untouched");
   }
 
   // a file from a newer version says so
