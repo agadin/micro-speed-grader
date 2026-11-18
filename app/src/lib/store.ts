@@ -1,5 +1,6 @@
 import { create } from "zustand";
 import type { GradeState, GradeStatus, Group, Session } from "./types";
+import type { Handoff } from "./handoff";
 import { writeText } from "./backend";
 
 const uid = () => Math.random().toString(36).slice(2, 10) + Date.now().toString(36).slice(-4);
@@ -35,6 +36,9 @@ interface Store {
   focusRequest: { pinIds: string[]; nonce: number } | null;
   settingsOpen: boolean;
   exportOpen: boolean;
+  handoffOpen: boolean;
+  /** help viewer: null = closed, "" = topic list, else a topic id */
+  help: string | null;
   startupIntent: null | "new" | "open";
 
   load: (s: Session) => void;
@@ -50,6 +54,10 @@ interface Store {
   set: (patch: Partial<Store>) => void;
   focusPins: (pinIds: string[]) => void;
   saveNow: () => Promise<void>;
+  /** host: record packs sent out / recalled */
+  setHandoffs: (h: Handoff[]) => void;
+  /** host: merge a guest's results (one undo step) */
+  applyResult: (grades: GradeState, h: Handoff[]) => void;
 }
 
 const cloneGrades = (g: GradeState): GradeState => ({
@@ -114,6 +122,8 @@ export const useStore = create<Store>((set, get) => {
     focusRequest: null,
     settingsOpen: false,
     exportOpen: false,
+    handoffOpen: false,
+    help: null,
     startupIntent: null,
 
     load: (session) =>
@@ -191,6 +201,18 @@ export const useStore = create<Store>((set, get) => {
     },
 
     set: (patch) => set(patch),
+    setHandoffs: (handoffs) => {
+      const s = get().session;
+      if (!s) return;
+      set({ session: { ...s, handoffs }, dirty: true });
+      scheduleSave();
+    },
+    applyResult: (grades, handoffs) => {
+      const s = get().session;
+      if (!s) return;
+      set({ session: { ...s, handoffs } });
+      commit(grades);
+    },
     focusPins: (pinIds) => set({ focusRequest: { pinIds, nonce: Date.now() } }),
 
     saveNow: async () => {

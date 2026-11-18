@@ -32,6 +32,9 @@ and the app updates itself from new releases (**Micro Speed Grader → Check for
   1/0 column per question) and a Statistics tab with KR-20 and item statistics (difficulty,
   point-biserial, KR-20 if deleted), saved as item-stats.csv
 - Feedback wording edited in place on a live "Student sees" preview (Preferences → Grading text)
+- Grade with other people: the host hands off part of the remaining images to any number of graders
+  as pack files (drag images between people, or split evenly by pin count); those pins lock until each
+  grader's results file is imported, and the host can recall a pack at any time ([how it works](docs/handoff.md))
 
 ## Run
 

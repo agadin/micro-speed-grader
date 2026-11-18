@@ -10,6 +10,7 @@ import { defaultSettings } from "../src/lib/settings";
 import { isPainted, pinsInPaint, type PaintOp } from "../src/lib/paint";
 import { exportTable, kr20, parseStudentName, EXPORT_PRESETS, testStats, safeFileName, uniqueFileNames, textCell, toCsv, type ExportRow } from "../src/lib/exportCsv";
 import { MAX_ANNOTATIONS } from "../src/lib/ndpa";
+import { awayPins, splitEven, guestSession, makePack, makeResult, mergeResult, parsePack, parseResult, remainingByTask } from "../src/lib/handoff";
 import type { Pin, Session } from "../src/lib/types";
 import { emptyGrades } from "../src/lib/types";
 
@@ -170,6 +171,77 @@ ok(!!dbl && studentResults(session, dbl, defaultSettings)[0].text === defaultSet
   const cl = computeClusters(many, 25, 2);
   ok(cl.filter((c) => !c.single).length === 3000, `pairs clustered (${cl.length})`);
   ok(performance.now() - c0 < 2000, `6000 pins clustered in ${(performance.now() - c0).toFixed(0)} ms`);
+}
+
+
+// hand-off packs: split → pack → guest grades → results → merge
+{
+  const mk = (id: string, stu: string, slide: string, q: number | null, cands: number[] = []) =>
+    ({ id, studentId: stu, slide, rawTitle: "", details: "", q, candidates: cands, titleGuessed: false, xNm: 0, yNm: 0, annotationType: "pin" }) as Pin;
+  const hs: Session = {
+    version: 1, name: "Final", createdAt: 0, savedAt: 0, sessionPath: "/h/final.msgrade", submissionsDir: "", slidesDir: "/h/slides",
+    questions: [{ num: 1, slides: ["A"], prompt: "", include: true }, { num: 2, slides: ["B"], prompt: "", include: true }, { num: 3, slides: ["B"], prompt: "", include: true }],
+    students: [{ id: "s1", name: "One", folder: "One" }, { id: "s2", name: "Two", folder: "Two" }],
+    pins: [mk("a1", "s1", "A", 1), mk("a2", "s2", "A", 1), mk("b1", "s1", "B", 2), mk("b2", "s2", "B", 2), mk("c1", "s1", "B", 3), mk("x", "s2", "B", null, [2, 3])],
+    slides: [{ id: "A", path: "/h/slides/A.ndpi" }, { id: "B", path: "/h/slides/B.ndpi" }],
+    grades: emptyGrades(), taskIndex: 0,
+  };
+  const ts = buildTasks(hs.questions, new Set(["A", "B"]));
+  const rem = remainingByTask(hs, ts);
+  ok(rem.map((r) => r.pinIds.length).join() === "2,3,2", `remaining per task ${rem.map((r) => r.pinIds.length)}`);
+  const sum = (m: Map<string, number>, items: { id: string; n: number }[], who: number) =>
+    items.filter((x) => m.get(x.id) === who).reduce((t, x) => t + x.n, 0);
+  const it3 = [{ id: "a", n: 10 }, { id: "b", n: 5 }, { id: "c", n: 5 }];
+  const s2 = splitEven(it3, 2);
+  ok(sum(s2, it3, 0) === 10 && sum(s2, it3, 1) === 10, "split 10 | 5+5 evenly between two");
+  const it6 = [{ id: "a", n: 30 }, { id: "b", n: 20 }, { id: "c", n: 20 }, { id: "d", n: 10 }, { id: "e", n: 20 }, { id: "f", n: 20 }];
+  const s3 = splitEven(it6, 3);
+  ok([0, 1, 2].every((w) => sum(s3, it6, w) >= 30 && sum(s3, it6, w) <= 50), `split among three ${[0, 1, 2].map((w) => sum(s3, it6, w))}`);
+  ok(splitEven(it6, 4).size === 6 && new Set(splitEven(it6, 4).values()).size === 4, "everyone gets work when there's enough");
+  ok(splitEven(it6, 0).size === 0 && [...splitEven(it6, 1).values()].every((v) => v === 0), "split extremes");
+
+  // host hands out task Q2·B
+  const give = rem.find((r) => r.task.q === 2)!;
+  const pack = parsePack(JSON.stringify(makePack(hs, "Jamie", [give.task.id], give.pinIds)));
+  hs.handoffs = [{ id: pack.id, guest: "Jamie", createdAt: 0, taskIds: pack.taskIds, pinIds: pack.pinIds, status: "out" }];
+  ok(awayPins(hs).size === give.pinIds.length && remainingByTask(hs, ts).find((r) => r.task.q === 2)!.pinIds.length === 0, "handed-out pins locked on host");
+
+  // guest grades everything they were given (plus tries to grade a pin they weren't)
+  const gs = guestSession(pack, [{ id: "B", path: "/g/B.ndpi" }], "/g/final-jamie.msgrade", "/g");
+  ok(gs.slides.length === 1 && gs.slides[0].path === "/g/B.ndpi" && gs.guestPack?.guest === "Jamie", "guest session relinks slides");
+  gs.grades = { groups: { g1: { id: "g1", taskId: give.task.id, status: "correct", text: "nice", pinIds: [...give.pinIds, "a1"], createdAt: 1 } }, pinGroup: Object.fromEntries([...give.pinIds, "a1"].map((id) => [id, "g1"])), assign: { x: 2 } };
+  const res = parseResult(JSON.stringify(makeResult(gs)));
+  ok(res.groups[0].pinIds.length === give.pinIds.length && !res.groups[0].pinIds.includes("a1"), "results contain only pack pins");
+
+  // host meanwhile graded one of them after a recall: host wins
+  hs.grades = { groups: { h1: { id: "h1", taskId: give.task.id, status: "wrong", text: "host", pinIds: ["b1"], createdAt: 2 } }, pinGroup: { b1: "h1" }, assign: {} };
+  const m = mergeResult(hs, res);
+  ok(m.grades.pinGroup.b1 === "h1" && m.skipped === 1 && m.merged === give.pinIds.length - 1, `merge keeps host grade (merged ${m.merged}, skipped ${m.skipped})`);
+  ok(m.grades.assign.x === 2 && m.handoffs[0].status === "returned", "assignment merged and pack marked returned");
+  let threw = false;
+  try { mergeResult({ ...hs, handoffs: [] }, res); } catch { threw = true; }
+  ok(threw, "results for an unknown pack are refused");
+
+  // several graders at once: two packs out, both locked, results merge independently in any order
+  const hm: Session = { ...hs, grades: emptyGrades(), handoffs: [] };
+  const r2 = remainingByTask(hm, ts);
+  const [ta, tb] = [r2.find((r) => r.task.q === 1)!, r2.find((r) => r.task.q === 3)!];
+  const pa = makePack(hm, "Ana", [ta.task.id], ta.pinIds);
+  const pb = makePack(hm, "Ben", [tb.task.id], tb.pinIds);
+  hm.handoffs = [pa, pb].map((p) => ({ id: p.id, guest: p.guest, createdAt: 0, taskIds: p.taskIds, pinIds: p.pinIds, status: "out" as const }));
+  ok(awayPins(hm).size === ta.pinIds.length + tb.pinIds.length, "two packs out lock both sets of pins");
+  const gradeAll = (p: typeof pa) => {
+    const g = guestSession(p, [{ id: "A", path: "/g/A.ndpi" }, { id: "B", path: "/g/B.ndpi" }], "/g/x.msgrade", "/g");
+    g.grades = { groups: { z: { id: "z", taskId: p.taskIds[0], status: "correct", text: p.guest, pinIds: p.pinIds, createdAt: 1 } }, pinGroup: Object.fromEntries(p.pinIds.map((id) => [id, "z"])), assign: {} };
+    return parseResult(JSON.stringify(makeResult(g)));
+  };
+  const m1 = mergeResult(hm, gradeAll(pb));
+  const hm2: Session = { ...hm, grades: m1.grades, handoffs: m1.handoffs };
+  const m2 = mergeResult(hm2, gradeAll(pa));
+  ok(
+    m2.handoffs.every((h) => h.status === "returned") && [...ta.pinIds, ...tb.pinIds].every((id) => m2.grades.pinGroup[id]),
+    "two graders' results merge in any order",
+  );
 }
 
 process.exit(fails ? 1 : 0);

@@ -42,3 +42,4 @@ export const IconKeyboard = () => <S d="M2 4.5h12v7H2zM4.5 7h1M7.5 7h1M10.5 7h1M
 export const IconCircleDash = () => <S d="M8 2.5a5.5 5.5 0 0 1 5.5 5.5M13.5 8A5.5 5.5 0 0 1 8 13.5M8 13.5A5.5 5.5 0 0 1 2.5 8M2.5 8A5.5 5.5 0 0 1 8 2.5" />;
 export const IconText = () => <S d="M3 4h10M3 7.5h10M3 11h6M11 10.5l1.5 1.5 2-2.5" />;
 export const IconPolygon = () => <S d="M3 12.5 2.5 5 8 2.5l5.5 4-2 6Z" />;
+export const IconHandoff = () => <S d="M6 5.5m-2 0a2 2 0 1 0 4 0a2 2 0 1 0-4 0M2.5 13c0-2 1.6-3.5 3.5-3.5S9.5 11 9.5 13M10.5 4.5h3.5M12.5 3l1.5 1.5-1.5 1.5" />;

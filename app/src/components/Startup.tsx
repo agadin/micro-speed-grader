@@ -7,6 +7,8 @@ import { loadExam } from "../lib/exam";
 import { scanSlides, scanSubmissions } from "../lib/loader";
 import { basename, dirname, joinPath, listFiles, pathExists, readText } from "../lib/backend";
 import { forgetRecent, recentSessions, rememberRecent, useStore, type Recent } from "../lib/store";
+import { guestSession, parsePack } from "../lib/handoff";
+import { writeText } from "../lib/backend";
 
 export async function openSessionFile(path: string): Promise<Session> {
   let raw: string;
@@ -109,6 +111,37 @@ export function Startup() {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [intent]);
 
+  /** second grader: open a pack, point it at your slides folder, pick where to keep your work */
+  const openPack = async () => {
+    setErr(null);
+    const p = await open({ filters: [{ name: "Hand-off pack", extensions: ["msgpack"] }] });
+    if (typeof p !== "string") return;
+    try {
+      const pack = parsePack(await readText(p));
+      const d = await open({ directory: true, title: `Choose your slides folder for “${pack.session.name}”` });
+      if (typeof d !== "string") return;
+      const slides = await scanSlides(d);
+      const needed = new Set(pack.taskIds.map((t) => t.split("|")[1] ?? "").filter(Boolean));
+      const missing = pack.session.slides.filter((x) => (needed.size ? needed.has(x.id) : true) && !slides.some((r) => r.id === x.id));
+      if (missing.length) {
+        setErr(`That folder is missing ${missing.map((m) => m.file).join(", ")}. Choose the folder that has the course slides.`);
+        return;
+      }
+      const target = await save({
+        defaultPath: p.replace(/\.msgpack$/i, "") + ".msgrade",
+        filters: [{ name: "Grading session", extensions: ["msgrade"] }],
+      });
+      if (!target) return;
+      const path = target.endsWith(".msgrade") ? target : `${target}.msgrade`;
+      const s = guestSession(pack, slides, path, d);
+      await writeText(path, JSON.stringify(s), true);
+      rememberRecent(path, s.name);
+      load(s);
+    } catch (e) {
+      setErr(String(e instanceof Error ? e.message : e));
+    }
+  };
+
   if (mode === "new") return <NewSession onCancel={() => setMode("home")} />;
 
   return (
@@ -156,7 +189,12 @@ export function Startup() {
             </ul>
           </>
         )}
-        <p className="muted small">Progress auto-saves after every change. After a crash, reopen the session from this list.</p>
+        <p className="muted small">
+          Progress auto-saves after every change. After a crash, reopen the session from this list.{" "}
+          <button className="text-link" onClick={openPack} title="Open a hand-off pack (.msgpack)">
+            Got work from another grader?
+          </button>
+        </p>
       </div>
     </div>
   );

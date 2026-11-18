@@ -543,6 +543,103 @@ await step("autosave + resume after reload", async () => {
   return `${before} groups in file; ledger (all images) shows ${all}`;
 });
 
+
+await step("hand off: host splits work, guest grades the pack, host merges results", async () => {
+  const PACK = path.join(WORK, "jamie.msgpack");
+  const GUEST = path.join(WORK, "jamie.msgrade");
+  const RESULT = path.join(WORK, "jamie.msgresult");
+  page.on("dialog", (d) => d.accept().catch(() => {}));
+  // host: split
+  await page.getByRole("button", { name: "Hand off" }).click();
+  await page.locator(".handoff-modal").waitFor();
+  await page.locator(".ho-name").first().fill("Jamie");
+  // more graders: add one, split three ways, check, then help, then back to one grader
+  await page.getByRole("button", { name: "+ Add grader" }).click();
+  await page.locator(".ho-name").nth(1).fill("Sam");
+  await page.getByRole("button", { name: "Split evenly" }).click();
+  const colCounts = await page.locator(".ho-col").evaluateAll((cs) => cs.map((c) => c.querySelectorAll(".ho-card").length));
+  const createLabel = await page.getByRole("button", { name: /Create/ }).innerText();
+  await snap("handoff-three-way");
+  expect(colCounts.length === 3 && colCounts.every((n) => n > 0) && /Create 2 packs/.test(createLabel), `three-way split: ${colCounts} / ${createLabel}`);
+  // drag a card from You onto Sam's column
+  const before = colCounts;
+  const src = await page.locator('.ho-col[data-col="0"] .ho-card').first().boundingBox();
+  const dst = await page.locator('.ho-col[data-col="2"]').boundingBox();
+  await page.mouse.move(src.x + 20, src.y + 10);
+  await page.mouse.down();
+  await page.mouse.move(src.x + 60, src.y + 20, { steps: 4 });
+  await page.mouse.move(dst.x + dst.width / 2, dst.y + dst.height - 10, { steps: 8 });
+  await page.mouse.up();
+  const afterDrag = await page.locator(".ho-col").evaluateAll((cs) => cs.map((c) => c.querySelectorAll(".ho-card").length));
+  expect(afterDrag[0] === before[0] - 1 && afterDrag[2] === before[2] + 1, `drag didn't move the card: ${before} → ${afterDrag}`);
+  await page.locator(".ho-help").click();
+  await page.locator(".help-panel").waitFor();
+  await page.waitForTimeout(400);
+  await snap("handoff-help");
+  expect((await page.locator(".help-panel").innerText()).includes("Add grader"), "help panel missing hand-off topic");
+  await page.keyboard.press("Escape");
+  expect((await page.locator(".help-panel").count()) === 0, "Esc didn't close help");
+  await page.getByRole("button", { name: "Remove Sam" }).click();
+  await page.getByRole("button", { name: "Keep all" }).click();
+  const card = page.locator(".ho-col.you .ho-card").last();
+  const cardLabel = await card.locator(".ho-l").innerText();
+  await card.click();
+  await page.waitForTimeout(250);
+  await snap("handoff-split");
+  const n = parseInt(await page.locator('.ho-col[data-col="1"] .ho-card .ho-n').first().innerText());
+  await dialog(PACK);
+  await page.getByRole("button", { name: /Create pack/ }).click();
+  await page.locator(".handoff-modal .ok-text").waitFor({ timeout: 5000 });
+  await page.waitForTimeout(900);
+  expect(fs.existsSync(PACK), "pack file not written");
+  const hs = session().handoffs ?? [];
+  expect(hs.length === 1 && hs[0].status === "out" && hs[0].pinIds.length === n, `handoff not recorded: ${JSON.stringify(hs.map((h) => [h.status, h.pinIds.length]))}`);
+  await page.locator(".handoff-modal").getByRole("button", { name: "Close", exact: true }).click();
+  const opts = await page.locator(".topbar select option").allInnerTexts();
+  expect(opts.some((o) => o.includes("→ Jamie")), "task list doesn't show the handed-off image");
+
+  // guest: open the pack, grade everything, send results
+  await page.locator('button[title="Save and close session"]').click();
+  await page.locator(".startup").waitFor();
+  await dialog(PACK, path.join(ROOT, "images"), GUEST);
+  await page.getByRole("button", { name: "Got work from another grader?" }).click();
+  await page.locator(".topbar").waitFor({ timeout: 30000 });
+  await waitTiles();
+  const gopts = await page.locator(".topbar select option").allInnerTexts();
+  expect(gopts.length === 1 && cardLabel.startsWith(gopts[0].split(" (")[0].trim()), `guest sees ${gopts.join(" | ")} (expected ${cardLabel})`);
+  const sendBtn = page.getByRole("button", { name: /Send results/ }).first();
+  expect((await sendBtn.innerText()).includes(`0/${n}`), `guest progress: ${await sendBtn.innerText()}`);
+  for (let i = 0; i < 400 && !(await sendBtn.innerText()).includes(`${n}/${n}`); i++) {
+    await page.keyboard.press("c");
+    await page.waitForTimeout(120);
+  }
+  await snap("handoff-guest-done");
+  expect((await sendBtn.innerText()).includes(`${n}/${n}`), `guest couldn't finish: ${await sendBtn.innerText()}`);
+  await dialog(RESULT);
+  await sendBtn.click();
+  await page.waitForTimeout(800);
+  expect(fs.existsSync(RESULT), "results file not written");
+
+  // host: reopen and merge
+  await page.locator('button[title="Save and close session"]').click();
+  await page.locator(".startup").waitFor();
+  await dialog(SESSION);
+  await page.getByRole("button", { name: "Open session…" }).click();
+  await page.locator(".topbar").waitFor({ timeout: 30000 });
+  await page.getByRole("button", { name: "Hand off" }).click();
+  await dialog(RESULT);
+  await page.getByRole("button", { name: "Import results…" }).click();
+  await page.locator(".handoff-modal .ok-text").waitFor({ timeout: 5000 });
+  const msg = await page.locator(".handoff-modal .ok-text").innerText();
+  await snap("handoff-merged");
+  await page.waitForTimeout(900);
+  const after = session();
+  const pack = after.handoffs[0];
+  expect(pack.status === "returned" && pack.pinIds.every((id) => after.grades.pinGroup[id]), "pack pins not merged into host grades");
+  await page.locator(".handoff-modal").getByRole("button", { name: "Close", exact: true }).click();
+  return `${cardLabel}: ${n} pins handed to Jamie, graded, merged — "${msg}"`;
+});
+
 await browser.close();
 tiles.stop();
 for (const r of results) {

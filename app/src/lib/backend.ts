@@ -13,6 +13,7 @@ export const writeText = (path: string, contents: string, keepBackup = false) =>
 export const pathExists = (path: string) => invoke<boolean>("path_exists", { path });
 /** opens/focuses the separate Preferences window; rejects outside Tauri */
 export const openPreferencesWindow = () => invoke<void>("open_preferences");
+export const openHelpWindow = (topic: string) => invoke<void>("open_help", { topic });
 
 const isWindows = navigator.userAgent.includes("Windows");
 /** Base URL of the custom `slide://` tile protocol (differs on Windows/WebView2). */
@@ -28,3 +29,4 @@ export const dirname = (p: string) => {
 };
 export const joinPath = (...parts: string[]) =>
   parts.map((p, i) => (i === 0 ? p.replace(/[\\/]+$/, "") : p.replace(/^[\\/]+|[\\/]+$/g, ""))).join(sep);
+

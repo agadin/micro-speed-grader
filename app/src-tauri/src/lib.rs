@@ -112,6 +112,34 @@ fn open_preferences<R: tauri::Runtime>(app: tauri::AppHandle<R>) -> Result<(), S
         .map_err(|e| e.to_string())
 }
 
+/// Help viewer: its own narrow window, like macOS Help. `topic` is a help topic id ("" = topic list).
+/// The window loads the app's own page and has no capabilities (it only shows text).
+#[tauri::command]
+fn open_help<R: tauri::Runtime>(app: tauri::AppHandle<R>, topic: String) -> Result<(), String> {
+    // ids are short slugs; anything else falls back to the topic list
+    let topic = if topic.len() <= 40 && topic.chars().all(|c| c.is_ascii_lowercase() || c.is_ascii_digit() || c == '-') { topic } else { String::new() };
+    let url = format!("index.html?window=help&topic={topic}");
+    if let Some(w) = app.get_webview_window("help") {
+        let _ = w.eval(&format!("location.replace({url:?})"));
+        let _ = w.unminimize();
+        let _ = w.show();
+        return w.set_focus().map_err(|e| e.to_string());
+    }
+    let mut b = tauri::WebviewWindowBuilder::new(&app, "help", tauri::WebviewUrl::App(url.into()))
+        .title("Micro Speed Grader Help")
+        .inner_size(380.0, 640.0)
+        .min_inner_size(320.0, 360.0);
+    // open beside the main window when there's room
+    if let Some(m) = app.get_webview_window("main") {
+        if let (Ok(pos), Ok(size), Ok(scale)) = (m.outer_position(), m.outer_size(), m.scale_factor()) {
+            let p = pos.to_logical::<f64>(scale);
+            let s = size.to_logical::<f64>(scale);
+            b = b.position((p.x + s.width - 400.0).max(0.0), p.y + 60.0);
+        }
+    }
+    b.build().map(|_| ()).map_err(|e| e.to_string())
+}
+
 #[tauri::command]
 fn path_exists(path: String) -> bool {
     Path::new(&path).exists()
@@ -160,6 +188,8 @@ fn build_menu<R: tauri::Runtime>(app: &tauri::AppHandle<R>) -> tauri::Result<Men
     let export = MenuItem::with_id(app, "export", "Export Grades…", true, Some("CmdOrCtrl+E"))?;
     let close_s = MenuItem::with_id(app, "close_session", "Close Session", true, Some("CmdOrCtrl+W"))?;
     let updates = MenuItem::with_id(app, "check_updates", "Check for Updates…", true, None::<&str>)?;
+    let help = MenuItem::with_id(app, "help", "Micro Speed Grader Help", true, Some("CmdOrCtrl+Shift+/"))?;
+    let help_menu = Submenu::with_items(app, "Help", true, &[&help])?;
 
     #[cfg(target_os = "macos")]
     let app_menu = Submenu::with_items(
@@ -218,9 +248,9 @@ fn build_menu<R: tauri::Runtime>(app: &tauri::AppHandle<R>) -> tauri::Result<Men
     )?;
 
     #[cfg(target_os = "macos")]
-    return Menu::with_items(app, &[&app_menu, &file_menu, &edit_menu, &window_menu]);
+    return Menu::with_items(app, &[&app_menu, &file_menu, &edit_menu, &window_menu, &help_menu]);
     #[cfg(not(target_os = "macos"))]
-    return Menu::with_items(app, &[&file_menu, &edit_menu, &window_menu]);
+    return Menu::with_items(app, &[&file_menu, &edit_menu, &window_menu, &help_menu]);
 }
 
 #[cfg_attr(mobile, tauri::mobile_entry_point)]
@@ -249,8 +279,21 @@ pub fn run() {
         })
         .on_menu_event(|app, event| {
             let id = event.id().as_ref();
+            // ⌘W in the Help or Preferences window closes that window, not the grading session
+            let side = ["help", "preferences"]
+                .into_iter()
+                .filter_map(|l| app.get_webview_window(l))
+                .find(|w| w.is_focused().unwrap_or(false));
+            if id == "close_session" {
+                if let Some(w) = side {
+                    let _ = w.close();
+                    return;
+                }
+            }
             if id == "preferences" {
                 let _ = open_preferences(app.clone());
+            } else if id == "help" {
+                let _ = open_help(app.clone(), String::new());
             } else if matches!(id, "new_session" | "open_session" | "export" | "close_session") {
                 let _ = app.emit("menu", id);
             }
@@ -262,7 +305,8 @@ pub fn run() {
             read_bytes,
             write_text,
             path_exists,
-            open_preferences
+            open_preferences,
+            open_help
         ])
         .run(tauri::generate_context!())
         .expect("error while running tauri application");

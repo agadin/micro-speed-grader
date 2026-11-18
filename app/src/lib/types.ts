@@ -1,3 +1,4 @@
+import type { GuestPack, Handoff } from "./handoff";
 export interface Question {
   num: number;
   /** Slide ids (e.g. "VMS146") the student may answer on. */
@@ -69,6 +70,10 @@ export interface Session {
   slides: SlideRef[];
   grades: GradeState;
   taskIndex: number;
+  /** host: packs of work sent to other graders */
+  handoffs?: Handoff[];
+  /** guest: this session was opened from a hand-off pack */
+  guestPack?: GuestPack;
 }
 
 export interface Task {

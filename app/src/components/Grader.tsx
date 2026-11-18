@@ -10,7 +10,11 @@ import {
   type PinState,
 } from "../lib/grading";
 import { computeClusters, type Cluster } from "../lib/cluster";
-import { openSlide } from "../lib/backend";
+import { openSlide, dirname, joinPath, writeText } from "../lib/backend";
+import { awayPins, awayTasks, guestProgress, makeResult } from "../lib/handoff";
+import { safeFileName } from "../lib/exportCsv";
+import { save } from "@tauri-apps/plugin-dialog";
+import { HandoffDialog } from "./HandoffDialog";
 import type { Session, SlideInfo } from "../lib/types";
 import { SlideViewer, type ViewerApi } from "./SlideViewer";
 import { ContextMenu } from "./ContextMenu";
@@ -25,6 +29,7 @@ import {
   IconClose,
   IconCross,
   IconExport,
+  IconHandoff,
   IconRedo,
   IconSliders,
   IconUndo,
@@ -156,10 +161,19 @@ export function Grader({ session }: { session: Session }) {
     () => new Set(session.slides.map((s) => s.id)),
     [session.slides],
   );
-  const tasks = useMemo(
-    () => buildTasks(session.questions, slideIds),
-    [session.questions, slideIds],
-  );
+  const guestPack = session.guestPack;
+  const tasks = useMemo(() => {
+    const all = buildTasks(session.questions, slideIds);
+    // a second grader only sees the images they were given
+    return guestPack ? all.filter((t) => guestPack.taskIds.includes(t.id)) : all;
+  }, [session.questions, slideIds, guestPack]);
+  // pins this grader can't touch: (host) out with someone else; (guest) not in their pack
+  const locked = useMemo(() => {
+    if (!guestPack) return awayPins(session);
+    const mine = new Set(guestPack.pinIds);
+    return new Set(session.pins.filter((p) => !mine.has(p.id)).map((p) => p.id));
+  }, [session, guestPack]);
+  const away = useMemo(() => awayTasks(session), [session]);
   const taskIndex = Math.min(session.taskIndex, Math.max(0, tasks.length - 1));
   const task = tasks[taskIndex];
   const question = session.questions.find((q) => q.num === task?.q);
@@ -173,8 +187,13 @@ export function Grader({ session }: { session: Session }) {
   );
 
   const taskPins = useMemo(
-    () => (task ? pinsForTask(session.pins, task, g) : []),
-    [session.pins, task, g],
+    () => (task ? pinsForTask(session.pins, task, g).filter((p) => !locked.has(p.id)) : []),
+    [session.pins, task, g, locked],
+  );
+  /** pins of this image that are out with another grader */
+  const lockedHere = useMemo(
+    () => (task && !guestPack ? pinsForTask(session.pins, task, g).filter((p) => locked.has(p.id)).length : 0),
+    [session.pins, task, g, locked, guestPack],
   );
   const otherPins = useMemo(
     () =>
@@ -561,7 +580,7 @@ export function Grader({ session }: { session: Session }) {
         t.tagName === "SELECT")
     )
       return;
-    if (st.menu || st.settingsOpen || st.exportOpen) return;
+    if (st.menu || st.settingsOpen || st.exportOpen || st.handoffOpen) return;
     const mod = isMac ? e.metaKey : e.ctrlKey;
     const k = e.key;
     if (mod && k.toLowerCase() === "z") {
@@ -648,7 +667,21 @@ export function Grader({ session }: { session: Session }) {
       </div>
     );
 
-  const allDone = progress.pinsDone === progress.pinsTotal;
+  const gp = guestProgress(session);
+  const allDone = guestPack ? gp.done === gp.total : progress.pinsDone === progress.pinsTotal;
+  const sendResults = async () => {
+    const path = await save({
+      defaultPath: joinPath(dirname(session.sessionPath), `${safeFileName(`${guestPack!.host} - ${guestPack!.guest} results`)}.msgresult`),
+      filters: [{ name: "Hand-off results", extensions: ["msgresult"] }],
+    });
+    if (!path) return;
+    try {
+      await writeText(path.endsWith(".msgresult") ? path : `${path}.msgresult`, JSON.stringify(makeResult(session)));
+      alert(`Results saved (${gp.done} of ${gp.total} pins graded). Send the file to ${guestPack!.host}'s grader.`);
+    } catch (e) {
+      alert(`Could not save results: ${e}`);
+    }
+  };
   const menuPinsGraded = st.menu?.pinIds.some((id) => g.pinGroup[id]) ?? false;
   const realClusters = clusters.filter((c) => !c.single).length;
 
@@ -673,6 +706,7 @@ export function Grader({ session }: { session: Session }) {
                 {t.slideCount > 1
                   ? ` (${t.slideIndex + 1}/${t.slideCount})`
                   : ""}
+                {away.has(t.id) ? ` → ${away.get(t.id)}` : ""}
               </option>
             ))}
           </select>
@@ -712,12 +746,23 @@ export function Grader({ session }: { session: Session }) {
           )}
         </span>
         <span className="vsep" />
-        <button
-          className={`btn ${allDone ? "light" : ""}`}
-          onClick={() => st.set({ exportOpen: true })}
-        >
-          <IconExport /> Export
-        </button>
+        {guestPack ? (
+          <button className={`btn ${allDone ? "light" : ""}`} onClick={sendResults} title={`Save the results file to send back (${guestPack.host})`}>
+            <IconExport /> Send results · {gp.done}/{gp.total}
+          </button>
+        ) : (
+          <>
+            <button className="btn ghost" onClick={() => st.set({ handoffOpen: true })} title="Split the remaining work with a second grader">
+              <IconHandoff /> Hand off
+            </button>
+            <button
+              className={`btn ${allDone ? "light" : ""}`}
+              onClick={() => st.set({ exportOpen: true })}
+            >
+              <IconExport /> Export
+            </button>
+          </>
+        )}
         <button
           className="btn ghost icon"
           onClick={() => st.set({ settingsOpen: true })}
@@ -816,14 +861,23 @@ export function Grader({ session }: { session: Session }) {
                 onClose={() => setSettings({ showKeyHints: false })}
               />
             )}
+            {lockedHere > 0 && (
+              <div className="handoff-banner">
+                {lockedHere} pin{lockedHere > 1 ? "s" : ""} on this image {lockedHere > 1 ? "are" : "is"} with{" "}
+                <b>{away.get(task.id) ?? "another grader"}</b>
+                <button className="btn ghost small" onClick={() => st.set({ handoffOpen: true })}>
+                  Manage
+                </button>
+              </div>
+            )}
             {allDone && (
               <div className="done-banner">
-                All pins graded.
+                {guestPack ? "All your pins are graded." : "All pins graded."}
                 <button
                   className="btn light"
-                  onClick={() => st.set({ exportOpen: true })}
+                  onClick={() => (guestPack ? sendResults() : st.set({ exportOpen: true }))}
                 >
-                  Export grades
+                  {guestPack ? "Send results" : "Export grades"}
                 </button>
               </div>
             )}
@@ -999,6 +1053,9 @@ export function Grader({ session }: { session: Session }) {
           paintRest={paintSplit?.rest.length ?? 0}
           onPaintGrade={gradePainted}
         />
+      )}
+      {st.handoffOpen && (
+        <HandoffDialog session={session} tasks={tasks} onClose={() => st.set({ handoffOpen: false })} />
       )}
       {st.exportOpen && (
         <ExportDialog
