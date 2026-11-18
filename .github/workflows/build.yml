@@ -1,0 +1,104 @@
+# Builds the app on each platform and checks the bundled OpenSlide can open a slide.
+# Runs when the native side or bundling changes, and on demand: the release script
+# (tools/release.sh) starts it to get the Windows installer, which it signs locally.
+name: Build
+on:
+  push:
+    branches: [main]
+    paths: ["app/src-tauri/**", "tools/fetch-openslide.sh", "app/package-lock.json", ".github/workflows/build.yml"]
+  pull_request:
+    paths: ["app/src-tauri/**", "tools/fetch-openslide.sh", "app/package-lock.json", ".github/workflows/build.yml"]
+  workflow_dispatch:
+    inputs:
+      version:
+        description: "Release version the installer is for (set by tools/release.sh)"
+        required: false
+concurrency:
+  group: build-${{ github.ref }}-${{ inputs.version }}
+  cancel-in-progress: true
+permissions:
+  contents: read
+env:
+  # a small public slide from the OpenSlide test data
+  TEST_SLIDE: https://openslide.cs.cmu.edu/download/openslide-testdata/Aperio/CMU-1-Small-Region.svs
+jobs:
+  slides:
+    name: OpenSlide smoke test (${{ matrix.name }})
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - { name: macOS Apple silicon, os: macos-latest, lib: mac }
+          - { name: macOS Intel, os: macos-15-intel, lib: mac }
+          - { name: Windows, os: windows-latest, lib: windows }
+    runs-on: ${{ matrix.os }}
+    timeout-minutes: 30
+    defaults:
+      run:
+        shell: bash
+    steps:
+      - uses: actions/checkout@v4
+      - uses: dtolnay/rust-toolchain@stable
+      - uses: Swatinem/rust-cache@v2
+        with:
+          workspaces: app/src-tauri
+          key: ${{ matrix.os }}
+      - run: tools/fetch-openslide.sh ${{ matrix.lib }}
+      - name: Rust tests
+        working-directory: app/src-tauri
+        run: cargo test --release --lib
+      - name: Open a slide and read a tile with the bundled library
+        working-directory: app/src-tauri
+        run: |
+          cargo build --release --example tileserver
+          curl -fsSL --retry 3 -o "$RUNNER_TEMP/test.svs" "$TEST_SLIDE"
+          if [ "${{ matrix.lib }}" = mac ]; then lib="$PWD/frameworks/libopenslide.1.dylib"; else lib="$PWD/lib/libopenslide-1.dll"; fi
+          OPENSLIDE_LIB="$lib" target/release/examples/tileserver 8787 &
+          sleep 2
+          slide="$RUNNER_TEMP/test.svs"
+          if [ "${{ matrix.lib }}" = windows ]; then slide="$(cygpath -m "$slide")"; fi
+          info=$(curl -fsS "http://127.0.0.1:8787/open?path=$(python3 -c 'import sys,urllib.parse;print(urllib.parse.quote(sys.argv[1]))' "$slide")")
+          echo "$info"
+          id=$(echo "$info" | python3 -c 'import json,sys;print(json.load(sys.stdin)["id"])')
+          curl -fsS -o tile.jpg "http://127.0.0.1:8787/tile/$id/0/0_0.jpg"
+          python3 -c 'import sys;b=open("tile.jpg","rb").read();assert b[:2]==b"\xff\xd8" and len(b)>500,len(b);print("tile ok,",len(b),"bytes")'
+
+  windows:
+    name: Windows installer
+    needs: slides
+    runs-on: windows-latest
+    timeout-minutes: 45
+    defaults:
+      run:
+        shell: bash
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+          cache-dependency-path: app/package-lock.json
+      - uses: dtolnay/rust-toolchain@stable
+      - uses: Swatinem/rust-cache@v2
+        with:
+          workspaces: app/src-tauri
+          key: windows-bundle
+      - run: tools/fetch-openslide.sh windows
+      - name: Check the version matches the release
+        if: inputs.version != ''
+        run: |
+          v=$(node -p 'require("./app/src-tauri/tauri.conf.json").version')
+          [ "$v" = "${{ inputs.version }}" ] || { echo "tauri.conf.json is $v, release is ${{ inputs.version }}"; exit 1; }
+      - working-directory: app
+        run: npm ci
+      - name: Build the installer
+        working-directory: app
+        # the updater signature is added by tools/release.sh on the release machine, so the key
+        # never leaves it
+        run: npx tauri build --bundles nsis --config '{"bundle":{"createUpdaterArtifacts":false}}'
+      - uses: actions/upload-artifact@v4
+        with:
+          name: windows-installer
+          path: app/src-tauri/target/release/bundle/nsis/*.exe
+          if-no-files-found: error
+          retention-days: 14

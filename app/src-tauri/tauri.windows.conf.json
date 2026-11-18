@@ -1,0 +1,13 @@
+{
+  "bundle": {
+    "resources": {
+      "lib/libopenslide-1.dll": "libopenslide-1.dll",
+      "lib/OpenSlide-LICENSE.txt": "licenses/OpenSlide-LICENSE.txt"
+    },
+    "windows": {
+      "nsis": {
+        "installMode": "currentUser"
+      }
+    }
+  }
+}

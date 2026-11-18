@@ -12,9 +12,14 @@ Export goes to a D2L-ready CSV plus per-student feedback.
 
 ## Download
 
-**macOS (Apple Silicon):** grab the `.dmg` from [Releases](../../releases), open it and drag the app to
-Applications. OpenSlide is bundled, so nothing else needs installing. The build is signed and notarized,
-and the app updates itself from new releases (**Micro Speed Grader → Check for Updates…**).
+From [Releases](../../releases). OpenSlide is bundled, so nothing else needs installing, and the app
+updates itself from new releases (**Check for Updates…** in the app menu).
+
+- **macOS** (Apple silicon and Intel, macOS 12+): the `.dmg`. Open it and drag the app to Applications.
+  Signed and notarized.
+- **Windows** (64-bit, Windows 10+): the `Windows-x64-setup.exe`. It installs for your user only, no
+  admin rights needed. It isn't code-signed yet, so Windows may say it "protected your PC": click
+  **More info → Run anyway**.
 
 ## Features
 
@@ -44,8 +49,8 @@ The full user guide is in [docs/help](docs/help/index.md); the same pages are bu
 
 ## Run
 
-Needs Node, Rust and OpenSlide (`brew install openslide` on macOS; on Windows put
-`libopenslide-1.dll` next to the app or set `OPENSLIDE_LIB`).
+Needs Node and Rust. Fetch OpenSlide once (the official prebuilt library, pinned and checksummed):
+`tools/fetch-openslide.sh mac` or `tools/fetch-openslide.sh windows` (from Git Bash).
 
 ```
 cd app
@@ -54,8 +59,12 @@ npm run tauri dev      # run the app
 npm run tauri build    # build an installer
 ```
 
-On macOS, run `tools/bundle-openslide-mac.sh` once before `tauri build`: it copies OpenSlide and its
-libraries out of Homebrew into the app bundle.
+Tests: `npm run test:logic` (fast, no slides needed), `npm run test:ui` (drives the app in a browser;
+needs the dev server and the demo class), `npm run test:real` (checks the readers against real exam
+PDFs and answer keys in `reference/` and `sample-data/`, when they're on the machine) and
+`npm run test:scale` (times the heavy work on a generated 400-student class; see the file for how to
+make one). GitHub Actions run the type check, logic tests and build on every change, and build and
+smoke-test macOS (both chips) and Windows when the native side changes.
 
 ## Demo class
 
@@ -87,14 +96,16 @@ node tests/ui/record-help-gifs.mjs       # selection-tool clips in docs/help/img
 node tests/ui/record-wiki-media.mjs      # wiki screenshots; pass file names to redo only those
 ```
 
-## Releasing (macOS)
+## Releasing
 
 ```
-tools/release-mac.sh 0.3.0 "What changed"
+tools/release.sh 0.3.7 "What changed"
 ```
 
-Builds, signs, notarizes and publishes a GitHub release with the DMG and the updater files
-(`latest.json`, signed `.app.tar.gz`). Needs the Developer ID certificate, a `notarytool` keychain
+Builds a universal macOS app, signs and notarizes it, has the Build workflow on GitHub make the
+Windows installer, signs both for the updater, and publishes a GitHub release with the DMG, the
+Windows installer and the updater files (`latest.json`, signed `.app.tar.gz` and `.exe`). Follow the
+steps in [CLAUDE.md](CLAUDE.md). Needs the Developer ID certificate, a `notarytool` keychain
 profile named `notary`, and the updater key at `~/.tauri/micro-speed-grader.key` (keep it backed up:
 without it, installed copies can't be updated).
 

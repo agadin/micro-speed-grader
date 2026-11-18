@@ -13,6 +13,7 @@ app/tests/.out/
 *.msgrade.bak
 .DS_Store
 app/src-tauri/frameworks/
+app/src-tauri/lib/
 
 # Claude Code working copies (parallel agents)
 .claude/worktrees/
