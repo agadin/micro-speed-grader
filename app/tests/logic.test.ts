@@ -11,8 +11,8 @@ import { isPainted, pinsInPaint, type PaintOp } from "../src/lib/paint";
 import { exportTable, kr20, parseStudentName, EXPORT_PRESETS, testStats, safeFileName, uniqueFileNames, textCell, toCsv, type ExportRow } from "../src/lib/exportCsv";
 import { MAX_ANNOTATIONS } from "../src/lib/ndpa";
 import { parseMarkdown, slug } from "../src/lib/markdown";
-import { awayPins, splitEven, guestSession, makePack, makeResult, mergeResult, parsePack, parseResult, remainingByTask } from "../src/lib/handoff";
-import type { Pin, Session } from "../src/lib/types";
+import { splitWeighted, HOST, agreement, conflictPins, hostGraded, planOverlap, recallChecks, resolveWith, sameReason, seeded, awayPins, splitEven, guestSession, makePack, makeResult, mergeResult, parsePack, parseResult, remainingByTask } from "../src/lib/handoff";
+import type { GradeState, Pin, Session } from "../src/lib/types";
 import { emptyGrades } from "../src/lib/types";
 
 (globalThis as any).DOMParser = new JSDOM().window.DOMParser;
@@ -199,6 +199,12 @@ ok(!!dbl && studentResults(session, dbl, defaultSettings)[0].text === defaultSet
   const s3 = splitEven(it6, 3);
   ok([0, 1, 2].every((w) => sum(s3, it6, w) >= 30 && sum(s3, it6, w) <= 50), `split among three ${[0, 1, 2].map((w) => sum(s3, it6, w))}`);
   ok(splitEven(it6, 4).size === 6 && new Set(splitEven(it6, 4).values()).size === 4, "everyone gets work when there's enough");
+  const ten = Array.from({ length: 10 }, (_, i) => ({ id: `t${i}`, n: 10 }));
+  const w73 = splitWeighted(ten, [70, 30]);
+  ok(sum(w73, ten, 0) === 70 && sum(w73, ten, 1) === 30, `70/30 split: ${sum(w73, ten, 0)}/${sum(w73, ten, 1)}`);
+  const w0 = splitWeighted(ten, [0, 50, 50]);
+  ok(sum(w0, ten, 0) === 0 && sum(w0, ten, 1) === 50, "a 0% share gets nothing");
+  ok(splitWeighted(ten, [0, 0]).size === 0, "all-zero shares split nothing");
   ok(splitEven(it6, 0).size === 0 && [...splitEven(it6, 1).values()].every((v) => v === 0), "split extremes");
 
   // host hands out task Q2·B
@@ -245,6 +251,122 @@ ok(!!dbl && studentResults(session, dbl, defaultSettings)[0].text === defaultSet
   );
 }
 
+// ---- grading with others: who graded, re-sent results, pins graded twice, disagreements ----
+{
+  const P = (id: string, stu: string, q: number) =>
+    ({ id, studentId: stu, slide: "A", rawTitle: "", details: "", q, candidates: [], titleGuessed: false, xNm: 0, yNm: 0, annotationType: "pin" }) as Pin;
+  const pins = Array.from({ length: 8 }, (_, i) => P(`p${i}`, `s${i}`, 1));
+  const base = (): Session => ({
+    version: 1, name: "Mid", createdAt: 0, savedAt: 0, sessionPath: "/h/mid.msgrade", submissionsDir: "", slidesDir: "/h",
+    questions: [{ num: 1, slides: ["A"], prompt: "", include: true }],
+    students: pins.map((p) => ({ id: p.studentId, name: p.studentId, folder: p.studentId })),
+    pins, slides: [{ id: "A", path: "/h/A.ndpi" }], grades: emptyGrades(), taskIndex: 0,
+  });
+  const pinMap = new Map(pins.map((p) => [p.id, p]));
+  const T = "Q1|A";
+  const result = (packId: string, guest: string, gs: { ids: string[]; status: "correct" | "wrong"; text: string }[]) =>
+    parseResult(JSON.stringify({ kind: "msg-handoff-result", version: 1, packId, guest, sentAt: 1, assign: {},
+      groups: gs.map((x, i) => ({ id: `r${i}`, taskId: T, status: x.status, text: x.text, pinIds: x.ids, createdAt: 1 })) }));
+  const hostGrade = (g: GradeState, ids: string[], status: "correct" | "wrong", text: string) => {
+    const id = `h${Math.random()}`;
+    g.groups[id] = { id, taskId: T, status, text, pinIds: ids, createdAt: 2 };
+    for (const p of ids) g.pinGroup[p] = id;
+    return hostGraded(g, ids, pinMap);
+  };
+
+  // reasons: only clearly different ones disagree
+  ok(sameReason("Neutrophil", "neutrophils.") && sameReason("Neutrophl", "Neutrophil") && sameReason("", "Lymphocyte") && sameReason("Dermis, not epidermis", "epidermis"), "same reason despite case, plural, typo, blank");
+  ok(!sameReason("Neutrophil", "Lymphocyte") && !sameReason("Smooth muscle", "Adipose tissue"), "clearly different reasons disagree");
+
+  // planning the overlap
+  const imgs = [{ taskId: "t1", pinIds: ["a", "b", "c", "d", "e", "f", "g", "h", "i", "j"], col: 1 }, { taskId: "t2", pinIds: ["k", "l", "m", "n"], col: 0 }];
+  const plan = planOverlap(imgs, [0, 1, 2], 0.2, seeded(7));
+  ok(plan.size === 3 && [...plan.values()].every(([a, b]) => a !== b), `overlap: 2 + 1 pins, two different people each (${[...plan.values()].join(" ")})`);
+  const noMe = planOverlap(imgs, [1, 2], 0.2, seeded(7));
+  ok(noMe.size === 2 && [...noMe.keys()].every((k) => !["k", "l", "m", "n"].includes(k)), "with the host left out, the host's own images are graded once");
+  ok(planOverlap(imgs, [1], 0.5).size === 0 && planOverlap(imgs, [0, 1], 0).size === 0, "no overlap with one person or 0%");
+
+  // results sent twice: the second file updates that guest's grades; the host's own grade still wins
+  {
+    const s = base();
+    s.handoffs = [{ id: "pk", guest: "Ana", createdAt: 0, taskIds: [T], pinIds: ["p0", "p1", "p2"], status: "out" }];
+    const m1 = mergeResult(s, result("pk", "Ana", [{ ids: ["p0", "p1"], status: "correct", text: "" }]));
+    ok(m1.merged === 2 && m1.grades.groups[m1.grades.pinGroup.p0].by === "Ana", "merged grades are stamped with the guest's name");
+    const s2 = { ...s, grades: m1.grades, handoffs: m1.handoffs };
+    hostGrade(s2.grades, ["p1"], "wrong", "host says no");
+    const m2 = mergeResult(s2, result("pk", "Ana", [{ ids: ["p0", "p1", "p2"], status: "wrong", text: "Lymphocyte" }]));
+    const g2 = m2.grades;
+    ok(m2.updated === 1 && m2.merged === 1 && m2.skipped === 1, `re-send: updated ${m2.updated}, new ${m2.merged}, kept host ${m2.skipped}`);
+    ok(g2.groups[g2.pinGroup.p0].text === "Lymphocyte" && g2.groups[g2.pinGroup.p1].text === "host says no", "re-sent grade replaces the guest's own, not the host's");
+  }
+
+  // host and a guest grade the same pins blind
+  {
+    const s = base();
+    s.grades.checks = Object.fromEntries(["p0", "p1", "p2"].map((id) => [id, { taskId: T, graders: [HOST, "Ana"], verdicts: [], state: "waiting" as const }]));
+    s.handoffs = [{ id: "pk", guest: "Ana", createdAt: 0, taskIds: [T], pinIds: ["p0", "p1", "p2", "p3"], checkPins: ["p0", "p1", "p2"], status: "out" }];
+    const away = awayPins(s);
+    ok(!away.has("p0") && away.has("p3"), "pins the host also grades aren't locked; the guest's own are");
+    const pack = makePack({ ...s, grades: { ...s.grades, groups: { z: { id: "z", taskId: T, status: "correct", text: "", pinIds: ["p0", "p7"], createdAt: 0 } }, pinGroup: { p0: "z", p7: "z" } } }, "Ana", [T], ["p0", "p1", "p2", "p3"]);
+    ok(!pack.session.grades.pinGroup.p0 && pack.session.grades.pinGroup.p7 === "z" && !("checks" in pack.session.grades), "pack leaves out grades on the guest's pins (blind) and the checks");
+    // host grades p0 correct, p1 correct; guest says p0 correct, p1 wrong, p2 wrong
+    hostGrade(s.grades, ["p0", "p1"], "correct", "");
+    ok(s.grades.checks!.p0.state === "waiting" && !!s.grades.pinGroup.p0, "host's verdict recorded; waits for the guest");
+    const m = mergeResult(s, result("pk", "Ana", [{ ids: ["p0", "p3"], status: "correct", text: "" }, { ids: ["p1", "p2"], status: "wrong", text: "Neutrophil" }]));
+    const g = m.grades;
+    ok(g.checks!.p0.state === "agreed" && !!g.pinGroup.p0, "agreement keeps the grade");
+    ok(g.checks!.p1.state === "conflict" && !g.pinGroup.p1 && conflictPins(g).join() === "p1", "disagreement: pin left ungraded and flagged");
+    ok(g.checks!.p2.state === "waiting" && !g.pinGroup.p2 && m.waiting === 1 && m.conflicts === 1, "host hasn't graded p2 yet: guest's grade stays hidden");
+    // host grades p2 wrong with a matching reason: agreed. Then settles p1 with Ana's grade.
+    const n = hostGrade(g, ["p2"], "wrong", "neutrophils");
+    ok(n === 0 && g.checks!.p2.state === "agreed", "host's later verdict is compared on the spot");
+    const r = resolveWith(g, ["p1"], "Ana", pinMap);
+    ok(r.checks!.p1.state === "resolved" && r.groups[r.pinGroup.p1].by === "Ana" && r.groups[r.pinGroup.p1].text === "Neutrophil", "resolve with one grader's verdict");
+    const st = agreement(r).find((x) => x.a === HOST || x.b === HOST)!;
+    ok(st.pins === 3 && st.agree === 2, `agreement counted (${st.agree}/${st.pins}, κ ${st.kappa?.toFixed(2)})`);
+  }
+
+  // two guests grade the same pins; the host only settles
+  {
+    const s = base();
+    s.grades.checks = { p4: { taskId: T, graders: ["Ana", "Ben"], verdicts: [], state: "waiting" }, p5: { taskId: T, graders: ["Ana", "Ben"], verdicts: [], state: "waiting" } };
+    s.handoffs = [
+      { id: "a", guest: "Ana", createdAt: 0, taskIds: [T], pinIds: ["p4", "p5"], checkPins: ["p4", "p5"], status: "out" },
+      { id: "b", guest: "Ben", createdAt: 0, taskIds: [T], pinIds: ["p4", "p5"], checkPins: ["p4", "p5"], status: "out" },
+    ];
+    ok(awayPins(s).has("p4"), "pins only guests grade are locked for the host");
+    const m1 = mergeResult(s, result("a", "Ana", [{ ids: ["p4", "p5"], status: "correct", text: "" }]));
+    const s1 = { ...s, grades: m1.grades, handoffs: m1.handoffs };
+    ok(!m1.grades.pinGroup.p4 && m1.waiting === 2, "first guest's verdicts wait for the second");
+    const m2 = mergeResult(s1, result("b", "Ben", [{ ids: ["p4"], status: "correct", text: "" }, { ids: ["p5"], status: "wrong", text: "Fibroblast" }]));
+    ok(m2.grades.groups[m2.grades.pinGroup.p4].by === "Ana & Ben" && m2.conflicts === 1 && !m2.grades.pinGroup.p5, "agreeing guests share the grade; the other pin is a disagreement");
+    // the host grading a disagreed pin settles it
+    const g = m2.grades;
+    hostGrade(g, ["p5"], "correct", "");
+    ok(g.checks!.p5.state === "resolved" && conflictPins(g).length === 0, "host's own grade settles a disagreement");
+    // recall: Ben's pack recalled before he returned → Ana's verdict alone decides
+    const r = recallChecks(m1.grades, "Ben", ["p4", "p5"], pinMap);
+    ok(r.checks!.p4.state === "agreed" && r.groups[r.pinGroup.p4].by === "Ana", "after a recall the remaining grader's verdict stands");
+  }
+
+  // recalled and handed on: two guests end up grading the same pin → compared, not silently overwritten
+  {
+    const s = base();
+    s.handoffs = [
+      { id: "a", guest: "Ana", createdAt: 0, taskIds: [T], pinIds: ["p6"], status: "recalled" },
+      { id: "b", guest: "Ben", createdAt: 0, taskIds: [T], pinIds: ["p6"], status: "out" },
+    ];
+    const m1 = mergeResult(s, result("b", "Ben", [{ ids: ["p6"], status: "correct", text: "" }]));
+    const m2 = mergeResult({ ...s, grades: m1.grades, handoffs: m1.handoffs }, result("a", "Ana", [{ ids: ["p6"], status: "wrong", text: "Mast cell" }]));
+    ok(m2.conflicts === 1 && m2.grades.checks!.p6.graders.join() === "Ben,Ana", "late results from a recalled pack become a disagreement");
+  }
+
+  // a file from a newer version says so
+  let msg = "";
+  try { parsePack(JSON.stringify({ kind: "msg-handoff", version: 2 })); } catch (e) { msg = String(e); }
+  ok(/newer version/.test(msg), "newer pack format: asks to update the app");
+}
+
 // ---- help wiki (docs/help): parses, nested lists survive, every link/anchor/image exists ----
 {
   const dir = path.resolve("../docs/help"); // run from app/
@@ -268,7 +390,7 @@ ok(!!dbl && studentResults(session, dbl, defaultSettings)[0].text === defaultSet
   ok(bad.length === 0, `help links and images resolve${bad.length ? `: ${bad.join("; ")}` : ""}`);
   const ho = docs.get("handoff.md")!;
   const steps = ho.blocks.find((b) => b.t === "ol") as { items: { text: string; sub: string[]; more: string[] }[] } | undefined;
-  ok(!!steps && steps.items.length === 4 && steps.items[2].sub.length === 3 && steps.items[2].more.length === 1, `nested list parsed (${steps?.items.map((i) => `${i.sub.length}/${i.more.length}`)})`);
+  ok(!!steps && steps.items.length === 4 && steps.items[2].sub.length === 4 && steps.items[2].more.length === 1, `nested list parsed (${steps?.items.map((i) => `${i.sub.length}/${i.more.length}`)})`);
   // every help reference in the app (data-help="a/b", showHelp("a/b"), HELP_ANCHOR, PANEL_HELP) points somewhere real
   const srcDir = path.resolve("src");
   const refs = new Set<string>();

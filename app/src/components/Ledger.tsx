@@ -143,6 +143,11 @@ export function Ledger({ session, task, tasks, doubles, settings, studentName }:
                   ) : (
                     g.text || <span className="q">no reason</span>
                   )}
+                  {g.by && (
+                    <span className="by" title={`Graded by ${g.by}`}>
+                      {g.by}
+                    </span>
+                  )}
                 </span>
               )}
               <span className="src">{taskLabel(g.taskId)}</span>

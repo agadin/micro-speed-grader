@@ -2483,16 +2483,56 @@ body.drag-sorting * {
   gap: 2px;
   font: 600 11.5px var(--sans);
 }
-.ho-bar span {
+.ho-seg {
+  position: relative;
+  display: flex;
+  min-width: 0;
+  overflow: hidden;
+  transition: flex-grow 0.25s cubic-bezier(0.2, 0.8, 0.3, 1);
+}
+.ho-seg > i {
+  display: block;
+  flex-basis: 0;
+  min-width: 0;
+  transition: flex-grow 0.25s cubic-bezier(0.2, 0.8, 0.3, 1);
+}
+.ho-seg-own {
+  background: var(--hue);
+}
+/* pins this person grades on someone else's image: the same colour, striped */
+.ho-seg-twice,
+.ho-key.twice {
+  background: repeating-linear-gradient(135deg, var(--hue) 0 4px, color-mix(in srgb, var(--hue) 35%, transparent) 4px 8px);
+}
+.ho-seg-l {
+  position: absolute;
+  inset: 0;
   display: flex;
   align-items: center;
   padding: 0 8px;
-  min-width: 0;
   white-space: nowrap;
   overflow: hidden;
   color: #17161a;
   text-shadow: none;
-  transition: flex-grow 0.25s cubic-bezier(0.2, 0.8, 0.3, 1);
+}
+.ho-seg-x {
+  margin-left: 4px;
+  font-weight: 500;
+  opacity: 0.75;
+}
+.ho-legend {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  margin-top: -4px;
+}
+.ho-key {
+  display: inline-block;
+  width: 14px;
+  height: 9px;
+  border-radius: 2px;
+  --hue: var(--accent);
+  background: var(--hue);
 }
 .ho-cols {
   display: grid;
@@ -3241,4 +3281,216 @@ body.drag-sorting * {
 }
 .help-q {
   font: 600 14px var(--sans);
+}
+
+/* ---------- hand-off: grade twice ---------- */
+.ho-twice {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 8px 12px;
+  padding: 8px 12px;
+  border-radius: 10px;
+  border: 1px solid var(--sep);
+  background: rgba(255, 255, 255, 0.03);
+}
+.ho-twice.on {
+  border-color: var(--accent-soft);
+}
+.ho-twice-l,
+.ho-twice-me {
+  display: inline-flex;
+  align-items: center;
+  gap: 7px;
+  font-weight: 600;
+}
+.ho-twice-me {
+  font-weight: 400;
+  margin-left: auto;
+}
+.ho-twice input[type="range"] {
+  width: 140px;
+}
+.ho-twice-pct {
+  font: 600 12px var(--mono);
+  min-width: 32px;
+}
+.ho-twice-sum {
+  flex-basis: 100%;
+}
+.ho-twice-n {
+  color: var(--tx-3);
+  font-weight: 500;
+}
+
+/* ---------- graders: who graded, notices, disagreements ---------- */
+.ledger .by {
+  margin-left: 8px;
+  padding: 1px 6px;
+  border-radius: 999px;
+  background: var(--fill-1);
+  color: var(--tx-3);
+  font-size: 11px;
+  font-weight: 500;
+}
+.notice-banner {
+  position: absolute;
+  z-index: 7;
+  top: 14px;
+  left: calc((100% - var(--panel-w, 0px)) / 2);
+  transform: translateX(-50%);
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  max-width: min(640px, calc(100% - 32px));
+  padding: 6px 6px 6px 14px;
+  border-radius: 12px;
+  background: rgba(24, 24, 26, 0.9);
+  border: 1px solid var(--glass-edge);
+  box-shadow: var(--glass-shadow);
+  color: #ececec;
+  font-size: 12.5px;
+  animation: tip-in 0.15s ease-out;
+}
+.notice-banner.conflict {
+  border-color: rgba(255, 123, 110, 0.45);
+}
+.notice-x {
+  width: 22px;
+  height: 22px;
+  padding: 0;
+  background: none;
+  border: 0;
+  box-shadow: none;
+  color: var(--tx-3);
+}
+.conflicts-btn {
+  color: var(--bad);
+  border-color: rgba(255, 123, 110, 0.35);
+}
+.conflicts-btn b {
+  margin-left: 4px;
+  font-family: var(--mono);
+}
+.conflicts-modal {
+  width: min(720px, calc(100vw - 32px));
+  max-height: calc(100vh - 48px);
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+}
+.cf-list {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  overflow: auto;
+  min-height: 0;
+}
+.cf-row {
+  padding: 10px 12px;
+  border-radius: 10px;
+  border: 1px solid var(--sep);
+  background: rgba(255, 255, 255, 0.03);
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+.cf-head {
+  display: flex;
+  justify-content: space-between;
+  align-items: baseline;
+}
+.cf-verdicts {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+  align-items: stretch;
+}
+.cf-v {
+  flex: 1 1 200px;
+  height: auto;
+  min-height: 44px;
+  display: grid;
+  grid-template-columns: 1fr auto;
+  grid-template-rows: auto auto;
+  justify-content: stretch;
+  align-items: center;
+  gap: 2px 10px;
+  padding: 7px 10px;
+  text-align: left;
+  white-space: normal;
+}
+.cf-who {
+  font-size: 11px;
+  color: var(--tx-3);
+}
+.cf-what {
+  grid-row: 2;
+  font-weight: 600;
+}
+.cf-v.correct .cf-what {
+  color: var(--ok);
+}
+.cf-v.wrong .cf-what {
+  color: var(--bad);
+}
+.cf-use {
+  grid-row: 1 / 3;
+  grid-column: 2;
+  font-size: 11.5px;
+  color: var(--tx-3);
+}
+.cf-v:hover:not(:disabled) .cf-use {
+  color: var(--accent);
+}
+.cf-stats table {
+  width: 100%;
+  border-collapse: collapse;
+  font-size: 12px;
+}
+.cf-stats th {
+  text-align: left;
+  color: var(--tx-3);
+  font-weight: 600;
+}
+.cf-stats th,
+.cf-stats td {
+  padding: 5px 6px;
+  border-bottom: 1px solid var(--sep);
+}
+.warn-text {
+  color: var(--bad);
+}
+/* a person's target share on their chip */
+.ho-pct {
+  display: inline-flex;
+  align-items: center;
+  gap: 1px;
+  margin-left: 2px;
+  padding: 1px 6px 1px 4px;
+  border-radius: 999px;
+  background: rgba(0, 0, 0, 0.25);
+  color: var(--tx-3);
+  font: 500 11.5px var(--mono);
+}
+.ho-pct input {
+  width: 30px;
+  height: auto;
+  padding: 0;
+  border: 0;
+  background: none;
+  box-shadow: none;
+  outline: none;
+  color: var(--tx-1);
+  font: inherit;
+  text-align: right;
+  -moz-appearance: textfield;
+}
+.ho-pct input::-webkit-inner-spin-button,
+.ho-pct input::-webkit-outer-spin-button {
+  -webkit-appearance: none;
+  margin: 0;
+}
+.ho-pct:focus-within {
+  box-shadow: 0 0 0 1px var(--accent);
 }

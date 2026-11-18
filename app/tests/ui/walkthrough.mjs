@@ -579,6 +579,13 @@ await step("hand off: host splits work, guest grades the pack, host merges resul
   expect((await page.locator(".help-panel").innerText()).includes("Add grader"), "help panel missing hand-off topic");
   await page.keyboard.press("Escape");
   expect((await page.locator(".help-panel").count()) === 0, "Esc didn't close help");
+  // percentages: give yourself 0% → your column empties, and the other two shares rise to 100 between them
+  await page.locator(".ho-chip.you .ho-pct input").fill("0");
+  await page.waitForTimeout(200);
+  const mine = await page.locator('.ho-col[data-col="0"] .ho-card').count();
+  const pcts = await page.locator(".ho-pct input").evaluateAll((xs) => xs.map((x) => Number(x.value)));
+  expect(mine === 0 && pcts[0] === 0 && pcts[1] + pcts[2] === 100, `0% for you: ${mine} cards left, shares ${pcts}`);
+  await page.locator(".ho-chip.you .ho-pct input").fill("34");
   await page.getByRole("button", { name: "Remove Sam" }).click();
   await page.getByRole("button", { name: "Keep all" }).click();
   const card = page.locator(".ho-col.you .ho-card").last();
@@ -638,6 +645,122 @@ await step("hand off: host splits work, guest grades the pack, host merges resul
   expect(pack.status === "returned" && pack.pinIds.every((id) => after.grades.pinGroup[id]), "pack pins not merged into host grades");
   await page.locator(".handoff-modal").getByRole("button", { name: "Close", exact: true }).click();
   return `${cardLabel}: ${n} pins handed to Jamie, graded, merged — "${msg}"`;
+});
+
+await step("grade twice: blind overlap with a guest, disagreements settled", async () => {
+  const PACK = path.join(WORK, "kim.msgpack");
+  const GUEST = path.join(WORK, "kim.msgrade");
+  const RESULT = path.join(WORK, "kim.msgresult");
+  const nothingLeft = () => page.getByText("Nothing left on this image").count();
+  // host: one image to Kim, 15% of pins graded twice, host included
+  await page.getByRole("button", { name: "Hand off" }).click();
+  await page.locator(".handoff-modal").waitFor();
+  await page.locator(".ho-name").first().fill("Kim");
+  await page.getByRole("button", { name: "Keep all" }).click();
+  const card = page.locator('.ho-col[data-col="0"] .ho-card').last();
+  const label = (await card.locator(".ho-l").innerText()).trim();
+  await card.click();
+  await page.locator(".ho-twice-l input").check();
+  await page.mouse.move(5, 5);
+  await page.waitForTimeout(600);
+  await snap("twice-plan");
+  await dialog(PACK);
+  await page.getByRole("button", { name: /Create pack/ }).click();
+  await page.locator(".handoff-modal .ok-text").waitFor({ timeout: 5000 });
+  await page.waitForTimeout(900);
+  const checks = Object.values(session().grades.checks ?? {});
+  expect(checks.length > 0 && checks.every((c) => c.graders.includes("@host") && c.graders.includes("Kim") && c.state === "waiting"), `checks: ${checks.length}`);
+  await page.locator(".handoff-modal").getByRole("button", { name: "Close", exact: true }).click();
+
+  // host: on Kim's image only the overlap pins are open to the host; mark them all wrong
+  const opts = await page.locator(".topbar select option").allInnerTexts();
+  const idx = opts.findIndex((o) => o.startsWith(label));
+  await page.locator(".topbar select").selectOption({ index: idx });
+  await waitTiles();
+  await page.keyboard.press("h");
+  await page.waitForTimeout(900);
+  await snap("twice-host-blind");
+  await page.keyboard.press("f");
+  await page.waitForTimeout(600);
+  let hostGraded = 0;
+  for (let i = 0; i < 80 && !(await nothingLeft()); i++) {
+    const n = parseInt((await page.locator(".vtool").innerText()).match(/(\d+)\s*selected/)?.[1] ?? "0");
+    await page.keyboard.press("w");
+    await page.waitForTimeout(80);
+    await page.keyboard.type("Neutrophil");
+    await page.keyboard.press("Enter");
+    await page.waitForTimeout(150);
+    hostGraded += n;
+  }
+  await page.waitForTimeout(900);
+  const onKim = checks.filter((c) => c.taskId === session().handoffs.at(-1).taskIds[0]).length;
+  expect(hostGraded > 0, `host graded ${hostGraded} overlap pins on ${label} (${onKim} planned there)`);
+
+  // guest: grade everything correct, send results
+  await page.locator('button[title="Save and close session"]').click();
+  await page.locator(".startup").waitFor();
+  await dialog(PACK, path.join(ROOT, "images"), GUEST);
+  await page.getByRole("button", { name: "Got work from another grader?" }).click();
+  await page.locator(".topbar").waitFor({ timeout: 30000 });
+  await waitTiles();
+  const sendBtn = page.getByRole("button", { name: /Send results/ }).first();
+  const total = (await sendBtn.innerText()).match(/\/(\d+)/)[1];
+  for (let i = 0; i < 600 && !(await sendBtn.innerText()).includes(`${total}/${total}`); i++) {
+    if (await nothingLeft()) await page.keyboard.press("Meta+ArrowRight"), await page.waitForTimeout(400);
+    else await page.keyboard.press("c"), await page.waitForTimeout(110);
+  }
+  expect((await sendBtn.innerText()).includes(`${total}/${total}`), `guest couldn't finish: ${await sendBtn.innerText()}`);
+  await dialog(RESULT);
+  await sendBtn.click();
+  await page.waitForTimeout(800);
+
+  // host: import → disagreements → settle with Kim's grades
+  await page.locator('button[title="Save and close session"]').click();
+  await page.locator(".startup").waitFor();
+  await dialog(SESSION);
+  await page.getByRole("button", { name: "Open session…" }).click();
+  await page.locator(".topbar").waitFor({ timeout: 30000 });
+  await page.getByRole("button", { name: "Hand off" }).click();
+  await dialog(RESULT);
+  await page.getByRole("button", { name: "Import results…" }).click();
+  await page.locator(".handoff-modal p.warn, .handoff-modal .ok-text").first().waitFor({ timeout: 5000 });
+  const msg = await page.locator(".handoff-modal p.warn, .handoff-modal .ok-text").first().innerText();
+  await snap("twice-imported");
+  await page.locator(".handoff-modal").getByRole("button", { name: "Close", exact: true }).click();
+  // show the flagged pins on Kim's image
+  {
+    const o = await page.locator(".topbar select option").allInnerTexts();
+    await page.locator(".topbar select").selectOption({ index: o.findIndex((x) => x.startsWith(label)) });
+    await waitTiles();
+    await page.keyboard.press("h");
+    await page.waitForTimeout(900);
+    await snap("twice-flagged");
+  }
+  const btn = page.locator(".conflicts-btn");
+  await btn.waitFor({ timeout: 3000 });
+  const nConf = parseInt(await btn.locator("b").innerText());
+  expect(nConf === hostGraded && /disagreement/.test(msg), `${nConf} disagreements for ${hostGraded} host-graded overlap pins; "${msg}"`);
+  await btn.click();
+  await page.locator(".conflicts-modal").waitFor();
+  await snap("twice-disagreements");
+  const stats = await page.locator(".cf-stats").innerText();
+  // "Grade myself": the pins are shown selected on the slide
+  await page.getByRole("button", { name: "Grade myself" }).first().click();
+  await page.waitForTimeout(1200);
+  await snap("twice-grade-myself");
+  expect((await page.locator(".vtool").innerText()).includes(`${nConf} selected`), "Grade myself didn't select the pins");
+  await page.locator(".conflicts-btn").click();
+  await page.locator(".conflicts-modal").waitFor();
+  for (let i = 0; i < 20 && (await page.locator(".cf-v", { hasText: "Kim" }).count()); i++) await page.locator(".cf-v", { hasText: "Kim" }).first().click();
+  await page.getByRole("button", { name: "Done" }).click();
+  await page.waitForTimeout(900);
+  await page.locator(".ledger").getByText("All images", { exact: true }).click();
+  await page.waitForTimeout(300);
+  await snap("twice-settled");
+  await page.locator(".ledger").getByText("All images", { exact: true }).click();
+  const left = Object.values(session().grades.checks).filter((c) => c.state === "conflict").length;
+  expect(left === 0 && (await btn.count()) === 0, `${left} disagreements left after settling`);
+  return `${checks.length} pins graded twice; host marked ${hostGraded} wrong on ${label}, Kim correct → ${nConf} disagreements, settled. ${stats.split("\n").slice(-1)[0]}`;
 });
 
 await step("help: styled tooltip → ? → article; help search; preferences search and About", async () => {

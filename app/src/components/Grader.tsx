@@ -11,10 +11,11 @@ import {
 } from "../lib/grading";
 import { computeClusters, type Cluster } from "../lib/cluster";
 import { openSlide, dirname, joinPath, showHelp, writeText } from "../lib/backend";
-import { awayPins, awayTasks, guestProgress, makeResult } from "../lib/handoff";
+import { awayPins, awayTasks, conflictPins, guestProgress, makeResult } from "../lib/handoff";
 import { safeFileName } from "../lib/exportCsv";
 import { save } from "@tauri-apps/plugin-dialog";
 import { HandoffDialog } from "./HandoffDialog";
+import { ConflictsDialog } from "./ConflictsDialog";
 import type { Session, SlideInfo } from "../lib/types";
 import { SlideViewer, type ViewerApi } from "./SlideViewer";
 import { ContextMenu } from "./ContextMenu";
@@ -191,6 +192,14 @@ export function Grader({ session }: { session: Session }) {
     [session.pins, task, g, locked],
   );
   /** pins of this image that are out with another grader */
+  const conflicts = useMemo(() => conflictPins(session.grades), [session.grades]);
+  const flagged = useMemo(() => new Set(conflicts), [conflicts]);
+  // notices (replaced someone's grade / new disagreements) fade on their own
+  useEffect(() => {
+    if (!st.notice) return;
+    const t = setTimeout(() => useStore.getState().set({ notice: null }), 9000);
+    return () => clearTimeout(t);
+  }, [st.notice]);
   const lockedHere = useMemo(
     () => (task && !guestPack ? pinsForTask(session.pins, task, g).filter((p) => locked.has(p.id)).length : 0),
     [session.pins, task, g, locked, guestPack],
@@ -580,7 +589,7 @@ export function Grader({ session }: { session: Session }) {
         t.tagName === "SELECT")
     )
       return;
-    if (st.menu || st.settingsOpen || st.exportOpen || st.handoffOpen) return;
+    if (st.menu || st.settingsOpen || st.exportOpen || st.handoffOpen || st.conflictsOpen) return;
     const mod = isMac ? e.metaKey : e.ctrlKey;
     const k = e.key;
     if (mod && k.toLowerCase() === "z") {
@@ -755,6 +764,16 @@ export function Grader({ session }: { session: Session }) {
           </button>
         ) : (
           <>
+            {conflicts.length > 0 && (
+              <button
+                className="btn conflicts-btn"
+                onClick={() => st.set({ conflictsOpen: true })}
+                title="Pins two graders marked differently: choose whose grade to keep"
+                data-help="handoff/settle-disagreements"
+              >
+                Disagreements <b>{conflicts.length}</b>
+              </button>
+            )}
             <button className="btn ghost" onClick={() => st.set({ handoffOpen: true })} title="Share the remaining work with other graders" data-help="handoff">
               <IconHandoff /> Hand off
             </button>
@@ -804,6 +823,7 @@ export function Grader({ session }: { session: Session }) {
               pins={taskPins}
               otherPins={otherPins}
               states={states}
+              flagged={flagged}
               selection={selection}
               cluster={cluster}
               isolate={st.isolate}
@@ -870,6 +890,36 @@ export function Grader({ session }: { session: Session }) {
                 swap={settings.swapMouse}
                 onClose={() => setSettings({ showKeyHints: false })}
               />
+            )}
+            {st.notice && (
+              <div className={`notice-banner ${st.notice.kind}`} role="status" data-help={st.notice.kind === "conflict" ? "handoff/settle-disagreements" : "handoff/replacing-another-graders-grade"}>
+                <span>{st.notice.text}</span>
+                {st.notice.kind === "conflict" ? (
+                  <button className="btn ghost small" onClick={() => st.set({ conflictsOpen: true, notice: null })}>
+                    Show
+                  </button>
+                ) : (
+                  <>
+                    {st.notice.undo && (
+                      <button
+                        className="btn ghost small"
+                        onClick={() => {
+                          st.undo();
+                          st.set({ notice: null });
+                        }}
+                      >
+                        Undo
+                      </button>
+                    )}
+                    <button className="btn ghost small" onClick={() => st.set({ overrideQuiet: true, notice: null })}>
+                      Don't warn again
+                    </button>
+                  </>
+                )}
+                <button className="notice-x" onClick={() => st.set({ notice: null })} aria-label="Dismiss" title="Dismiss">
+                  ×
+                </button>
+              </div>
             )}
             {lockedHere > 0 && (
               <div className="handoff-banner">
@@ -1064,6 +1114,7 @@ export function Grader({ session }: { session: Session }) {
           onPaintGrade={gradePainted}
         />
       )}
+      {st.conflictsOpen && <ConflictsDialog session={session} tasks={tasks} onClose={() => st.set({ conflictsOpen: false })} />}
       {st.handoffOpen && (
         <HandoffDialog session={session} tasks={tasks} onClose={() => st.set({ handoffOpen: false })} />
       )}

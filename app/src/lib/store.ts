@@ -1,6 +1,6 @@
 import { create } from "zustand";
 import type { GradeState, GradeStatus, Group, Session } from "./types";
-import type { Handoff } from "./handoff";
+import { graderLabel, hostGraded, type Handoff } from "./handoff";
 import { writeText } from "./backend";
 
 const uid = () => Math.random().toString(36).slice(2, 10) + Date.now().toString(36).slice(-4);
@@ -37,6 +37,11 @@ interface Store {
   settingsOpen: boolean;
   exportOpen: boolean;
   handoffOpen: boolean;
+  conflictsOpen: boolean;
+  /** a one-line notice over the slide (e.g. "you replaced Jamie's grade") with optional undo */
+  notice: { kind: "override" | "conflict"; text: string; undo?: boolean } | null;
+  /** "don't warn me again" for replacing other graders' grades, until the app is closed */
+  overrideQuiet: boolean;
   /** help viewer: null = closed, "" = topic list, else a topic id */
   help: string | null;
   startupIntent: null | "new" | "open";
@@ -64,7 +69,23 @@ const cloneGrades = (g: GradeState): GradeState => ({
   groups: { ...g.groups },
   pinGroup: { ...g.pinGroup },
   assign: { ...g.assign },
+  ...(g.checks ? { checks: { ...g.checks } } : {}),
 });
+
+/** other graders whose grades on these pins are about to be replaced, e.g. ["Jamie"] and how many pins */
+function othersOn(g: GradeState, pinIds: string[]) {
+  const names = new Map<string, number>();
+  for (const id of pinIds) {
+    const by = g.groups[g.pinGroup[id]]?.by;
+    if (by) names.set(by, (names.get(by) ?? 0) + 1);
+  }
+  return names;
+}
+const overrideText = (names: Map<string, number>) => {
+  const n = [...names.values()].reduce((a, b) => a + b, 0);
+  const who = [...names.keys()].map(graderLabel).join(", ");
+  return `${n} pin${n === 1 ? " was" : "s were"} graded by ${who}. Your grade replaced theirs.`;
+};
 
 /** Remove pins from whatever group they're in (deleting emptied groups). */
 function detach(g: GradeState, pinIds: string[]) {
@@ -123,6 +144,9 @@ export const useStore = create<Store>((set, get) => {
     settingsOpen: false,
     exportOpen: false,
     handoffOpen: false,
+    conflictsOpen: false,
+    notice: null,
+    overrideQuiet: false,
     help: null,
     startupIntent: null,
 
@@ -144,6 +168,8 @@ export const useStore = create<Store>((set, get) => {
       batches = batches.filter((b) => b.pinIds.length);
       if (!s || !batches.length) return;
       const g = cloneGrades(s.grades);
+      const all = batches.flatMap((b) => b.pinIds);
+      const others = othersOn(g, all);
       for (const { pinIds, status, text } of batches) {
         detach(g, pinIds);
         const id = uid();
@@ -154,25 +180,38 @@ export const useStore = create<Store>((set, get) => {
           if (pin && pin.q === null) g.assign[p] = assignQ;
         }
       }
+      // pins graded twice: record your verdict, or settle a disagreement with your grade
+      const conflicts = g.checks ? hostGraded(g, all, new Map(s.pins.map((p) => [p.id, p]))) : 0;
       commit(g);
-      set({ selection: [], menu: null, isolate: false });
+      const notice = conflicts
+        ? { kind: "conflict" as const, text: `${conflicts} pin${conflicts === 1 ? "" : "s"} you graded disagree${conflicts === 1 ? "s" : ""} with another grader. They're flagged in Disagreements.` }
+        : others.size && !get().overrideQuiet
+          ? { kind: "override" as const, text: overrideText(others), undo: true }
+          : null;
+      set({ selection: [], menu: null, isolate: false, ...(notice ? { notice } : {}) });
     },
 
     ungrade: (pinIds) => {
       const s = get().session;
       if (!s) return;
       const g = cloneGrades(s.grades);
+      const others = othersOn(g, pinIds);
       detach(g, pinIds);
       for (const p of pinIds) delete g.assign[p];
       commit(g);
+      if (others.size && !get().overrideQuiet)
+        set({ notice: { kind: "override", text: overrideText(others).replace("Your grade replaced theirs.", "You removed their grade."), undo: true } });
     },
 
     editGroup: (groupId, patch) => {
       const s = get().session;
       if (!s || !s.grades.groups[groupId]) return;
       const g = cloneGrades(s.grades);
-      g.groups[groupId] = { ...g.groups[groupId], ...patch };
+      const by = g.groups[groupId].by;
+      g.groups[groupId] = { ...g.groups[groupId], ...patch, by: undefined };
       commit(g);
+      if (by && !get().overrideQuiet)
+        set({ notice: { kind: "override", text: `You changed a grade ${graderLabel(by)} gave. It's now yours.`, undo: true } });
     },
 
     undo: () => {

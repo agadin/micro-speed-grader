@@ -1,5 +1,5 @@
 // Screenshots and short GIFs for the help wiki (docs/help/img), taken from the demo class.
-//   (dev server running)  node tests/ui/record-wiki-media.mjs
+//   (dev server running)  node tests/ui/record-wiki-media.mjs [file …]   (only those files, e.g. disagreements.png)
 // The selection-tool clips come from record-help-gifs.mjs.
 import fs from "node:fs";
 import path from "node:path";
@@ -23,6 +23,8 @@ const page = await context.newPage();
 const wait = (ms) => page.waitForTimeout(ms);
 const dialog = (...a) => page.evaluate((x) => window.__dialogQueue.push(...x), a);
 const made = [];
+const ONLY = process.argv.slice(2);
+const wanted = (name) => !ONLY.length || ONLY.includes(name);
 const cursor = (on) => page.evaluate((v) => document.getElementById("__cur") && (document.getElementById("__cur").style.display = v ? "" : "none"), on);
 const pad = (b, p, bounds = { width: W, height: H }) => {
   const x = Math.max(0, b.x - p), y = Math.max(0, b.y - p);
@@ -47,6 +49,7 @@ const mask = () =>
     for (const el of document.querySelectorAll("input")) if (el.value !== fix(el.value)) el.value = fix(el.value);
   }, ROOT);
 async function shot(name, target, { pad: p = 0, jpeg = name.endsWith(".jpg") } = {}) {
+  if (!wanted(name)) return;
   await cursor(false);
   await mask();
   const file = path.join(OUT, name);
@@ -59,6 +62,12 @@ async function shot(name, target, { pad: p = 0, jpeg = name.endsWith(".jpg") } =
   await cursor(true);
   made.push(`${name} ${(fs.statSync(file).size / 1e3).toFixed(0)} kB`);
   console.log("made", made.at(-1));
+}
+/** record a GIF, or (when it isn't wanted this run) just do the actions */
+async function maybeGif(name, opts, fn) {
+  if (wanted(name)) return recordGif(context, page, opts, fn);
+  await fn();
+  return { kb: 0, frames: 0 };
 }
 let mx = W / 2, my = H / 2;
 async function glide(x, y, ms = 500) {
@@ -145,7 +154,7 @@ await page.evaluate(() => (window.__noKeys = false));
   const crop = { x: 0, y: 44, width: right.x - 8, height: tb.y + tb.height + 8 - 44 };
   await page.evaluate((a) => (window.__keyAt = a), { x: 40, y: crop.y + crop.height - 120 });
   await glide(crop.width / 2 + 160, crop.height / 2 + 120, 200);
-  const r = await recordGif(context, page, { file: path.join(OUT, "grade-cluster.gif"), crop, work: WORK, width: 720 }, async () => {
+  const r = await maybeGif("grade-cluster.gif", { file: path.join(OUT, "grade-cluster.gif"), crop, work: WORK, width: 720 }, async () => {
     await wait(700);
     await key("c", 1500);
     await key("w", 600);
@@ -169,6 +178,11 @@ await page.getByRole("button", { name: "Split evenly" }).click();
 await wait(400);
 await page.mouse.move(5, 5);
 await shot("handoff.png", ".handoff-modal");
+await page.locator(".ho-twice-l input").check();
+await wait(300);
+await page.mouse.move(5, 5);
+await shot("handoff-twice.png", ".handoff-modal");
+await page.locator(".ho-twice-l input").uncheck();
 {
   const m = await page.locator(".handoff-modal").boundingBox();
   const src = await page.locator('.ho-col[data-col="0"] .ho-card').first().boundingBox();
@@ -176,7 +190,7 @@ await shot("handoff.png", ".handoff-modal");
   mx = src.x + 40;
   my = src.y + 60;
   await page.mouse.move(mx, my);
-  const r = await recordGif(context, page, { file: path.join(OUT, "handoff-drag.gif"), crop: m, work: WORK, width: 640 }, async () => {
+  const r = await maybeGif("handoff-drag.gif", { file: path.join(OUT, "handoff-drag.gif"), crop: m, work: WORK, width: 640 }, async () => {
     await glide(src.x + 60, src.y + src.height / 2, 600);
     await wait(300);
     await page.mouse.down();
@@ -228,9 +242,50 @@ await shot("export-stats.png", ".modal-backdrop .modal");
 await key("Escape", 300);
 if (await page.locator(".modal-backdrop").count()) await page.getByRole("button", { name: "Close", exact: true }).click();
 
-// ---- start screen with the session under Resume ----
+// ---- disagreements: write a few into the session file, reopen, and show the window ----
 await page.locator('button[title="Save and close session"]').click();
 await page.locator(".startup").waitFor();
+{
+  const file = path.join(WORK, "Practical 2.msgrade");
+  const s = JSON.parse(fs.readFileSync(file, "utf8"));
+  const g = s.grades;
+  const pick = (taskId, n) => Object.values(g.groups).filter((x) => x.taskId === taskId).flatMap((x) => x.pinIds).slice(0, n);
+  const now = Date.now();
+  const add = (ids, taskId, a, b) => {
+    for (const id of ids) {
+      const gid = g.pinGroup[id];
+      delete g.pinGroup[id];
+      if (gid && g.groups[gid]) {
+        g.groups[gid].pinIds = g.groups[gid].pinIds.filter((x) => x !== id);
+        if (!g.groups[gid].pinIds.length) delete g.groups[gid];
+      }
+      g.checks ??= {};
+      g.checks[id] = { taskId, graders: [a.by, b.by], verdicts: [{ ...a, at: now }, { ...b, at: now }], state: "conflict" };
+    }
+  };
+  const tasks = [...new Set(Object.values(g.groups).map((x) => x.taskId))];
+  add(pick(tasks[0], 12), tasks[0], { by: "Jamie", status: "correct", text: "" }, { by: "Sam", status: "wrong", text: "Neutrophil" });
+  add(pick(tasks[1], 4), tasks[1], { by: "Jamie", status: "wrong", text: "Lymphocyte" }, { by: "Sam", status: "wrong", text: "Plasma cell" });
+  add(pick(tasks[2], 2), tasks[2], { by: "@host", status: "correct", text: "" }, { by: "Jamie", status: "wrong", text: "Mast cell" });
+  // some agreements too, so the agreement table has numbers
+  for (const id of pick(tasks[3], 30)) g.checks[id] = { taskId: tasks[3], graders: ["Jamie", "Sam"], verdicts: [{ by: "Jamie", status: "correct", text: "", at: now }, { by: "Sam", status: "correct", text: "", at: now }], state: "agreed" };
+  for (const id of pick(tasks[4], 20)) g.checks[id] = { taskId: tasks[4], graders: ["@host", "Jamie"], verdicts: [{ by: "@host", status: "correct", text: "", at: now }, { by: "Jamie", status: "correct", text: "", at: now }], state: "agreed" };
+  fs.writeFileSync(file, JSON.stringify(s));
+}
+await dialog(path.join(WORK, "Practical 2.msgrade"));
+await page.getByRole("button", { name: "Open session…" }).click();
+await page.locator(".topbar").waitFor();
+await wait(1500);
+await page.locator(".conflicts-btn").click();
+await page.locator(".conflicts-modal").waitFor();
+await wait(300);
+await page.mouse.move(5, 5);
+await shot("disagreements.png", ".conflicts-modal");
+await page.getByRole("button", { name: "Done" }).click();
+await page.locator('button[title="Save and close session"]').click();
+await page.locator(".startup").waitFor();
+
+// ---- start screen with the session under Resume ----
 await wait(500);
 await shot("start.png", ".startup-card");
 

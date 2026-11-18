@@ -1,4 +1,4 @@
-import type { GuestPack, Handoff } from "./handoff";
+import type { Check, GuestPack, Handoff } from "./handoff";
 export interface Question {
   num: number;
   /** Slide ids (e.g. "VMS146") the student may answer on. */
@@ -42,6 +42,8 @@ export interface Group {
   text: string;
   pinIds: string[];
   createdAt: number;
+  /** who gave this grade: a hand-off grader's name, or several joined with " & " when they agreed; absent = you */
+  by?: string;
 }
 
 export interface GradeState {
@@ -49,6 +51,8 @@ export interface GradeState {
   pinGroup: Record<string, string>;
   /** Ambiguous pins that the grader assigned to a question by grading them. */
   assign: Record<string, number>;
+  /** pins graded twice (hand-off overlap): each grader's verdict and whether they agree */
+  checks?: Record<string, Check>;
 }
 
 export interface SlideRef {

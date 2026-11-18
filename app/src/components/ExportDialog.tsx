@@ -6,6 +6,7 @@ import { feedbackText, studentResults } from "../lib/grading";
 import { dirname, joinPath, writeText } from "../lib/backend";
 import { exportTable, statsTable, testStats, toCsv, uniqueFileNames, type ExportRow } from "../lib/exportCsv";
 import { CsvPreviewTable, ExportLayoutEditor } from "./ExportLayout";
+import { conflictPins } from "../lib/handoff";
 
 const fmt = (x: number | null, d = 2) => (x === null || !Number.isFinite(x) ? "—" : (x + 0).toFixed(d).replace(/^-(0\.0*)$/, "$1"));
 
@@ -108,6 +109,11 @@ export function ExportDialog({ session, onClose }: { session: Session; onClose: 
           <div className={ungraded ? "warn" : ""}>
             <b>{ungraded}</b> ungraded answers
           </div>
+          {conflictPins(session.grades).length > 0 && (
+            <div className="warn" title="Pins two graders marked differently count as ungraded until you settle them (Disagreements in the top bar)">
+              <b>{conflictPins(session.grades).length}</b> disagreements
+            </div>
+          )}
         </div>
 
         <div className="ex-body">
