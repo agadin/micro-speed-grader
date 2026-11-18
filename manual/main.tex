@@ -1,0 +1,145 @@
+% Micro Speed Grader: user manual (DRAFT).
+% The chapters are generated from the in-app help (docs/help/*.md) by app/scripts/manual.ts:
+%   cd app && npm run manual
+% Edit the help pages, not chapters/*.tex. This file holds the layout, the cover and the key caps.
+\documentclass[10pt]{article}
+\usepackage[margin=0.75in]{geometry}
+\usepackage[T1]{fontenc}
+\usepackage{lmodern}
+\usepackage{microtype}
+\usepackage{booktabs}
+\usepackage[table]{xcolor}
+\usepackage{enumitem}
+\usepackage{fancyhdr}
+\input{version}
+\newcommand{\manualauthors}{Gadin and Le}
+\pagestyle{fancy}
+\fancyhf{}
+\fancyhead[L]{Micro Speed Grader}
+\fancyhead[C]{User Manual \textcolor{draftred}{(Draft)}}
+\fancyhead[R]{Version \appversion}
+\fancyfoot[L]{}
+\fancyfoot[C]{\thepage}
+\fancyfoot[R]{}
+\setlength{\headheight}{15pt}
+\renewcommand{\headrulewidth}{0.4pt}
+\renewcommand{\footrulewidth}{0.4pt}
+\definecolor{accent}{HTML}{1F4E79}
+\definecolor{soft}{HTML}{E8EEF5}
+\definecolor{draftred}{HTML}{B03A2E}
+\setlist{nosep,leftmargin=1.2em}
+\setlength{\parindent}{0pt}
+\setlength{\parskip}{4pt}
+\usepackage{tikz}
+\usepackage{amssymb}
+\usepackage{graphicx}
+\usepackage[most]{tcolorbox}
+\usepackage{tabularx}
+\newcolumntype{Y}{>{\raggedright\arraybackslash}X}
+\usetikzlibrary{calc}
+
+% ---- added for the manual ----
+\usepackage{textcomp}
+\usepackage{pifont}
+\usepackage{alltt}
+\usepackage{qrcode}
+\usepackage{titlesec}
+\usepackage{draftwatermark}
+\SetWatermarkText{DRAFT}
+\SetWatermarkScale{1.1}
+\SetWatermarkColor[gray]{0.94}
+\usepackage[hidelinks]{hyperref}
+\hypersetup{colorlinks=true, linkcolor=accent, urlcolor=accent, pdftitle={Micro Speed Grader: User Manual (Draft, version \appversion)}}
+\setcounter{tocdepth}{2}
+\makeatletter\renewcommand*\l@subsection{\@dottedtocline{2}{1.5em}{2.6em}}\makeatother
+\titleformat{\section}{\Large\bfseries\color{accent}}{\thesection}{0.6em}{}
+\titleformat{\subsection}{\large\bfseries}{\thesubsection}{0.6em}{}
+\titleformat{\subsubsection}{\normalsize\bfseries}{\thesubsubsection}{0.6em}{}
+\titlespacing*{\section}{0pt}{0pt}{6pt}
+\titlespacing*{\subsection}{0pt}{12pt}{3pt}
+
+% key caps: one rounded box per key
+\newtcbox{\keycap}{enhanced, on line, nobeforeafter, tcbox raise base, boxsep=0pt, left=2.6pt, right=2.6pt, top=1.4pt, bottom=1.4pt,
+  arc=2.4pt, boxrule=0.45pt, bottomrule=1.1pt, colback=white, colframe=black!38, fontupper=\footnotesize\sffamily}
+\newcommand{\keyplus}{\kern1.5pt}
+% symbols drawn so any LaTeX engine can typeset them
+\newcommand{\cmdsym}{\tikz[baseline=-0.6ex, x=0.3em, y=0.3em, line width=0.38pt]{%
+  \draw (-0.32,-0.32) rectangle (0.32,0.32);
+  \foreach \sx/\sy in {1/1,-1/1,-1/-1,1/-1} \draw (0.32*\sx+0.24*\sx,0.32*\sy+0.24*\sy) circle (0.26);}}
+\newcommand{\optsym}{\tikz[baseline=-0.1ex, x=0.55em, y=0.55em, line width=0.45pt]{\draw (0,0.8) -- (0.35,0.8) -- (0.8,0) -- (1.15,0); \draw (0.7,0.8) -- (1.15,0.8);}}
+\newcommand{\shiftsym}{\tikz[baseline=-0.1ex, x=0.5em, y=0.5em, line width=0.45pt]{\draw (0.3,0) -- (0.3,0.45) -- (0,0.45) -- (0.6,1.1) -- (1.2,0.45) -- (0.9,0.45) -- (0.9,0) -- cycle;}}
+\newcommand{\returnsym}{\ensuremath{\hookleftarrow}}
+\newcommand{\deletesym}{\textsf{Delete}}
+\newcommand{\tabsym}{\textsf{Tab}}
+\newcommand{\menuarrow}{\,\raisebox{0.15ex}{\scalebox{0.7}{\ensuremath{\blacktriangleright}}}\,}
+\newcommand{\checksym}{\ding{51}}
+\newcommand{\crosssym}{\ding{55}}
+\newcommand{\warnsym}{\tikz[baseline=-0.1ex, x=0.6em, y=0.6em]{\draw[line width=0.45pt, line join=round] (0,0) -- (1,0) -- (0.5,0.9) -- cycle; \node[font=\tiny\bfseries, inner sep=0] at (0.5,0.32) {!};}}
+
+% boxes
+\newtcolorbox{note}{enhanced, breakable, colback=soft, colframe=soft, boxrule=0pt, borderline west={2.2pt}{0pt}{accent},
+  arc=2pt, left=8pt, right=8pt, top=5pt, bottom=5pt, before skip=8pt, after skip=8pt}
+\newtcolorbox{codebox}{enhanced, breakable, colback=black!3, colframe=black!12, boxrule=0.4pt, arc=3pt, left=8pt, right=8pt, top=4pt, bottom=4pt,
+  fontupper=\small, before skip=8pt, after skip=8pt}
+% figures: the screenshot with rounded corners, the caption under it
+\newcommand{\shot}[3]{% width, file, caption
+  \par\begin{center}
+  \tcbox[enhanced, boxsep=0pt, left=0pt, right=0pt, top=0pt, bottom=0pt, arc=5pt, boxrule=0.5pt, colframe=black!22, colback=white, clip upper]%
+    {\includegraphics[width=#1, height=0.40\textheight, keepaspectratio]{#2}}\par\vspace{2pt}
+  {\footnotesize\color{black!60}#3}
+  \end{center}\par}
+
+\begin{document}
+
+% ---------------- cover ----------------
+\begin{titlepage}
+\thispagestyle{empty}
+\SetWatermarkText{}
+\begin{tikzpicture}[remember picture, overlay]
+  \fill[accent] (current page.north west) rectangle ($(current page.north east)+(0,-7.2cm)$);
+  \fill[soft] ($(current page.north west)+(0,-7.2cm)$) rectangle ($(current page.north east)+(0,-7.45cm)$);
+  \node[anchor=north west, inner sep=0] at ($(current page.north west)+(2cm,-1.7cm)$) {\includegraphics[width=2.6cm]{icon.png}};
+  \node[anchor=north west, align=left, text=white, inner sep=0] at ($(current page.north west)+(5.2cm,-1.9cm)$)
+    {{\fontsize{30}{34}\selectfont\bfseries Micro Speed Grader}\\[10pt]{\Large User Manual}};
+  \node[anchor=north west, inner sep=0] at ($(current page.north west)+(5.2cm,-4.6cm)$)
+    {\tcbox[colback=draftred, colframe=draftred, arc=3pt, boxsep=2pt, left=6pt, right=6pt, fontupper=\color{white}\bfseries\large]{DRAFT}};
+  \node[anchor=north west, inner sep=0, text=white] at ($(current page.north west)+(7.8cm,-4.72cm)$)
+    {\large For version \appversion};
+\end{tikzpicture}
+\vspace*{6.6cm}
+
+{\large Grade virtual-microscopy practicals one question at a time.}
+
+\vspace{6pt}
+Students drop a pin on a structure in a whole-slide image. Micro Speed Grader gathers every student's pin for a question onto one slide, groups pins that land on the same structure, and lets you grade a whole group with one key press. When you're done it exports a grades spreadsheet and a feedback note for each student.
+
+\vspace{14pt}
+\begin{tcolorbox}[colback=white, colframe=draftred!70, boxrule=0.6pt, arc=3pt, left=10pt, right=10pt, top=8pt, bottom=8pt]
+\textbf{\color{draftred}This is a draft.} It describes \textbf{Micro Speed Grader \appversion}\appchanges. Built \builddate{} from commit \texttt{\appcommit}. Details and screenshots may change before the final version. The Help built into the app (\textbf{Help} in the menu bar, or the \keycap{?}\ button) is always up to date.
+\end{tcolorbox}
+
+\vfill
+\begin{center}
+\begin{tabular}{@{}c@{\hspace{2.6cm}}c@{}}
+\href{\repourl}{\qrcode[height=3cm, nolink]{\repourl}} & \href{\releaseurl}{\qrcode[height=3cm, nolink]{\releaseurl}}\\[6pt]
+\textbf{Source code and help} & \textbf{Download the app}\\
+\href{\repourl}{\small\texttt{github.com/agadin/micro-speed-grader}} & \href{\releaseurl}{\small\texttt{\ldots/releases/latest}}\\[2pt]
+{\footnotesize\color{black!60}issues, the online help, the code} & {\footnotesize\color{black!60}macOS (Apple silicon and Intel) and Windows}
+\end{tabular}
+\end{center}
+\vspace{1.2cm}
+{\small\color{black!60}\manualauthors\hfill \builddate}
+\end{titlepage}
+
+% ---------------- contents ----------------
+\SetWatermarkText{DRAFT}
+\tableofcontents
+\vspace{10pt}
+\begin{note}
+\textbf{About this manual.} Each section matches a page of the app's built-in Help, in the same order. Links between sections are clickable in the PDF. Animations in the online help appear here as a still picture. On Windows, use \keycap{Ctrl} where this manual shows \keycap{\cmdsym}, and \keycap{Alt} for \keycap{\optsym}.
+\end{note}
+\clearpage
+
+\input{chapters/all}
+
+\end{document}

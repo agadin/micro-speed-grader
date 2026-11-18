@@ -17,3 +17,5 @@ app/src-tauri/lib/
 
 # Claude Code working copies (parallel agents)
 .claude/worktrees/
+manual/build/
+manual/*.zip
