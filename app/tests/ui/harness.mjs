@@ -10,6 +10,8 @@ export const APP = path.resolve(import.meta.dirname, "../..");
 export const ROOT = path.resolve(APP, "..");
 const TILE_PORT = Number(process.env.MSG_TILE_PORT ?? 8787);
 const TILE = `http://127.0.0.1:${TILE_PORT}`;
+/** the dev server (another port with MSG_APP_URL, e.g. when several copies run at once) */
+export const APP_URL = process.env.MSG_APP_URL ?? "http://localhost:1420/";
 
 async function waitFor(url, ms = 120000) {
   const t0 = Date.now();
@@ -130,6 +132,16 @@ const SHIM = (tile) => {
 export async function installShim(context) {
   await context.addInitScript(SHIM, `${TILE}/tile`);
   const issues = [];
+  // a shared tile server only allows the default dev origin: on another port, relay its tiles
+  if (process.env.MSG_APP_URL)
+    await context.route(`${TILE}/tile/**`, async (route) => {
+      try {
+        const r = await route.fetch();
+        await route.fulfill({ response: r, headers: { ...r.headers(), "access-control-allow-origin": new URL(APP_URL).origin } });
+      } catch {
+        await route.abort().catch(() => {});
+      }
+    });
   await context.route("**/__invoke/**", async (route) => {
     const cmd = route.request().url().split("/__invoke/")[1];
     const args = JSON.parse(route.request().postData() || "{}");
@@ -149,7 +161,7 @@ export async function installShim(context) {
  *   initScripts: extra scripts run before the app (e.g. media-kit's drawn cursor)
  */
 export async function launch({
-  url = "http://localhost:1420/",
+  url = APP_URL,
   headless = true,
   viewport = { width: 1440, height: 900 },
   browser: which = process.env.UI_BROWSER,
@@ -181,7 +193,7 @@ export async function launch({
  * `beforeStart(page)` runs with the wizard filled in (e.g. to screenshot it).
  */
 export async function newDemoSession(page, dialog, { save, slides = path.join(ROOT, "images"), beforeStart } = {}) {
-  await page.goto("http://localhost:1420/");
+  await page.goto(APP_URL);
   await page.evaluate(() => localStorage.clear());
   await page.reload();
   await page.getByText("New grading session…").click();

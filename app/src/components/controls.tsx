@@ -1,4 +1,4 @@
-import type { RefObject } from "react";
+import type { KeyboardEvent as ReactKeyboardEvent, RefObject } from "react";
 import { clamp } from "../lib/util";
 
 /** Small controls shared by several screens. */
@@ -36,17 +36,24 @@ export function SearchField(p: {
   value: string;
   onChange: (v: string) => void;
   onEnter?: () => void;
+  /** Esc on an empty field */
+  onEscape?: () => void;
+  /** keys other than Esc / ↵ (e.g. ↑ ↓ to move through results) */
+  onKey?: (e: ReactKeyboardEvent<HTMLInputElement>) => void;
+  autoFocus?: boolean;
+  title?: string;
   placeholder?: string;
   inputRef?: RefObject<HTMLInputElement | null>;
 }) {
   return (
-    <label className={p.className}>
+    <label className={p.className} title={p.title}>
       <svg viewBox="0 0 16 16" width="12" height="12" aria-hidden>
         <circle cx="7" cy="7" r="4.5" fill="none" stroke="currentColor" strokeWidth="1.6" />
         <path d="M10.5 10.5 14 14" stroke="currentColor" strokeWidth="1.6" strokeLinecap="round" />
       </svg>
       <input
         ref={p.inputRef}
+        autoFocus={p.autoFocus}
         placeholder={p.placeholder ?? "Search"}
         value={p.value}
         onChange={(e) => p.onChange(e.target.value)}
@@ -54,7 +61,11 @@ export function SearchField(p: {
           if (e.key === "Escape" && p.value) {
             e.stopPropagation();
             p.onChange("");
+          } else if (e.key === "Escape" && p.onEscape) {
+            e.stopPropagation();
+            p.onEscape();
           } else if (e.key === "Enter") p.onEnter?.();
+          else p.onKey?.(e);
         }}
       />
     </label>

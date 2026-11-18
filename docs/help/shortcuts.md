@@ -46,6 +46,15 @@ Press **?** while grading to show the shortcuts sheet over the slide. On Windows
 | - / = | Smaller / bigger brush |
 | Esc | Clear painted area and isolation |
 | ? | Shortcuts sheet |
+| / | Find a student (see [Look up a student](students.md)) |
+
+## In the student panel
+
+| Key | Action |
+| --- | --- |
+| ↑ ↓ then ↵ | Choose a student from the search results |
+| ↵ | Mark wrong with the reason typed |
+| Esc | Clear the search, cancel a reason, or close the panel |
 
 ## While selecting
 
