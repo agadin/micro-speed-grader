@@ -1,8 +1,8 @@
 import { create } from "zustand";
-import type { GradeState, GradeStatus, Group, Session } from "./types";
+import type { GradeState, GradeStatus, Group, Pin, RetiredPin, Session } from "./types";
 import { graderLabel, hostGraded, type Handoff } from "./handoff";
 import type { AnswerKey } from "./answerKey";
-import type { RescanResult } from "./rescan";
+import type { RescanResult, ReviewChange } from "./rescan";
 import { writeText } from "./backend";
 import { cloneGrades, detach, pinMap } from "./grading";
 import { uid } from "./util";
@@ -18,10 +18,18 @@ export interface MenuState {
   paintOk?: string[];
 }
 
+/** what one undo step puts back: the grades, and the pins (Changed submissions can restore pins) */
+interface Snap {
+  grades: GradeState;
+  pins: Pin[];
+  retired?: RetiredPin[];
+}
+const snap = (s: Session): Snap => ({ grades: s.grades, pins: s.pins, retired: s.retired });
+
 interface Store {
   session: Session | null;
-  past: GradeState[];
-  future: GradeState[];
+  past: Snap[];
+  future: Snap[];
   dirty: boolean;
   saveError: string | null;
 
@@ -40,12 +48,14 @@ interface Store {
   exportOpen: boolean;
   handoffOpen: boolean;
   conflictsOpen: boolean;
+  /** the Changed submissions review */
+  changesOpen: boolean;
   /** editing the answer key instead of grading */
   keyMode: boolean;
   /** the "what should the key apply to?" dialog */
   keyApplyOpen: boolean;
   /** a one-line notice over the slide (e.g. "you replaced Jamie's grade") with optional undo */
-  notice: { kind: "override" | "conflict" | "info"; text: string; undo?: boolean } | null;
+  notice: { kind: "override" | "conflict" | "info"; text: string; undo?: boolean; review?: boolean; problems?: number } | null;
   /** File ▸ Rescan Submissions… (a request the grading screen acts on) */
   rescanAsk: number;
   /** "don't warn me again" for replacing other graders' grades, until the app is closed */
@@ -73,12 +83,16 @@ interface Store {
   setHandoffs: (h: Handoff[]) => void;
   /** host: merge a guest's results (one undo step) */
   applyResult: (grades: GradeState, h: Handoff[]) => void;
+  /** "Things to check" after a rescan: files whose slide was chosen, and acknowledged problems */
+  setScanFixes: (fileSlides: Record<string, string>, scanAck: string[]) => void;
   /** save the answer key (marks aren't part of undo; applying them is) */
   setKey: (key: AnswerKey) => void;
   /** grades changed by applying the answer key (one undo step) */
   applyGrades: (grades: GradeState) => void;
   /** new students/pins from Rescan submissions (clears undo: earlier steps refer to the old pins) */
   applyRescan: (r: RescanResult, grades: GradeState) => void;
+  /** carry over / restore / dismiss in Changed submissions (one undo step) */
+  applyReview: (c: ReviewChange) => void;
 }
 
 /** other graders whose grades on these pins are about to be replaced, e.g. ["Jamie"] and how many pins */
@@ -99,12 +113,12 @@ const overrideText = (names: Map<string, number>) => {
 let saveTimer: ReturnType<typeof setTimeout> | null = null;
 
 export const useStore = create<Store>((set, get) => {
-  const commit = (next: GradeState) => {
+  const commit = (next: GradeState, more?: Omit<Snap, "grades">) => {
     const s = get().session;
     if (!s) return;
     set({
-      session: { ...s, grades: next },
-      past: [...get().past.slice(-199), s.grades],
+      session: { ...s, ...more, grades: next },
+      past: [...get().past.slice(-199), snap(s)],
       future: [],
       dirty: true,
     });
@@ -135,6 +149,7 @@ export const useStore = create<Store>((set, get) => {
     exportOpen: false,
     handoffOpen: false,
     conflictsOpen: false,
+    changesOpen: false,
     keyMode: false,
     keyApplyOpen: false,
     notice: null,
@@ -144,7 +159,7 @@ export const useStore = create<Store>((set, get) => {
     startupIntent: null,
 
     load: (session) =>
-      set({ session, past: [], future: [], dirty: false, selection: [], clusterIndex: 0, menu: null, isolate: false, keyMode: false, keyApplyOpen: false }),
+      set({ session, past: [], future: [], dirty: false, selection: [], clusterIndex: 0, menu: null, isolate: false, keyMode: false, keyApplyOpen: false, changesOpen: false }),
     close: () => set({ session: null, past: [], future: [] }),
 
     setTask: (i) => {
@@ -211,9 +226,9 @@ export const useStore = create<Store>((set, get) => {
       const { past, session } = get();
       if (!session || !past.length) return;
       set({
-        session: { ...session, grades: past[past.length - 1] },
+        session: { ...session, ...past[past.length - 1] },
         past: past.slice(0, -1),
-        future: [session.grades, ...get().future],
+        future: [snap(session), ...get().future],
         dirty: true,
         menu: null,
       });
@@ -223,9 +238,9 @@ export const useStore = create<Store>((set, get) => {
       const { future, session } = get();
       if (!session || !future.length) return;
       set({
-        session: { ...session, grades: future[0] },
+        session: { ...session, ...future[0] },
         future: future.slice(1),
-        past: [...get().past, session.grades],
+        past: [...get().past, snap(session)],
         dirty: true,
         menu: null,
       });
@@ -245,6 +260,12 @@ export const useStore = create<Store>((set, get) => {
       set({ session: { ...s, handoffs } });
       commit(grades);
     },
+    setScanFixes: (fileSlides, scanAck) => {
+      const s = get().session;
+      if (!s) return;
+      set({ session: { ...s, fileSlides, scanAck }, dirty: true });
+      scheduleSave();
+    },
     setKey: (key) => {
       const s = get().session;
       if (!s) return;
@@ -256,7 +277,7 @@ export const useStore = create<Store>((set, get) => {
       const s = get().session;
       if (!s) return;
       set({
-        session: { ...s, students: r.students, pins: r.pins, grades },
+        session: { ...s, students: r.students, pins: r.pins, retired: r.retired, grades },
         past: [],
         future: [],
         selection: [],
@@ -265,6 +286,7 @@ export const useStore = create<Store>((set, get) => {
       });
       scheduleSave();
     },
+    applyReview: (c) => commit(c.grades, { pins: c.pins, retired: c.retired }),
     focusPins: (pinIds) => set({ focusRequest: { pinIds, nonce: Date.now() } }),
     showPins: (taskIndex, pinIds) => {
       const s = get().session;

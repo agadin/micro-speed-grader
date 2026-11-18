@@ -832,6 +832,93 @@ await step("answer key: paint a correct and a wrong area, apply to ungraded, han
   return `${inside} pins in the first area; key graded ${keyed} (${byKey.length} groups); hand-off offers ${offered}; rescan: "${note.split("\n")[0]}"`;
 });
 
+await step("rescan a changed folder: late student, moved pin, removed pin → Changed submissions review", async () => {
+  // work on a copy of the submissions (demo/ is shared): reopen the session pointed at the copy
+  const SUBS = path.join(WORK, "submissions");
+  fs.cpSync(path.join(ROOT, "demo/submissions"), SUBS, { recursive: true });
+  await page.waitForTimeout(1500); // let the last autosave land
+  await page.reload();
+  await page.locator(".startup").waitFor({ timeout: 10000 });
+  const s0 = session();
+  fs.writeFileSync(SESSION, JSON.stringify({ ...s0, submissionsDir: SUBS }));
+  await page.locator(".startup button.link").first().click();
+  await page.locator(".topbar").waitFor({ timeout: 30000 });
+  await waitTiles();
+
+  // two students whose one Q1 pin on VMS109 you graded: one moves it, one takes it out
+  const g = s0.grades;
+  const folderOf = new Map(s0.students.map((x) => [x.id, x.folder]));
+  const q1 = s0.pins.filter((p) => p.slide === "VMS109" && (p.q ?? g.assign[p.id]) === 1);
+  const count = new Map();
+  for (const p of q1) count.set(p.studentId, (count.get(p.studentId) ?? 0) + 1);
+  const mine = q1.filter((p) => count.get(p.studentId) === 1 && g.pinGroup[p.id] && !g.groups[g.pinGroup[p.id]].by);
+  expect(mine.length >= 2, `${mine.length} pins you graded to change`);
+  const [moved, removed] = mine;
+  const fileOf = (p) => path.join(SUBS, folderOf.get(p.studentId), "VMS109.ndpi.ndpa");
+  const edit = (p, fn) => {
+    const f = fileOf(p);
+    const parts = fs.readFileSync(f, "utf8").split(/(?=<ndpviewstate)/);
+    const i = parts.findIndex((b) => b.includes(`<x>${p.xNm}</x>`) && b.includes(`<title>${p.rawTitle}</title>`));
+    expect(i > 0, `pin ${p.id} not found in ${f}`);
+    parts[i] = fn(parts[i]);
+    fs.writeFileSync(f, parts.join(""));
+  };
+  edit(moved, (b) => b.replaceAll(`<x>${moved.xNm}</x>`, `<x>${moved.xNm + 400000}</x>`));
+  edit(removed, (b) => (b.trimEnd().endsWith("</annotations>") ? "</annotations>\n" : ""));
+  const lateFrom = folderOf.get(s0.pins[0].studentId);
+  fs.cpSync(path.join(SUBS, lateFrom), path.join(SUBS, "9999999 - Late, Lou"), { recursive: true });
+
+  await page.locator(".right .rescan").click();
+  await page.locator(".notice-banner").filter({ hasText: "Rescan:" }).waitFor({ timeout: 15000 });
+  const note = (await page.locator(".notice-banner").innerText()).split("\n")[0];
+  expect(/1 new student/.test(note) && /1 changed/.test(note) && /1 removed/.test(note), `rescan said: ${note}`);
+  await page.waitForTimeout(1200); // autosave
+  const s1 = session();
+  const retired = new Map((s1.retired ?? []).map((r) => [r.pin.id, r]));
+  expect(retired.has(moved.id) && retired.has(removed.id) && !s1.pins.some((p) => p.id === moved.id || p.id === removed.id), "old pins not retired");
+  const repl = retired.get(moved.id).replacedBy;
+  expect(repl && s1.pins.some((p) => p.id === repl) && !retired.get(removed.id).replacedBy, "moved pin not linked to its new pin");
+  expect(retired.get(moved.id).grade?.status === g.groups[g.pinGroup[moved.id]].status, "retired pin lost its grade");
+  const btn = page.locator(".topbar .changes-btn");
+  expect((await btn.innerText()).includes("2"), `top bar: ${await btn.innerText()}`);
+
+  // Review → the dialog, grouped by question
+  await page.locator(".notice-banner").getByRole("button", { name: "Review" }).click();
+  await page.locator(".changes-modal").waitFor();
+  const shotPath = await snap("changed-submissions");
+  const rows = page.locator(".changes-modal .ch-row");
+  expect((await rows.count()) === 2, `${await rows.count()} rows`);
+  const dlg = await page.locator(".changes-modal").innerText();
+  expect(/Q1/.test(dlg) && /was/i.test(dlg) && /no longer in the files/.test(dlg), `dialog: ${dlg.slice(0, 200)}`);
+
+  // Grade myself: jumps to the new pin, selected (with its ↻ badge)
+  await page.locator(`.ch-row[data-pin="${repl}"]`).getByRole("button", { name: "Grade myself" }).click();
+  await page.waitForTimeout(900);
+  const sel = await page.evaluate(() => document.querySelector(".changes-modal") === null);
+  expect(sel, "dialog didn't close");
+  await snap("changed-new-pin");
+
+  // carry the grade over, restore the removed pin; both rows go, then undo the restore
+  await btn.click();
+  await page.locator(".changes-modal").waitFor();
+  await page.locator(`.ch-row[data-pin="${repl}"]`).getByRole("button", { name: "Carry grade over" }).click();
+  await page.locator(`.ch-row[data-pin="${removed.id}"]`).getByRole("button", { name: "Restore" }).click();
+  await page.locator(".changes-modal .ex-empty").waitFor({ timeout: 3000 });
+  await page.locator(".changes-modal").getByRole("button", { name: "Done" }).click();
+  await page.waitForTimeout(1200);
+  const s2 = session();
+  const ng = s2.grades.groups[s2.grades.pinGroup[repl]];
+  const og = g.groups[g.pinGroup[moved.id]];
+  expect(ng && ng.status === og.status && ng.text === og.text, "grade not carried over");
+  expect(s2.pins.some((p) => p.id === removed.id && p.restored) && s2.grades.pinGroup[removed.id], "removed pin not restored with its grade");
+  expect((await btn.count()) === 0, "Changed submissions button still showing");
+  await page.keyboard.press("Meta+z");
+  await page.waitForTimeout(1200);
+  const s3 = session();
+  expect(!s3.pins.some((p) => p.id === removed.id) && (await btn.count()) === 1, "undo didn't bring the removed pin's row back");
+  return `${note} · screenshot ${path.basename(shotPath)}`;
+});
+
 await step("help: styled tooltip → ? → article; help search; preferences search and About", async () => {
   // hover a control: the app's own tooltip (not the native one) with a ? to its article
   const exportBtn = page.locator(".topbar").getByRole("button", { name: "Export" });

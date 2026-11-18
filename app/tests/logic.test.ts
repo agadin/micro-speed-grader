@@ -14,7 +14,7 @@ import { exportTable, kr20, parseStudentName, EXPORT_PRESETS, testStats, safeFil
 import { MAX_ANNOTATIONS } from "../src/lib/ndpa";
 import { parseMarkdown, slug } from "../src/lib/markdown";
 import { applyPlan, emptyKey, makeKeyFile, matchPin, newMark, parseKeyFile, planKey, type AnswerKey } from "../src/lib/answerKey";
-import { mergeRescan } from "../src/lib/rescan";
+import { canCarry, carryOver, dismissRows, mergeRescan, rescanMessage, restorePins, reviewPinIds, reviewRows } from "../src/lib/rescan";
 import { KEY, HOST, agreement, conflictPins, hostGraded, planOverlap, recallChecks, resolveWith, sameReason, seeded, awayPins, splitWeighted, guestSession, makePack, makeResult, mergeResult, parsePack, parseResult, remainingByTask } from "../src/lib/handoff";
 import type { GradeState, Pin, Session } from "../src/lib/types";
 import { emptyGrades } from "../src/lib/types";
@@ -453,8 +453,8 @@ ok(!!dbl && studentResults(session, dbl, defaultSettings)[0].text === defaultSet
     ],
   };
   const r = mergeRescan({ ...s, grades: g1 }, scanned);
-  ok(r.newStudents === 1 && r.added.length === 2 && r.removed === 1, `rescan: +${r.newStudents} student, +${r.added.length} pins, −${r.removed}`);
-  ok(r.pins.some((p) => p.id === "a1") && !!r.grades.pinGroup.a1 && !r.pins.some((p) => p.id === "a3"), "unchanged pins keep their id and grade; removed pin dropped");
+  ok(r.newStudents === 1 && r.added.length === 2 && r.replacements.length === 1 && r.removed === 0, `rescan: +${r.newStudents} student, +${r.added.length} pins (${r.replacements.length} changed), −${r.removed}`);
+  ok(r.pins.some((p) => p.id === "a1") && !!r.grades.pinGroup.a1 && !r.pins.some((p) => p.id === "a3") && r.retired.some((x) => x.pin.id === "a3"), "unchanged pins keep their id and grade; the moved pin is retired");
   const sr: Session = { ...s, students: r.students, pins: r.pins, grades: r.grades };
   const auto = planKey(sr, key, 0, new Set(r.added));
   ok(auto.grade.length === 2, "new submissions get the key (level 0 = only new pins)");
@@ -466,6 +466,107 @@ ok(!!dbl && studentResults(session, dbl, defaultSettings)[0].text === defaultSet
   ok(left.join() === "a3,b3", `hand-off after the key: only ${left.join(", ")} remain`);
   const pk = makePack(sk, "Jamie", rest.filter((x) => x.pinIds.length).map((x) => x.task.id), left);
   ok(pk.pinIds.join() === "a3,b3" && pk.session.key?.marks.length === 4 && pk.session.key.mode === "suggest", "pack carries the key (as suggestions) and only the untouched pins");
+}
+
+// ---- rescan: changed / removed / new pins, the Changed submissions review ----
+{
+  const P = (id: string, stu: string, slide: string, q: number | null, x: number, title = `Q${q}`) =>
+    ({ id, studentId: stu, slide, rawTitle: title, details: "", q, candidates: [], titleGuessed: false, xNm: x, yNm: 0, annotationType: "pin" }) as Pin;
+  const grp = (id: string, pinIds: string[], status: "correct" | "wrong", text = "", by?: string) =>
+    ({ id, taskId: "Q1|A", status, text, pinIds, createdAt: 1, ...(by ? { by } : {}) });
+  // s1..s4 each answer Q1 on slide A; s1 and s2 also answer Q2
+  const s: Session = {
+    version: 1, name: "Prac", createdAt: 0, savedAt: 0, sessionPath: "/p.msgrade", submissionsDir: "/subs", slidesDir: "/s",
+    questions: [{ num: 1, slides: ["A"], prompt: "Find a neutrophil", include: true }, { num: 2, slides: ["A"], prompt: "", include: true }],
+    students: ["s1", "s2", "s3", "s4"].map((id) => ({ id, name: `Student ${id}`, folder: id })),
+    pins: [P("p1", "s1", "A", 1, 0), P("p2", "s2", "A", 1, 0), P("p3", "s3", "A", 1, 100), P("p4", "s4", "A", 1, 0), P("p5", "s1", "A", 2, 50), P("p6", "s2", "A", 2, 50)],
+    slides: [], taskIndex: 0,
+    grades: {
+      groups: { g1: grp("g1", ["p1", "p2", "p4"], "correct"), g2: grp("g2", ["p3"], "wrong", "Neutrophil", "Jamie"), g3: { ...grp("g3", ["p5"], "correct"), taskId: "Q2|A" } },
+      pinGroup: { p1: "g1", p2: "g1", p4: "g1", p3: "g2", p5: "g3" },
+      assign: {},
+    },
+  };
+  const stu = (id: string) => s.students.find((x) => x.id === id)!;
+  // the folder again: s2 and s3 moved their Q1 pin (Jamie graded s3's), s4 took Q1 out, s1's Q2 pin
+  // is gone, s1's Q1 pin is unchanged, and a late student s5 arrives
+  const scan = {
+    students: [...s.students.map((x) => ({ ...x, id: `n${x.id}` })), { id: "ns5", name: "Student s5", folder: "s5" }],
+    pins: [P("x1", "ns1", "A", 1, 0), P("x2", "ns2", "A", 1, 900), P("x3", "ns3", "A", 1, 0), P("x6", "ns2", "A", 2, 50), P("x7", "ns5", "A", 1, 0)],
+  };
+  const r = mergeRescan(s, scan);
+  ok(r.newStudents === 1 && r.added.length === 3 && r.replacements.length === 2 && r.removed === 2, `rescan classifies: ${r.added.length} added, ${r.replacements.length} changed, ${r.removed} removed`);
+  const ret = new Map(r.retired.map((x) => [x.pin.id, x]));
+  const newOf = (sid: string) => r.pins.find((p) => r.added.includes(p.id) && p.studentId === sid)!;
+  ok(ret.get("p2")?.replacedBy === newOf("s2").id && ret.get("p3")?.replacedBy === newOf("s3").id && !ret.get("p4")?.replacedBy && !ret.get("p5")?.replacedBy, "each changed pin is linked to the student's new pin for the same question");
+  ok(ret.get("p3")?.grade?.status === "wrong" && ret.get("p3")?.grade?.text === "Neutrophil" && ret.get("p3")?.grade?.by === "Jamie", "a retired pin keeps its grade (and who gave it)");
+  ok(!r.grades.pinGroup.p2 && !r.grades.pinGroup.p3 && r.grades.groups.g1.pinIds.join() === "p1", "retired pins are out of the grades; unchanged p1 keeps its grade");
+  ok(r.pins.length === 5 && !r.pins.some((p) => ["p2", "p3", "p4", "p5"].includes(p.id)), "retired pins aren't the student's answer any more");
+  const s2: Session = { ...s, students: r.students, pins: r.pins, retired: r.retired, grades: r.grades };
+  ok(rescanMessage(r, r.grades) === "Rescan: 1 new student, 1 new pin, 2 changed, 2 removed.", `message: ${rescanMessage(r, r.grades)}`);
+
+  // results / export: a removed answer is "no answer", a changed one is ungraded until reviewed
+  const res = (st: Session, id: string, q: number) => studentResults(st, stu(id), defaultSettings).find((x) => x.q === q)!;
+  ok(res(s2, "s4", 1).status === "wrong" && res(s2, "s4", 1).text === defaultSettings.noAnswerMessage && res(s2, "s2", 1).status === "ungraded", "export: retired pins don't count");
+
+  const rows = reviewRows(s2);
+  ok(rows.length === 4 && rows.filter((x) => x.kind === "changed").length === 2 && rows.filter((x) => x.kind === "removed").length === 2, `review lists ${rows.length} rows (2 changed, 2 removed)`);
+  ok(reviewPinIds(rows).size === 2 && reviewPinIds(rows).has(newOf("s2").id), "the changed submissions' new pins are badged");
+
+  // carry over: the new pin gets the old grade, from whoever gave it; the row is done
+  const c1 = carryOver(s2, rows.filter((x) => x.studentId === "s3"));
+  const g3 = c1.grades.groups[c1.grades.pinGroup[newOf("s3").id]];
+  ok(g3?.status === "wrong" && g3.text === "Neutrophil" && g3.by === "Jamie" && g3.taskId === "Q1|A", "carry over: Jamie's ✗ Neutrophil moves to the new pin");
+  const s3: Session = { ...s2, ...c1 };
+  ok(reviewRows(s3).length === 3 && res(s3, "s3", 1).status === "wrong", "carried-over row leaves the review; the grade counts");
+
+  // a person grades a new pin: the row is done, and carry over can't overwrite it
+  const np2 = newOf("s2").id;
+  const gMe = { ...s3.grades, groups: { ...s3.grades.groups, me: grp("me", [np2], "wrong", "Eosinophil") }, pinGroup: { ...s3.grades.pinGroup, [np2]: "me" } };
+  const s4: Session = { ...s3, grades: gMe };
+  const stale = reviewRows(s3).find((x) => x.newPin?.id === np2)!;
+  ok(!reviewRows(s4).some((x) => x.newPin?.id === np2), "a person grading the new pin settles its row");
+  const c4 = carryOver(s4, [{ ...stale, newGrade: gMe.groups.me }]);
+  ok(c4.grades.groups[c4.grades.pinGroup[np2]].text === "Eosinophil", "carry over never replaces a person's grade");
+
+  // the answer key graded the new pin: still listed, and carrying over replaces the key's grade
+  const gKey = { ...s3.grades, groups: { ...s3.grades.groups, k: grp("k", [np2], "wrong", "Mast cell", KEY) }, pinGroup: { ...s3.grades.pinGroup, [np2]: "k" } };
+  const s5: Session = { ...s3, grades: gKey };
+  const kr = reviewRows(s5).find((x) => x.newPin?.id === np2)!;
+  ok(kr?.newGrade?.by === KEY && canCarry(kr), "a key-graded new pin stays listed and can take the old grade");
+  const c2 = carryOver(s5, [kr]);
+  const kg = c2.grades.groups[c2.grades.pinGroup[np2]];
+  ok(kg.by === undefined && kg.status === "correct", "carry over replaces the key's grade with the old one (yours)");
+  ok(reviewRows({ ...s5, ...dismissRows(s5, [kr]) }).every((x) => x.newPin?.id !== np2), "keep the key's grade: the row is done");
+
+  // restore: the removed pin counts again, with its grade; accept removal just closes the row
+  const rm = reviewRows(s3).filter((x) => x.kind === "removed");
+  const s6: Session = { ...s3, ...restorePins(s3, rm.filter((x) => x.id === "p4")) };
+  ok(s6.pins.some((p) => p.id === "p4" && p.restored) && s6.grades.groups[s6.grades.pinGroup.p4]?.status === "correct" && res(s6, "s4", 1).status === "correct", "restore: p4 counts again, still correct");
+  ok(!s6.retired!.some((x) => x.pin.id === "p4"), "a restored pin is no longer retired");
+  const s7: Session = { ...s6, ...dismissRows(s6, reviewRows(s6).filter((x) => x.id === "p5")) };
+  ok(!reviewRows(s7).some((x) => x.id === "p5") && s7.retired!.some((x) => x.pin.id === "p5"), "accept removal: off the list, the old pin stays retired");
+
+  // rescanning again: the restored pin isn't retired again; nothing else changes
+  const again = mergeRescan(s7, scan);
+  ok(again.added.length === 0 && again.removed === 0 && again.pins.some((p) => p.id === "p4"), "a second rescan finds nothing new, and keeps the restored pin");
+
+  // the double-pin rule ignores retired pins: s1 replaces Q1 with two pins, then takes one out
+  const others = scan.pins.filter((p) => p.studentId !== "ns1");
+  const two = mergeRescan(s, { ...scan, pins: [...others, P("y1", "ns1", "A", 1, 300, "Q1a"), P("y2", "ns1", "A", 1, 400, "Q1b")] });
+  const st2: Session = { ...s, students: two.students, pins: two.pins, retired: two.retired, grades: two.grades };
+  ok(doublePinIds(st2.pins, 1, st2.grades).size === 2 && reviewRows(st2).some((x) => x.studentId === "s1" && x.double && !canCarry(x)), "two new pins: double-pin rule, no carry over");
+  const one = mergeRescan(st2, { ...scan, pins: [...others, P("y1", "ns1", "A", 1, 300, "Q1a")] });
+  const st3: Session = { ...st2, students: one.students, pins: one.pins, retired: one.retired, grades: one.grades };
+  ok(doublePinIds(st3.pins, 1, st3.grades).size === 0 && one.retired.filter((x) => x.pin.studentId === "s1" && x.q === 1).length === 2, "the retired second pin no longer makes a double");
+  const s1row = reviewRows(st3).find((x) => x.studentId === "s1" && x.q === 1);
+  ok(!!s1row && s1row.old.pin.id === "p1" && canCarry(s1row), "the original grade is still offered for the pin that remains");
+
+  // the answer key ignores retired pins; old session files (no retired list) still load and rescan
+  const keyAll: AnswerKey = { ...emptyKey(), marks: [newMark(1, "A", "correct", "", [{ kind: "brush", mode: "add", pts: [{ x: 100, y: 0 }], rNm: 20 }])] };
+  ok(planKey(s2, keyAll, 4).grade.length === 0, "the answer key never grades a retired pin");
+  const oldFile = JSON.parse(JSON.stringify(s)) as Session;
+  ok(oldFile.retired === undefined && reviewRows(oldFile).length === 0 && mergeRescan(oldFile, scan).retired.length === 4, "old session files (no retired pins) load and rescan");
 }
 
 // ---- help wiki (docs/help): parses, nested lists survive, every link/anchor/image exists ----

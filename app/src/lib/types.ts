@@ -31,6 +31,26 @@ export interface Pin {
   xNm: number;
   yNm: number;
   annotationType: string;
+  /** brought back from Changed submissions after it left the files: kept even though the files no longer have it */
+  restored?: boolean;
+}
+
+/**
+ * A pin that is no longer in the student's files (found by Rescan submissions). It doesn't count as
+ * the student's answer any more, but it keeps the grade it had, so the grade can be carried over to
+ * the student's new pin, or the pin restored.
+ */
+export interface RetiredPin {
+  pin: Pin;
+  /** the question it answered (from its title, inference or a grader's assignment) */
+  q: number | null;
+  /** its grade when it was retired */
+  grade?: { taskId: string; status: GradeStatus; text: string; by?: string; createdAt: number };
+  retiredAt: number;
+  /** the student's new pin for the same question that came in when this one went */
+  replacedBy?: string;
+  /** still waiting in Changed submissions */
+  review?: boolean;
 }
 
 export type GradeStatus = "correct" | "wrong";
@@ -85,6 +105,8 @@ export interface Session {
   scanAck?: string[];
   /** the instructor's answer key: painted areas that grade (or suggest) matching pins */
   key?: AnswerKey;
+  /** pins that left the submission files (Rescan submissions), with the grades they had */
+  retired?: RetiredPin[];
 }
 
 export interface Task {
