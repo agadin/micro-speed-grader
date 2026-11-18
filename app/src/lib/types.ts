@@ -79,6 +79,10 @@ export interface Session {
   handoffs?: Handoff[];
   /** guest: this session was opened from a hand-off pack */
   guestPack?: GuestPack;
+  /** files whose slide the instructor chose in "Things to check" (path in the submissions folder → slide ID) */
+  fileSlides?: Record<string, string>;
+  /** "Things to check" the instructor acknowledged (problemKey), so a rescan only shows new ones */
+  scanAck?: string[];
   /** the instructor's answer key: painted areas that grade (or suggest) matching pins */
   key?: AnswerKey;
 }

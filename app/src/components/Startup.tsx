@@ -5,7 +5,7 @@ import type { Question, Session, SlideRef } from "../lib/types";
 import { emptyGrades } from "../lib/types";
 import { loadExam } from "../lib/exam";
 import { scanSlides, scanSubmissions, startBlockers, type ScanProblem } from "../lib/loader";
-import { ScanProblemsDialog, ScanProblemsRow } from "./ScanProblemsDialog";
+import { ScanProblemsDialog, ScanProblemsRow, type Resolve } from "./ScanProblemsDialog";
 import { basename, dirname, joinPath, listFiles, pathExists, readText, withExt, writeText } from "../lib/backend";
 import { forgetRecent, recentSessions, rememberRecent, useStore, type Recent } from "../lib/store";
 import { guestSession, parsePack } from "../lib/handoff";
@@ -277,7 +277,31 @@ function NewSession({ onCancel }: { onCancel: () => void }) {
   const [checking, setChecking] = useState(false);
   const [showProblems, setShowProblems] = useState(false);
   const [recheck, setRecheck] = useState(0);
-  const scanKey = subDir && included.length ? JSON.stringify([subDir, questions.map((q) => [q.num, q.slides, q.include]), recheck]) : "";
+  /** fixes and acknowledgements made in "Things to check" (kept in the session) */
+  const [fileSlides, setFileSlides] = useState<Record<string, string>>({});
+  const [acked, setAcked] = useState<Set<string>>(new Set());
+  const examSlides = useMemo(() => [...new Set(questions.flatMap((q) => q.slides))].sort(), [questions]);
+  const resolve: Resolve = {
+    root: subDir,
+    slides: examSlides,
+    fileSlides,
+    setFileSlide: (file, slide) =>
+      setFileSlides((m) => {
+        const n = { ...m };
+        if (slide) n[file] = slide;
+        else delete n[file];
+        return n;
+      }),
+    acked,
+    setAcked: (keys, on) =>
+      setAcked((a) => {
+        const n = new Set(a);
+        for (const k of keys) (on ? n.add(k) : n.delete(k));
+        return n;
+      }),
+  };
+  const scanKey =
+    subDir && included.length ? JSON.stringify([subDir, questions.map((q) => [q.num, q.slides, q.include]), fileSlides, recheck]) : "";
   useEffect(() => {
     if (!scanKey) {
       setProblems(null);
@@ -287,7 +311,7 @@ function NewSession({ onCancel }: { onCancel: () => void }) {
     setChecking(true);
     const t = window.setTimeout(async () => {
       try {
-        const r = await scanSubmissions(subDir, questions);
+        const r = await scanSubmissions(subDir, questions, undefined, fileSlides);
         if (alive) setProblems(r.problems);
       } catch {
         // Start reads the folder again and reports the error
@@ -317,7 +341,7 @@ function NewSession({ onCancel }: { onCancel: () => void }) {
     setErr(null);
     setBusy("Reading student annotations…");
     try {
-      const scan = await scanSubmissions(subDir, questions);
+      const scan = await scanSubmissions(subDir, questions, undefined, fileSlides);
       const now = Date.now();
       const session: Session = {
         version: 1,
@@ -334,6 +358,8 @@ function NewSession({ onCancel }: { onCancel: () => void }) {
         grades: emptyGrades(),
         taskIndex: 0,
         ...(keyFile ? { key: { ...emptyKey(), mode: keyFile.mode, marks: keyFile.marks } } : {}),
+        ...(Object.keys(fileSlides).length ? { fileSlides } : {}),
+        ...(acked.size ? { scanAck: [...acked] } : {}),
       };
       // an imported key grades the matching pins straight away (nothing else is graded yet)
       if (session.key && session.key.mode === "grade") session.grades = applyPlan(session, planKey(session, session.key, 1));
@@ -437,7 +463,9 @@ function NewSession({ onCancel }: { onCancel: () => void }) {
             )}
             <div className="muted small">Expected: one folder per student containing their .ndpa files.</div>
             {checking && <div className="muted small">Checking the files…</div>}
-            {!checking && problems && <ScanProblemsRow problems={problems} onReview={() => setShowProblems(true)} />}
+            {!checking && problems && (
+              <ScanProblemsRow problems={problems} acked={acked} fixed={Object.keys(fileSlides).length} onReview={() => setShowProblems(true)} />
+            )}
           </div>
         </div>
 
@@ -512,7 +540,7 @@ function NewSession({ onCancel }: { onCancel: () => void }) {
         </div>
       </div>
       {showProblems && problems && (
-        <ScanProblemsDialog problems={problems} onClose={() => setShowProblems(false)} onRecheck={() => setRecheck((n) => n + 1)} />
+        <ScanProblemsDialog problems={problems} onClose={() => setShowProblems(false)} onRecheck={() => setRecheck((n) => n + 1)} resolve={resolve} />
       )}
     </div>
   );

@@ -49,6 +49,9 @@ export interface ScanProblem {
   detail: string;
 }
 
+/** A problem's identity across scans (for "acknowledged"): kind + file or folder + what was found. */
+export const problemKey = (p: ScanProblem) => `${p.kind}|${p.file ?? p.student ?? ""}|${p.detail}`;
+
 /** Problems grouped by kind, in SCAN_PROBLEM_KINDS order, empty kinds left out. */
 export function groupProblems(problems: ScanProblem[]): { kind: ScanProblemKind; items: ScanProblem[] }[] {
   return SCAN_PROBLEM_KINDS.map((kind) => ({ kind, items: problems.filter((p) => p.kind === kind) })).filter((g) => g.items.length);
@@ -79,7 +82,17 @@ const LOOSE = "(loose files)";
 const qList = (nums: number[]) => nums.map((n) => `Q${n}`).join(", ");
 const firstFew = (xs: string[], n = 3) => xs.slice(0, n).join(", ") + (xs.length > n ? "…" : "");
 
-export async function scanSubmissions(dir: string, questions: Question[], io: ScanIO = { listFiles, readText }): Promise<ScanResult> {
+/**
+ * Read a submissions folder.
+ * `fileSlides` says which slide a file is for when its name doesn't (or names the wrong one):
+ * path inside the folder → slide ID, as chosen in "Things to check".
+ */
+export async function scanSubmissions(
+  dir: string,
+  questions: Question[],
+  io: ScanIO = { listFiles, readText },
+  fileSlides: Record<string, string> = {},
+): Promise<ScanResult> {
   // every file, so a student folder holding only a PDF or a screenshot still shows up as "no submission"
   const all = await io.listFiles(dir, []);
   const files = all.filter((f) => f.toLowerCase().endsWith(".ndpa"));
@@ -123,7 +136,7 @@ export async function scanSubmissions(dir: string, questions: Question[], io: Sc
     }
     const name = student.name;
     const problem = (kind: ScanProblemKind, detail: string) => problems.push({ kind, student: name, file: rel, detail });
-    const slide = slideIdFromFilename(basename(f));
+    const slide = fileSlides[rel] ?? slideIdFromFilename(basename(f));
     const slideQs = slide ? questionsBySlide.get(slide) : undefined;
     if (!slide || !slideQs) {
       // slide not used by any included question (one only a left-out question uses is fine)

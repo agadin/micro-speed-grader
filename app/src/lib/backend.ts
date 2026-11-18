@@ -32,6 +32,16 @@ export const openExternal = async (url: string) => {
   }
 };
 
+/** Show a file or folder in Finder / Explorer. */
+export const revealFile = async (p: string) => {
+  try {
+    const { revealItemInDir } = await import("@tauri-apps/plugin-opener");
+    await revealItemInDir(p);
+  } catch {
+    /* not in the app */
+  }
+};
+
 export const isMac = navigator.userAgent.includes("Mac");
 const isWindows = navigator.userAgent.includes("Windows");
 /** running inside the app's window (also true under the UI-test stand-in) */

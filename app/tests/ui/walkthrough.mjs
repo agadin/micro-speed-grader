@@ -929,13 +929,29 @@ await step("wizard: things to check before Start", async () => {
   await snap("things-to-check");
   expect(kinds.length === 8, `groups: ${kinds.join(", ")}`);
   expect(/Rename the file so it includes the slide ID/.test(text) && text.includes("my answers.ndpa") && text.includes("“Q9”"), "explanations or file names missing");
-  // fix one file, check again
-  fs.rmSync(path.join(noId, "my answers.ndpa"));
-  await page.locator(".scan-modal").getByRole("button", { name: "Check again" }).click();
-  await page.locator(".scan-modal .modal-actions", { hasText: "7 things to check" }).waitFor({ timeout: 10000 });
+  // fix one in the app: the badly named file is for VMS109 (the file itself isn't changed)
+  await page.locator('.scan-modal .sp-group[data-kind="no-slide-id"] select.sp-slide').selectOption("VMS109");
+  await page.locator(".scan-modal .sp-fixed").waitFor({ timeout: 10000 });
+  const counts1 = await page.locator(".scan-modal .sp-counts").innerText();
+  expect(/8 found/.test(counts1) && /1 fixed/.test(counts1) && /7 left/.test(counts1), `after choosing a slide: ${counts1}`);
+  expect(fs.existsSync(path.join(noId, "my answers.ndpa")), "the file was changed or removed");
+  // acknowledge one, then everything left
+  await page.locator('.scan-modal .sp-group[data-kind="unknown-question"]').getByRole("button", { name: "OK" }).click();
+  const counts2 = await page.locator(".scan-modal .sp-counts").innerText();
+  expect(/1 acknowledged/.test(counts2) && /6 left/.test(counts2), `after OK: ${counts2}`);
+  await page.locator(".scan-modal").getByRole("button", { name: "Acknowledge all" }).click();
+  const counts3 = await page.locator(".scan-modal .sp-counts").innerText();
+  await snap("things-to-check-done");
+  expect(/all checked/.test(counts3), `after Acknowledge all: ${counts3}`);
   await page.locator(".scan-modal").getByRole("button", { name: "Done" }).click();
   const row2 = await page.locator(".scan-row").innerText();
-  expect(/7 things to check/.test(row2), `after fixing: ${row2}`);
+  expect(/All 8 checked/.test(row2), `wizard row: ${row2}`);
+  // fixing it in the folder and checking again still works (the stray VMS999 file goes)
+  fs.rmSync(path.join(other, "VMS999.ndpi.ndpa"));
+  await page.locator(".scan-row").getByRole("button", { name: "Review" }).click();
+  await page.locator(".scan-modal").getByRole("button", { name: "Check again" }).click();
+  await page.locator(".scan-modal .sp-counts", { hasText: "7 found" }).waitFor({ timeout: 10000 });
+  await page.locator(".scan-modal").getByRole("button", { name: "Done" }).click();
   await page.getByRole("button", { name: "Cancel" }).click();
   return `${row.replace(/\s+/g, " ")} → ${row2.replace(/\s+/g, " ")} · ${kinds.join(", ")} · "${needs}"`;
 });

@@ -56,7 +56,13 @@ The last step lets you import an [answer key](answer-key.md) saved from another 
 
 Once the exam and the submissions folder are chosen, the app reads every student's files. If anything looks wrong, step 2 shows **⚠ N things to check · Review**. Click **Review** to see each problem, what it means and what to do, with the students and files it affects. Long lists are cut short: click **Show all** to see the rest.
 
-You can start grading anyway. To fix something, change the files in the submissions folder, then click **Check again**.
+The top of the list shows how far you've got: how many were found, fixed, acknowledged and left. Work through it like this:
+
+- **This file is for…**: for a file with no slide ID, or the wrong one, choose the slide it's really for. The app reads it as that slide from then on (including when you [rescan](#new-and-changed-submissions)); the file itself isn't renamed. It moves to **Fixed**, where **Undo** takes it back.
+- **Show file** / **Show folder** opens it in Finder, so you can look at it or add what's missing. Then click **Check again**.
+- **OK** marks one item as checked; **Acknowledge all** does a whole group, or everything left. Acknowledged items stay listed, crossed out, and **Undo** puts one back.
+
+When nothing is left, step 2 shows **✓ All N checked**. You can start grading at any time, whether or not everything is checked. Fixes and acknowledgements are saved with the session.
 
 | Problem | What it means | What to do |
 | --- | --- | --- |
