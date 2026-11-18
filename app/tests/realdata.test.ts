@@ -3,16 +3,14 @@
 //   npm run test:real
 // Skips (exit 0) when the material isn't there.
 import "./setup-window";
+import "./xml-parser";
 import fs from "node:fs";
-import { JSDOM } from "jsdom";
 import path from "node:path";
 import { getDocument } from "pdfjs-dist/legacy/build/pdf.mjs";
 import { parseQuestionsFromText } from "../src/lib/examParse";
 import { scanSubmissions } from "../src/lib/loader";
 import { parseNdpa } from "../src/lib/ndpa";
 
-// the annotation reader uses the browser's XML parser
-(globalThis as { DOMParser?: unknown }).DOMParser = new JSDOM("").window.DOMParser;
 
 const ROOT = path.resolve("..");
 const EXAMS = path.join(ROOT, "reference/exams");

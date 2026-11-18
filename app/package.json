@@ -10,6 +10,7 @@
     "tauri": "tauri",
     "test:logic": "rolldown tests/logic.test.ts --platform node --format esm -o tests/.out/logic.test.mjs --external jsdom && node tests/.out/logic.test.mjs ../demo",
     "test:ui": "node tests/ui/walkthrough.mjs",
+    "test:scale": "rolldown tests/scale.test.ts --platform node --format esm -o tests/.out/scale.test.mjs --external jsdom && node tests/.out/scale.test.mjs",
     "test:real": "rolldown tests/realdata.test.ts --platform node --format esm -o tests/.out/realdata.test.mjs --external jsdom --external pdfjs-dist/legacy/build/pdf.mjs && node tests/.out/realdata.test.mjs"
   },
   "dependencies": {
