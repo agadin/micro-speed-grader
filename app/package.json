@@ -9,7 +9,8 @@
     "preview": "vite preview",
     "tauri": "tauri",
     "test:logic": "rolldown tests/logic.test.ts --platform node --format esm -o tests/.out/logic.test.mjs --external jsdom && node tests/.out/logic.test.mjs ../demo",
-    "test:ui": "node tests/ui/walkthrough.mjs"
+    "test:ui": "node tests/ui/walkthrough.mjs",
+    "test:real": "rolldown tests/realdata.test.ts --platform node --format esm -o tests/.out/realdata.test.mjs --external jsdom --external pdfjs-dist/legacy/build/pdf.mjs && node tests/.out/realdata.test.mjs"
   },
   "dependencies": {
     "@fontsource/ibm-plex-mono": "^5.3.0",
