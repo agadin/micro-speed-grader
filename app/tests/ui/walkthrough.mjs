@@ -5,7 +5,7 @@
 //   node tests/ui/walkthrough.mjs
 import fs from "node:fs";
 import path from "node:path";
-import { launch, startTileServer, closeSession, openSession, pickTool, ringOf, APP, ROOT } from "./harness.mjs";
+import { launch, startTileServer, closeSession, openSession, pickTool, ringOf, APP, APP_URL, ROOT } from "./harness.mjs";
 
 const OUT = path.join(APP, "tests/.out/ui");
 const WORK = path.join(APP, "tests/.out/ui-work");
@@ -73,7 +73,7 @@ async function rightDrag(points, mods = [], button = "right") {
   for (const m of mods) await page.keyboard.up(m);
 }
 
-await page.goto("http://localhost:1420/");
+await page.goto(APP_URL);
 await page.evaluate(() => localStorage.clear());
 await page.reload();
 
@@ -751,6 +751,85 @@ await step("grade twice: blind overlap with a guest, disagreements settled", asy
   const left = Object.values(session().grades.checks).filter((c) => c.state === "conflict").length;
   expect(left === 0 && (await btn.count()) === 0, `${left} disagreements left after settling`);
   return `${checks.length} pins graded twice; host marked ${hostGraded} wrong on ${label}, Kim correct → ${nConf} disagreements, settled. ${stats.split("\n").slice(-1)[0]}`;
+});
+
+await step("answer key: paint a correct and a wrong area, apply to ungraded, hand off only the rest", async () => {
+  const KEYFILE = path.join(WORK, "practical.msgkey");
+  await page.locator(".topbar select").selectOption({ index: 0 });
+  await waitTiles();
+  const before = session();
+  const ungradedHere = (sess) => sess.pins.filter((p) => p.slide === "VMS109" && (p.q === 1 || p.candidates.includes(1)) && !sess.grades.pinGroup[p.id]).length;
+  const u0 = ungradedHere(before);
+  // open the editor, lasso the current cluster as the right answer
+  await page.getByRole("button", { name: /Answer key/ }).click();
+  await page.locator(".key-panel").waitFor();
+  await tool("Lasso");
+  await page.keyboard.press("f");
+  await page.waitForTimeout(900);
+  const loop = (c, k = 1.25) => Array.from({ length: 25 }, (_, i) => [c.x + c.r * k * Math.cos((i / 24) * 2 * Math.PI), c.y + c.r * k * Math.sin((i / 24) * 2 * Math.PI)]);
+  let c = await ring();
+  await rightDrag(loop(c));
+  await page.waitForTimeout(300);
+  const inside = parseInt(await page.locator(".key-new-n b").innerText());
+  expect(inside > 0, `painted area has ${inside} pins`);
+  await snap("key-paint");
+  await page.keyboard.press("c");
+  await page.waitForTimeout(300);
+  // next cluster: a common wrong answer with a reason
+  await page.keyboard.press("]");
+  await page.waitForTimeout(900);
+  c = await ring();
+  await rightDrag(loop(c));
+  await page.waitForTimeout(300);
+  await page.keyboard.press("w");
+  await page.keyboard.type("Eccrine sweat gland");
+  await page.keyboard.press("Enter");
+  await page.waitForTimeout(400);
+  const marks = await page.locator(".key-list li").count();
+  expect(marks === 2, `${marks} areas on this image`);
+  await snap("key-editor");
+  // Done → what should it apply to? default: ungraded pins
+  await page.getByRole("button", { name: "Done", exact: true }).click();
+  await page.locator(".key-apply-modal").waitFor();
+  await snap("key-apply");
+  const chosen = await page.locator(".ka-choice.on b").innerText();
+  const btn = await page.locator(".key-apply-modal .primary").innerText();
+  await page.locator(".key-apply-modal .primary").click();
+  await page.waitForTimeout(900);
+  const after = session();
+  const byKey = Object.values(after.grades.groups).filter((g) => g.by === "@key");
+  const keyed = byKey.reduce((a, g) => a + g.pinIds.length, 0);
+  expect(chosen === "Ungraded pins" && keyed > 0 && byKey.some((g) => g.status === "wrong" && g.text === "Eccrine sweat gland"), `"${chosen}" → ${btn}: ${keyed} pins graded by the key`);
+  expect(ungradedHere(after) === u0 - keyed, `ungraded here ${u0} → ${ungradedHere(after)} (key graded ${keyed})`);
+  const ledger = await page.locator(".ledger").innerText();
+  expect(ledger.includes("Answer key"), "ledger doesn't show Answer key");
+
+  // hand off: this image only offers what the key didn't grade
+  await page.getByRole("button", { name: "Hand off" }).click();
+  await page.locator(".handoff-modal").waitFor();
+  const card = page.locator(".ho-card", { hasText: "Q1 · VMS109" });
+  const offered = (await card.count()) ? parseInt(await card.locator(".ho-n").innerText()) : 0;
+  await page.locator(".handoff-modal").getByRole("button", { name: "Close", exact: true }).click();
+  expect(offered > 0 && offered <= u0 - keyed, `hand-off offers ${offered} of the ${u0 - keyed} pins the key left`);
+
+  // export the key, then rescan (nothing changed on disk)
+  await page.getByRole("button", { name: /Answer key/ }).click();
+  await dialog(KEYFILE);
+  await page.getByRole("button", { name: "Export key…" }).click();
+  await page.waitForTimeout(500);
+  const kf = JSON.parse(fs.readFileSync(KEYFILE, "utf8"));
+  expect(kf.kind === "msg-key" && kf.marks.length === 2, `key file has ${kf.marks?.length} areas`);
+  await page.getByRole("button", { name: "Done", exact: true }).click();
+  await page.getByRole("button", { name: "Not now" }).click();
+  await page.locator(".right .rescan").click();
+  await page.locator(".notice-banner").filter({ hasText: "Rescan" }).waitFor({ timeout: 15000 });
+  const note = await page.locator(".notice-banner").innerText();
+  // on screen, not hidden under the top bar
+  const nb = await page.locator(".notice-banner").boundingBox();
+  const tb = await page.locator(".topbar").boundingBox();
+  expect(nb.y >= tb.y + tb.height, `notice at y=${nb.y} is under the top bar (ends ${tb.y + tb.height})`);
+  expect(/no new or changed submissions/.test(note), `rescan said: ${note}`);
+  return `${inside} pins in the first area; key graded ${keyed} (${byKey.length} groups); hand-off offers ${offered}; rescan: "${note.split("\n")[0]}"`;
 });
 
 await step("help: styled tooltip → ? → article; help search; preferences search and About", async () => {

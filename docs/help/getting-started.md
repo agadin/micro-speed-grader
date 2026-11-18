@@ -48,6 +48,21 @@ You can correct the **Slides** cell if the exam lists the wrong slide ID: type t
 - Shapes other than pins (circles, outlines) count as a pin at their centre.
 - Limits that stop a damaged file from slowing the app: 2 MB per annotation file, 200 annotations per file and 50 pins per student per slide.
 
+### Answer key (optional)
+
+The last step lets you import an [answer key](answer-key.md) saved from another session, or start by marking one. Pins that land in the key's areas are graded for you.
+
+## New and changed submissions
+
+Students who hand in late, or resubmit, don't mean starting over. Choose **File ▸ Rescan Submissions**, or click **Rescan submissions** under Progress in the right panel. The app reads the submissions folder again and:
+
+- adds new students and new annotation files;
+- keeps every pin that hasn't changed, along with its grade;
+- removes pins that are no longer in the files, and their grades;
+- grades the new pins with the [answer key](answer-key.md#new-submissions), if you have one set to grade.
+
+A message over the slide says what changed, for example *Rescan: 2 new students, 9 new pins (7 graded by the answer key).* Rescanning can't be undone (the undo history starts again), but it never changes a grade on a pin that's still there.
+
 ## Saving and backups
 
 There's no Save button: the session saves itself a moment after every change, and whenever you change image or close the session. The top bar shows **Saving…**, then **✓ Saved**.

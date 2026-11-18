@@ -59,6 +59,7 @@ export default function App() {
       };
       if (payload === "preferences") st.set({ settingsOpen: true, menu: null });
       else if (payload === "export" && st.session) st.set({ exportOpen: true, menu: null });
+      else if (payload === "rescan_submissions" && st.session) st.set({ rescanAsk: Date.now(), menu: null });
       else if (payload === "close_session") await leave();
       else if (payload === "new_session") {
         await leave();

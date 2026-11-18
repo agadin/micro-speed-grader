@@ -1,6 +1,7 @@
 import { useMemo, useState } from "react";
 import type { Group, Pin, Session, Task } from "../lib/types";
 import { pinMap, taskIdLabel } from "../lib/grading";
+import { graderLabel, KEY } from "../lib/handoff";
 import { useStore } from "../lib/store";
 import type { Settings } from "../lib/settings";
 import { IconCheck, IconCross, IconPencil, IconTrash, IconTri } from "./icons";
@@ -139,8 +140,8 @@ export function Ledger({ session, task, tasks, doubles, settings, studentName }:
                     g.text || <span className="q">no reason</span>
                   )}
                   {g.by && (
-                    <span className="by" title={`Graded by ${g.by}`}>
-                      {g.by}
+                    <span className={`by${g.by === KEY ? " key" : ""}`} title={`Graded by ${graderLabel(g.by)}`}>
+                      {graderLabel(g.by)}
                     </span>
                   )}
                 </span>

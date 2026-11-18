@@ -15,7 +15,9 @@ import { uid } from "./util";
 
 /** the host's name inside checks and verdicts (shown as "You") */
 export const HOST = "@host";
-export const graderLabel = (by: string | undefined) => (!by || by === HOST ? "You" : by);
+/** grades given by the answer key (lib/answerKey.ts) */
+export const KEY = "@key";
+export const graderLabel = (by: string | undefined) => (!by || by === HOST ? "You" : by === KEY ? "Answer key" : by);
 
 /** One pack the host has sent out (kept in the host's session). */
 export interface Handoff {
@@ -72,7 +74,7 @@ export interface PackFile {
   guest: string;
   taskIds: string[];
   pinIds: string[];
-  session: Pick<Session, "name" | "questions" | "students" | "pins" | "grades"> & {
+  session: Pick<Session, "name" | "questions" | "students" | "pins" | "grades" | "key"> & {
     /** slide ids and the host's file names: the guest relinks them to their own folder */
     slides: { id: string; file: string }[];
   };
@@ -230,6 +232,8 @@ export function makePack(s: Session, guest: string, taskIds: string[], pinIds: s
       students: s.students,
       pins: s.pins,
       grades: { groups, pinGroup, assign: { ...s.grades.assign } },
+      // the answer key travels with the pack as suggestions: the host's key already graded what it matches
+      ...(s.key?.marks.length ? { key: { ...s.key, mode: "suggest" as const, autoNew: false } } : {}),
       slides: s.slides.map((r) => ({ id: r.id, file: r.path.split(/[\\/]/).pop() ?? r.path })),
     },
   };
@@ -261,6 +265,7 @@ export function guestSession(p: PackFile, slides: SlideRef[], sessionPath: strin
     pins: p.session.pins,
     slides: slides.filter((r) => p.session.slides.some((x) => x.id === r.id)),
     grades: { groups: p.session.grades.groups, pinGroup: p.session.grades.pinGroup, assign: p.session.grades.assign },
+    ...(p.session.key ? { key: p.session.key } : {}),
     taskIndex: 0,
     guestPack: { id: p.id, host: p.host, guest: p.guest, taskIds: p.taskIds, pinIds: p.pinIds, createdAt: p.createdAt },
   };
@@ -333,8 +338,8 @@ export function sameReason(a: string, b: string) {
 
 export const sameVerdict = (a: Verdict, b: Verdict) => a.status === b.status && (a.status === "correct" || sameReason(a.text, b.text));
 
-/** give pins a grade, as one group per (task, status, text, by) */
-function applyVerdicts(g: GradeState, items: { pinId: string; taskId: string; v: Omit<Verdict, "at">; assignQ?: number; pin?: Pin }[]) {
+/** give pins a grade, as one group per (task, status, text, by). Changes `g`. */
+export function applyVerdicts(g: GradeState, items: { pinId: string; taskId: string; v: Omit<Verdict, "at">; assignQ?: number; pin?: Pin }[]) {
   const byKey = new Map<string, Group>();
   for (const it of items) {
     detach(g, [it.pinId]);

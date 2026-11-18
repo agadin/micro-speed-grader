@@ -47,8 +47,12 @@ export interface ViewerProps {
   onlyPinIds?: Set<string> | null;
   /** area painted while pins were hidden (slide coordinates) */
   paint?: PaintOp[];
-  /** a stroke made while pins are hidden (and painting is on) */
+  /** a stroke made while pins are hidden (and painting is on), or any stroke when `paintAlways` */
   onPaint?: (op: PaintOp) => void;
+  /** answer-key editing: the selection tools paint areas even with the pins showing */
+  paintAlways?: boolean;
+  /** painted areas drawn under the pins, e.g. answer-key marks (green right, red wrong) */
+  layers?: { ops: PaintOp[]; color: string; alpha: number }[];
   /** pins that "painted ✓ / rest ✗" would mark wrong: drawn with a dashed red ring */
   pendingWrong?: Set<string>;
 }
@@ -144,7 +148,8 @@ export function SlideViewer(props: ViewerProps) {
     return pins;
   };
   /** pins are hidden but strokes paint an area to grade by */
-  const paintMode = () => !propsRef.current.flagsVisible && propsRef.current.settings.hiddenPaint;
+  const paintMode = () =>
+    !!propsRef.current.paintAlways || (!propsRef.current.flagsVisible && propsRef.current.settings.hiddenPaint);
 
   /** marker style / size in effect: small dots once zoomed past the shrink threshold */
   const markerLook = (): { style: Settings["pinStyle"]; size: number } => {
@@ -303,7 +308,9 @@ export function SlideViewer(props: ViewerProps) {
     const { colors, labelMode } = p.settings;
     const { style: pinStyle, size: pinSize } = markerLook();
 
-    drawPaint(ctx, w, h, dpr);
+    for (const l of propsRef.current.layers ?? []) drawArea(ctx, w, h, dpr, l.ops, l.color, l.alpha);
+    const pOps = propsRef.current.paint;
+    if (pOps?.length) drawArea(ctx, w, h, dpr, pOps, propsRef.current.settings.colors.paint, propsRef.current.flagsVisible ? 0.26 : 0.38);
 
     // current cluster circle
     const G = clusterGeom();
@@ -544,10 +551,9 @@ export function SlideViewer(props: ViewerProps) {
     drawNavigator();
   }
 
-  /** the area painted while pins were hidden: one translucent layer, erasures cut out */
-  function drawPaint(ctx: CanvasRenderingContext2D, w: number, h: number, dpr: number) {
-    const ops = propsRef.current.paint;
-    if (!ops?.length) return;
+  /** a painted area (strokes and polygons, erasures cut out) as one translucent layer */
+  function drawArea(ctx: CanvasRenderingContext2D, w: number, h: number, dpr: number, ops: PaintOp[], color: string, alpha: number) {
+    if (!ops.length) return;
     let pc = paintCanvas.current;
     if (!pc) pc = paintCanvas.current = document.createElement("canvas");
     if (pc.width !== Math.round(w * dpr) || pc.height !== Math.round(h * dpr)) {
@@ -575,14 +581,14 @@ export function SlideViewer(props: ViewerProps) {
         g.stroke();
       }
     }
-    // tint the mask with the paint colour
+    // tint the mask
     g.globalCompositeOperation = "source-in";
-    g.fillStyle = propsRef.current.settings.colors.paint;
+    g.fillStyle = color;
     g.fillRect(0, 0, w, h);
     g.globalCompositeOperation = "source-over";
     ctx.save();
     ctx.setTransform(1, 0, 0, 1, 0, 0);
-    ctx.globalAlpha = propsRef.current.flagsVisible ? 0.26 : 0.38;
+    ctx.globalAlpha = alpha;
     ctx.drawImage(pc, 0, 0);
     ctx.restore();
   }

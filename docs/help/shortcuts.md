@@ -46,6 +46,7 @@ Press **?** while grading to show the shortcuts sheet over the slide. On Windows
 | - / = | Smaller / bigger brush |
 | Esc | Clear painted area and isolation |
 | ? | Shortcuts sheet |
+| K | Use the answer key's suggestion for this cluster (Suggest only) |
 
 ## While selecting
 

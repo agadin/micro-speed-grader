@@ -10,7 +10,7 @@ Micro Speed Grader marks virtual-microscopy practicals one question at a time. S
 
 ![The grading screen: one question, every student's pins, grouped into clusters](img/grading-overview.jpg)
 
-**New here?** Read [Getting started](getting-started.md), then [Grading](grading.md). Keep [Keyboard shortcuts](shortcuts.md) open while you work: most grading is done from the keyboard.
+**New here?** Read [Getting started](getting-started.md), then [Grading](grading.md). To grade the common answers automatically, mark an [Answer key](answer-key.md). Keep [Keyboard shortcuts](shortcuts.md) open while you work: most grading is done from the keyboard.
 
 > Hover over any control in the app to see what it does. When the tooltip shows a **?**, click it to jump to the matching section here.
 

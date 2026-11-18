@@ -23,6 +23,11 @@ import { SlideViewer, type ViewerApi } from "./SlideViewer";
 import { ContextMenu } from "./ContextMenu";
 import { Ledger } from "./Ledger";
 import { RightPanel, type Progress } from "./RightPanel";
+import { KeyPanel } from "./KeyPanel";
+import { KeyApplyDialog } from "./KeyApplyDialog";
+import { planKey, applyPlan, suggest } from "../lib/answerKey";
+import { mergeRescan } from "../lib/rescan";
+import { scanSubmissions } from "../lib/loader";
 import { ExportDialog } from "./ExportDialog";
 import {
   IconCheck,
@@ -33,6 +38,7 @@ import {
   IconCross,
   IconExport,
   IconHandoff,
+  IconKey,
   IconRedo,
   IconSliders,
   IconUndo,
@@ -195,7 +201,38 @@ export function Grader({ session }: { session: Session }) {
   );
   /** pins of this image that are out with another grader */
   const conflicts = useMemo(() => conflictPins(session.grades), [session.grades]);
-  const flagged = useMemo(() => new Set(conflicts), [conflicts]);
+  // ---- Rescan submissions: late and changed work, graded by the key when it's set up to ----
+  const rescan = async () => {
+    if (guestPack || !session.submissionsDir) return;
+    st.set({ notice: { kind: "info", text: "Reading the submissions folder…" } });
+    try {
+      const scan = await scanSubmissions(session.submissionsDir, session.questions);
+      const r = mergeRescan(session, scan);
+      let grades = r.grades;
+      let keyed = 0;
+      const k = session.key;
+      if (k && k.mode === "grade" && k.autoNew && r.added.length) {
+        const next = { ...session, students: r.students, pins: r.pins, grades };
+        const plan = planKey(next, k, 0, new Set(r.added));
+        keyed = plan.grade.length;
+        grades = applyPlan(next, plan);
+      }
+      st.applyRescan(r, grades);
+      const parts = [
+        r.newStudents ? `${r.newStudents} new student${r.newStudents === 1 ? "" : "s"}` : "",
+        r.added.length ? `${r.added.length} new pin${r.added.length === 1 ? "" : "s"}${keyed ? ` (${keyed} graded by the answer key)` : ""}` : "",
+        r.removed ? `${r.removed} pin${r.removed === 1 ? "" : "s"} no longer in the files (their grades were removed)` : "",
+      ].filter(Boolean);
+      st.set({ notice: { kind: "info", text: parts.length ? `Rescan: ${parts.join(", ")}.` : "Rescan: no new or changed submissions." } });
+    } catch (e) {
+      st.set({ notice: { kind: "info", text: `Could not read the submissions folder: ${e}` } });
+    }
+  };
+  const rescanAsk = st.rescanAsk;
+  useEffect(() => {
+    if (rescanAsk) void rescan();
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [rescanAsk]);
   // notices (replaced someone's grade / new disagreements) fade on their own
   useEffect(() => {
     if (!st.notice) return;
@@ -262,6 +299,30 @@ export function Grader({ session }: { session: Session }) {
     queue.key === task?.id &&
     queue.cluster.pinIds.some((id) => states.get(id) === "ungraded");
   const cluster = queueValid ? queue!.cluster : liveCluster;
+  // ---- answer key ----
+  const key = session.key;
+  const keyHere = useMemo(() => (key && task ? key.marks.filter((m) => m.q === task.q && m.slide === task.slide) : []), [key, task]);
+  const keyLayers = useMemo(() => {
+    if (!keyHere.length || (!st.keyMode && !settings.showKey)) return undefined;
+    const a = st.keyMode ? 0.3 : 0.2;
+    return keyHere.map((m) => ({ ops: m.ops, color: m.kind === "correct" ? "#22c55e" : "#ef4444", alpha: a }));
+  }, [keyHere, st.keyMode, settings.showKey]);
+  /** suggest mode: what the key says about the current cluster's ungraded pins */
+  const keyHint = useMemo(() => {
+    if (!key || key.mode !== "suggest" || st.keyMode || !keyHere.length || !cluster) return null;
+    const ids = new Set(cluster.pinIds);
+    const h = suggest(key, ungraded.filter((p) => ids.has(p.id)), g);
+    return h.correct.length || h.wrong.size ? h : null;
+  }, [key, keyHere, st.keyMode, cluster, ungraded, g]);
+  const acceptKey = () => {
+    if (!keyHint || !task) return;
+    st.gradeMany(
+      [{ pinIds: keyHint.correct, status: "correct", text: "" }, ...[...keyHint.wrong].map(([text, pinIds]) => ({ pinIds, status: "wrong" as const, text }))],
+      task.id,
+      task.q,
+    );
+  };
+  const flagged = useMemo(() => new Set(conflicts), [conflicts]);
   /** index (in the queue) of the pin being graded: first ungraded at or after the cursor */
   const pinAt = (from: number, dir: 1 | -1) => {
     if (!queueValid) return -1;
@@ -591,7 +652,7 @@ export function Grader({ session }: { session: Session }) {
         t.tagName === "SELECT")
     )
       return;
-    if (st.menu || st.settingsOpen || st.exportOpen || st.handoffOpen || st.conflictsOpen) return;
+    if (st.menu || st.settingsOpen || st.exportOpen || st.handoffOpen || st.conflictsOpen || st.keyApplyOpen) return;
     const mod = isMac ? e.metaKey : e.ctrlKey;
     const k = e.key;
     if (mod && k.toLowerCase() === "z") {
@@ -638,6 +699,9 @@ export function Grader({ session }: { session: Session }) {
     if (k === "s") return jumpKind(onSingles ? "clusters" : "singles");
     if (k === "?") return setSettings({ showKeyHints: !settings.showKeyHints });
     if (k === "Escape") return (setPaint([]), st.set({ isolate: false }));
+    // editing the key: the side panel handles C / W; nothing here grades
+    if (st.keyMode) return;
+    if (k === "k" && keyHint) return acceptKey();
     const c = menuAnchor(st.selection);
     if (k === "Enter") return openMenu(st.selection, c.x, c.y);
     if (k === "c" && paintSplit && (paintSplit.ok.length || paintSplit.rest.length) && task) {
@@ -773,6 +837,14 @@ export function Grader({ session }: { session: Session }) {
                 Disagreements <b>{conflicts.length}</b>
               </button>
             )}
+            <button
+              className={`btn ${st.keyMode ? "light" : "ghost"}`}
+              onClick={() => st.set(st.keyMode ? { keyMode: false, keyApplyOpen: !!key?.marks.length } : { keyMode: true, menu: null, selection: [] })}
+              title="Mark where the right and common wrong answers are; matching pins are graded for you"
+              data-help="answer-key"
+            >
+              <IconKey /> Answer key{key?.marks.length ? ` · ${key.marks.length}` : ""}
+            </button>
             <button className="btn ghost" onClick={() => st.set({ handoffOpen: true })} title="Share the remaining work with other graders" data-help="handoff">
               <IconHandoff /> Hand off
             </button>
@@ -842,6 +914,8 @@ export function Grader({ session }: { session: Session }) {
               onlyPinIds={pinOnly}
               paint={paint}
               onPaint={(op) => setPaint((ops) => [...ops, op])}
+              paintAlways={st.keyMode}
+              layers={keyLayers}
               pendingWrong={pendingWrong}
               onSelect={(ids) => st.set({ selection: ids })}
               onPinClick={(id, x, y) => openMenu([id], x, y)}
@@ -890,13 +964,19 @@ export function Grader({ session }: { session: Session }) {
               />
             )}
             {st.notice && (
-              <div className={`notice-banner ${st.notice.kind}`} role="status" data-help={st.notice.kind === "conflict" ? "handoff/settle-disagreements" : "handoff/replacing-another-graders-grade"}>
+              <div className={`notice-banner ${st.notice.kind}`} role="status" data-help={
+                  st.notice.kind === "conflict"
+                    ? "handoff/settle-disagreements"
+                    : st.notice.kind === "info"
+                      ? "getting-started/new-and-changed-submissions"
+                      : "handoff/replacing-another-graders-grade"
+                }>
                 <span>{st.notice.text}</span>
                 {st.notice.kind === "conflict" ? (
                   <button className="btn ghost small" onClick={() => st.set({ conflictsOpen: true, notice: null })}>
                     Show
                   </button>
-                ) : (
+                ) : st.notice.kind === "override" ? (
                   <>
                     {st.notice.undo && (
                       <button
@@ -913,10 +993,30 @@ export function Grader({ session }: { session: Session }) {
                       Don't warn again
                     </button>
                   </>
-                )}
+                ) : null}
                 <button className="notice-x" onClick={() => st.set({ notice: null })} aria-label="Dismiss" title="Dismiss">
                   ×
                 </button>
+              </div>
+            )}
+            {keyHint && (
+              <div className="key-hint" data-help="answer-key/grade-or-suggest">
+                <span className="key-hint-l">Answer key</span>
+                {keyHint.correct.length > 0 && <span className="ok-text">✓ {keyHint.correct.length}</span>}
+                {[...keyHint.wrong].map(([t, ids]) => (
+                  <span key={t} className="warn-text">
+                    ✗ {t} {ids.length}
+                  </span>
+                ))}
+                {keyHint.none > 0 && <span className="muted">{keyHint.none} not in the key</span>}
+                <button className="btn small" onClick={acceptKey} title="Grade these pins as the key says (K)">
+                  Use key <span className="kbd">K</span>
+                </button>
+              </div>
+            )}
+            {st.keyMode && (
+              <div className="key-banner">
+                Editing the answer key: paint where an answer is, then save it in the panel on the right.
               </div>
             )}
             {lockedHere > 0 && (
@@ -1065,25 +1165,37 @@ export function Grader({ session }: { session: Session }) {
             studentName={studentName}
           />
         </section>
-        <RightPanel
-          task={task}
-          question={question}
-          clusters={clusters}
-          selectionCount={st.selection.length}
-          progress={progress}
-          reasons={recentReasons}
-          onPickReason={(text) => {
-            if (!st.selection.length) return;
-            st.grade(st.selection, "wrong", text, task.id, task.q);
-          }}
-          realClusters={realClusters}
-          onSingles={onSingles}
-          onJumpKind={jumpKind}
-          onNextImage={nextImage}
-          onPrevImage={prevImage}
-          hasPrev={taskIndex > 0}
-          hasNext={taskIndex < tasks.length - 1}
-        />
+        {st.keyMode ? (
+          <KeyPanel
+            session={session}
+            task={task}
+            tasks={tasks}
+            question={question}
+            paint={paint}
+            clearPaint={() => setPaint([])}
+            onGoTask={(i) => st.setTask(i)}
+          />
+        ) : (
+          <RightPanel
+            task={task}
+            question={question}
+            clusters={clusters}
+            selectionCount={st.selection.length}
+            progress={progress}
+            reasons={recentReasons}
+            onPickReason={(text) => {
+              if (!st.selection.length) return;
+              st.grade(st.selection, "wrong", text, task.id, task.q);
+            }}
+            realClusters={realClusters}
+            onSingles={onSingles}
+            onJumpKind={jumpKind}
+            onNextImage={nextImage}
+            onPrevImage={prevImage}
+            hasPrev={taskIndex > 0}
+            hasNext={taskIndex < tasks.length - 1}
+          />
+        )}
       </main>
 
       {st.menu && (
@@ -1108,6 +1220,7 @@ export function Grader({ session }: { session: Session }) {
           onPaintGrade={gradePainted}
         />
       )}
+      {st.keyApplyOpen && <KeyApplyDialog session={session} onClose={() => st.set({ keyApplyOpen: false })} />}
       {st.conflictsOpen && <ConflictsDialog session={session} tasks={tasks} onClose={() => st.set({ conflictsOpen: false })} />}
       {st.handoffOpen && (
         <HandoffDialog session={session} tasks={tasks} onClose={() => st.set({ handoffOpen: false })} />

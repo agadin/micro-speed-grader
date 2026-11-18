@@ -1,4 +1,5 @@
 import type { Check, GuestPack, Handoff } from "./handoff";
+import type { AnswerKey } from "./answerKey";
 export interface Question {
   num: number;
   /** Slide ids (e.g. "VMS146") the student may answer on. */
@@ -78,6 +79,8 @@ export interface Session {
   handoffs?: Handoff[];
   /** guest: this session was opened from a hand-off pack */
   guestPack?: GuestPack;
+  /** the instructor's answer key: painted areas that grade (or suggest) matching pins */
+  key?: AnswerKey;
 }
 
 export interface Task {

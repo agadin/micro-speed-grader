@@ -1,6 +1,8 @@
 import { create } from "zustand";
 import type { GradeState, GradeStatus, Group, Session } from "./types";
 import { graderLabel, hostGraded, type Handoff } from "./handoff";
+import type { AnswerKey } from "./answerKey";
+import type { RescanResult } from "./rescan";
 import { writeText } from "./backend";
 import { cloneGrades, detach, pinMap } from "./grading";
 import { uid } from "./util";
@@ -38,8 +40,14 @@ interface Store {
   exportOpen: boolean;
   handoffOpen: boolean;
   conflictsOpen: boolean;
+  /** editing the answer key instead of grading */
+  keyMode: boolean;
+  /** the "what should the key apply to?" dialog */
+  keyApplyOpen: boolean;
   /** a one-line notice over the slide (e.g. "you replaced Jamie's grade") with optional undo */
-  notice: { kind: "override" | "conflict"; text: string; undo?: boolean } | null;
+  notice: { kind: "override" | "conflict" | "info"; text: string; undo?: boolean } | null;
+  /** File ▸ Rescan Submissions… (a request the grading screen acts on) */
+  rescanAsk: number;
   /** "don't warn me again" for replacing other graders' grades, until the app is closed */
   overrideQuiet: boolean;
   /** help viewer: null = closed, "" = topic list, else a topic id */
@@ -65,6 +73,12 @@ interface Store {
   setHandoffs: (h: Handoff[]) => void;
   /** host: merge a guest's results (one undo step) */
   applyResult: (grades: GradeState, h: Handoff[]) => void;
+  /** save the answer key (marks aren't part of undo; applying them is) */
+  setKey: (key: AnswerKey) => void;
+  /** grades changed by applying the answer key (one undo step) */
+  applyGrades: (grades: GradeState) => void;
+  /** new students/pins from Rescan submissions (clears undo: earlier steps refer to the old pins) */
+  applyRescan: (r: RescanResult, grades: GradeState) => void;
 }
 
 /** other graders whose grades on these pins are about to be replaced, e.g. ["Jamie"] and how many pins */
@@ -121,13 +135,16 @@ export const useStore = create<Store>((set, get) => {
     exportOpen: false,
     handoffOpen: false,
     conflictsOpen: false,
+    keyMode: false,
+    keyApplyOpen: false,
     notice: null,
+    rescanAsk: 0,
     overrideQuiet: false,
     help: null,
     startupIntent: null,
 
     load: (session) =>
-      set({ session, past: [], future: [], dirty: false, selection: [], clusterIndex: 0, menu: null, isolate: false }),
+      set({ session, past: [], future: [], dirty: false, selection: [], clusterIndex: 0, menu: null, isolate: false, keyMode: false, keyApplyOpen: false }),
     close: () => set({ session: null, past: [], future: [] }),
 
     setTask: (i) => {
@@ -227,6 +244,26 @@ export const useStore = create<Store>((set, get) => {
       if (!s) return;
       set({ session: { ...s, handoffs } });
       commit(grades);
+    },
+    setKey: (key) => {
+      const s = get().session;
+      if (!s) return;
+      set({ session: { ...s, key }, dirty: true });
+      scheduleSave();
+    },
+    applyGrades: (grades) => commit(grades),
+    applyRescan: (r, grades) => {
+      const s = get().session;
+      if (!s) return;
+      set({
+        session: { ...s, students: r.students, pins: r.pins, grades },
+        past: [],
+        future: [],
+        selection: [],
+        menu: null,
+        dirty: true,
+      });
+      scheduleSave();
     },
     focusPins: (pinIds) => set({ focusRequest: { pinIds, nonce: Date.now() } }),
     showPins: (taskIndex, pinIds) => {

@@ -9,6 +9,7 @@ import { basename, dirname, joinPath, listFiles, pathExists, readText, withExt, 
 import { forgetRecent, recentSessions, rememberRecent, useStore, type Recent } from "../lib/store";
 import { guestSession, parsePack } from "../lib/handoff";
 import { parseTaskId } from "../lib/grading";
+import { applyPlan, emptyKey, parseKeyFile, planKey, type AnswerKey, type KeyMark } from "../lib/answerKey";
 
 async function openSessionFile(path: string): Promise<Session> {
   try {
@@ -211,6 +212,9 @@ function NewSession({ onCancel }: { onCancel: () => void }) {
   const [sessionPath, setSessionPath] = useState("");
   const [busy, setBusy] = useState<string | null>(null);
   const [err, setErr] = useState<string | null>(null);
+  /** step 5 (optional): an answer key imported from a file, and/or start by marking one */
+  const [keyFile, setKeyFile] = useState<{ path: string; marks: KeyMark[]; mode: AnswerKey["mode"]; skipped: number } | null>(null);
+  const [markFirst, setMarkFirst] = useState(false);
 
   const slideSet = useMemo(() => new Set(slides.map((s) => s.id)), [slides]);
 
@@ -265,6 +269,17 @@ function NewSession({ onCancel }: { onCancel: () => void }) {
   const included = questions.filter((q) => q.include);
   const ready = included.length > 0 && subDir && slidesDir && sessionPath;
 
+  const pickKey = async () => {
+    const f = await open({ filters: [{ name: "Answer key", extensions: ["msgkey"] }] });
+    if (typeof f !== "string") return;
+    try {
+      const r = parseKeyFile(await readText(f, 20_000_000), { questions });
+      setKeyFile({ path: f, marks: r.marks, mode: r.file.mode === "suggest" ? "suggest" : "grade", skipped: r.skipped });
+    } catch (e) {
+      setErr(String(e instanceof Error ? e.message : e));
+    }
+  };
+
   const start = async () => {
     setErr(null);
     setBusy("Reading student annotations…");
@@ -285,8 +300,12 @@ function NewSession({ onCancel }: { onCancel: () => void }) {
         slides,
         grades: emptyGrades(),
         taskIndex: 0,
+        ...(keyFile ? { key: { ...emptyKey(), mode: keyFile.mode, marks: keyFile.marks } } : {}),
       };
+      // an imported key grades the matching pins straight away (nothing else is graded yet)
+      if (session.key && session.key.mode === "grade") session.grades = applyPlan(session, planKey(session, session.key, 1));
       load(session);
+      if (markFirst) useStore.getState().set({ keyMode: true });
       await useStore.getState().saveNow();
       if (scan.warnings.length) console.warn(scan.warnings);
     } catch (e) {
@@ -411,6 +430,33 @@ function NewSession({ onCancel }: { onCancel: () => void }) {
             </div>
             {sessionPath && <div className="muted small">{sessionPath}</div>}
             <div className="muted small">Grading auto-saves to this file as you work.</div>
+          </div>
+        </div>
+
+        <div className="step" data-help="answer-key/in-a-new-session">
+          <div className="step-n">5</div>
+          <div className="step-body">
+            <div className="step-head">
+              <b>
+                Answer key <span className="muted">(optional)</span>
+              </b>
+              <button onClick={pickKey} disabled={!questions.length} title={questions.length ? "Load a key saved from another session (.msgkey)" : "Choose the exam first"}>
+                {keyFile ? "Change…" : "Import key…"}
+              </button>
+            </div>
+            {keyFile ? (
+              <div className="muted small">
+                {keyFile.path} · {keyFile.marks.length} area{keyFile.marks.length === 1 ? "" : "s"}
+                {keyFile.skipped ? ` (${keyFile.skipped} for questions or slides not in this exam skipped)` : ""} · pins in them are{" "}
+                {keyFile.mode === "grade" ? "graded as soon as grading starts" : "suggested while you grade"}
+              </div>
+            ) : (
+              <div className="muted small">Mark where the answers are and matching pins are graded for you, now and as late work comes in.</div>
+            )}
+            <label className="check key-first">
+              <input type="checkbox" checked={markFirst} onChange={(e) => setMarkFirst(e.target.checked)} />
+              {keyFile ? "Review the key before grading" : "Start by marking the answer key"}
+            </label>
           </div>
         </div>
 

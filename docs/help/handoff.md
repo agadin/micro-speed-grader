@@ -38,6 +38,8 @@ There is no server and no account. The files travel however you like: email, Goo
 
 ![Dragging an image to another grader](img/handoff-drag.gif)
 
+If you have an [answer key](answer-key.md), apply it first: pins it grades are no longer "remaining", so you only hand off the answers the key couldn't place. The pack carries the key as suggestions.
+
 The handed-off pins are now **locked** in your session:
 
 - They're drawn faint on the slide and can't be graded.

@@ -2662,7 +2662,7 @@ body.drag-sorting * {
 .handoff-banner {
   position: absolute;
   z-index: 6;
-  bottom: 16px;
+  bottom: calc(var(--ledger-h) + var(--tool-h) + 3 * var(--gap) + 6px);
   left: calc((100% - var(--panel-w, 0px)) / 2);
   transform: translateX(-50%);
   display: flex;
@@ -3232,7 +3232,7 @@ body.drag-sorting * {
 .notice-banner {
   position: absolute;
   z-index: 7;
-  top: 14px;
+  top: calc(var(--top) + 14px);
   left: calc((100% - var(--panel-w, 0px)) / 2);
   transform: translateX(-50%);
   display: flex;
@@ -3389,4 +3389,223 @@ body.drag-sorting * {
 }
 .ho-pct:focus-within {
   box-shadow: 0 0 0 1px var(--accent);
+}
+
+/* ---------- answer key ---------- */
+.ledger .by.key {
+  background: rgba(79, 191, 106, 0.16);
+  color: #8fd9a0;
+}
+/* over the slide: what the key says about this cluster (suggest mode) */
+.key-hint,
+.key-banner {
+  position: absolute;
+  z-index: 6;
+  left: calc((100% - var(--panel-w, 0px)) / 2);
+  transform: translateX(-50%);
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 6px 8px 6px 14px;
+  border-radius: 12px;
+  background: rgba(24, 24, 26, 0.88);
+  border: 1px solid rgba(79, 191, 106, 0.4);
+  color: #ececec;
+  font-size: 12px;
+  white-space: nowrap;
+}
+.key-hint {
+  bottom: calc(var(--ledger-h) + var(--tool-h) + 3 * var(--gap) + 52px);
+}
+.key-hint-l {
+  font-weight: 600;
+  color: #8fd9a0;
+}
+.key-banner {
+  top: calc(var(--top) + 14px);
+  padding: 7px 14px;
+  border-color: var(--accent-soft);
+}
+.key-panel .muted.small {
+  line-height: 1.45;
+}
+.key-new {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  margin-top: 4px;
+  padding: 10px;
+  border-radius: 10px;
+  border: 1px dashed var(--fill-2);
+}
+.key-new.on {
+  border-style: solid;
+  border-color: var(--accent-soft);
+  background: rgba(232, 178, 90, 0.05);
+}
+.key-new-n {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+}
+.key-ok {
+  justify-content: space-between;
+  color: var(--ok);
+}
+.key-wrong {
+  display: flex;
+  gap: 6px;
+}
+.key-wrong .input {
+  flex: 1;
+  min-width: 0;
+}
+.key-bad {
+  color: var(--bad);
+}
+.key-list {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+}
+.key-list li {
+  display: grid;
+  grid-template-columns: 10px minmax(0, 1fr) auto auto;
+  align-items: center;
+  gap: 8px;
+  padding: 4px 4px 4px 6px;
+  border-radius: 7px;
+}
+.key-list li:hover {
+  background: var(--fill-1);
+}
+.key-list li > i {
+  width: 10px;
+  height: 10px;
+  border-radius: 3px;
+  background: #4fbf6a;
+}
+.key-list li.wrong > i {
+  background: #e5484d;
+}
+.key-what {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.key-list .icon {
+  background: none;
+  border: 0;
+  box-shadow: none;
+  color: var(--tx-3);
+}
+.key-others {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 4px;
+  margin-top: 8px;
+}
+.key-chip {
+  height: 22px;
+  padding: 0 8px;
+  border-radius: 999px;
+  font-size: 11px;
+  background: var(--fill-1);
+  border: 1px solid var(--sep);
+  box-shadow: none;
+}
+.key-chip.on {
+  border-color: var(--accent);
+}
+.key-files {
+  display: flex;
+  gap: 6px;
+  margin-top: 8px;
+}
+.key-done {
+  margin-top: auto;
+  padding: 10px 12px 12px;
+  display: flex;
+  justify-content: flex-end;
+}
+.key-first {
+  display: inline-flex;
+  align-items: center;
+  gap: 7px;
+  margin-top: 2px;
+  font-size: 12.5px;
+}
+.right .rescan {
+  height: auto;
+  padding: 0;
+  background: none;
+  border: 0;
+  box-shadow: none;
+  color: var(--accent);
+  font-size: 11.5px;
+}
+.right .rescan:hover:not(:disabled) {
+  background: none;
+  text-decoration: underline;
+}
+
+/* "what should the key apply to?" */
+.key-apply-modal {
+  width: min(600px, calc(100vw - 32px));
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+}
+.key-apply-modal h2 {
+  margin: 0;
+}
+.ka-group {
+  margin: 0;
+  padding: 4px;
+  border: 1px solid var(--sep);
+  border-radius: 12px;
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+}
+.ka-group legend {
+  padding: 0 6px;
+  font: 600 11.5px var(--sans);
+  color: var(--tx-3);
+}
+.ka-choice {
+  display: grid;
+  grid-template-columns: auto minmax(0, 1fr) auto;
+  align-items: center;
+  gap: 10px;
+  padding: 8px 10px;
+  border-radius: 9px;
+  cursor: pointer;
+}
+.ka-choice:hover {
+  background: var(--fill-1);
+}
+.ka-choice.on {
+  background: var(--accent-soft);
+}
+.ka-text {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+}
+.ka-count {
+  font: 600 11.5px var(--mono);
+  color: var(--tx-2);
+  white-space: nowrap;
+}
+.ka-count.zero {
+  color: var(--tx-4);
+  font-weight: 500;
+}
+.ka-sum {
+  margin: 0;
+  color: var(--tx-2);
 }

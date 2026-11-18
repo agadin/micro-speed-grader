@@ -27,6 +27,10 @@ The full user guide is in [docs/help](docs/help/index.md); the same pages are bu
 - Crowded clusters: hide the pins and paint the true structure (painted ✓, rest of cluster ✗ in one
   key), or step through a cluster pin by pin; also polygon outlining, spotlight-on-hover and small
   pins when zoomed in. Each is toggled in Preferences → Selection, which shows a short demo of each
+- Answer key: paint where the right answer and common wrong answers are, per question and slide, and
+  matching pins are graded for you (or only suggested), now and as late work comes in; reusable as a
+  `.msgkey` file ([how it works](docs/help/answer-key.md))
+- Rescan submissions picks up late and changed work without losing grades
 - Auto-flags students who submit more than one pin per question
 - Ledger of every grading decision with undo/redo, editable afterwards
 - Autosave with crash recovery; CSV + feedback export

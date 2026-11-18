@@ -35,6 +35,8 @@ export interface Settings {
   fbShow: "all" | "notCorrect";
   fbAllCorrect: string;
   showOtherQuestions: boolean;
+  /** draw the answer key's areas on the slide while grading */
+  showKey: boolean;
   selectTool: SelectTool;
   /** which selection tools appear in the tool switcher (B cycles through them) */
   tools: Record<SelectTool, boolean>;
@@ -118,6 +120,7 @@ export const defaultSettings: Settings = {
   fbShow: "all",
   fbAllCorrect: "All answers correct.",
   showOtherQuestions: false,
+  showKey: true,
   selectTool: "lasso",
   tools: { lasso: true, brush: true, polygon: true },
   clickToggle: false,

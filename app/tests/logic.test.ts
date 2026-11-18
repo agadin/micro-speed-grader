@@ -11,7 +11,9 @@ import { isPainted, pinsInPaint, type PaintOp } from "../src/lib/paint";
 import { exportTable, kr20, parseStudentName, EXPORT_PRESETS, testStats, safeFileName, uniqueFileNames, textCell, toCsv, type ExportRow } from "../src/lib/exportCsv";
 import { MAX_ANNOTATIONS } from "../src/lib/ndpa";
 import { parseMarkdown, slug } from "../src/lib/markdown";
-import { HOST, agreement, conflictPins, hostGraded, planOverlap, recallChecks, resolveWith, sameReason, seeded, awayPins, splitWeighted, guestSession, makePack, makeResult, mergeResult, parsePack, parseResult, remainingByTask } from "../src/lib/handoff";
+import { applyPlan, emptyKey, makeKeyFile, matchPin, newMark, parseKeyFile, planKey, type AnswerKey } from "../src/lib/answerKey";
+import { mergeRescan } from "../src/lib/rescan";
+import { KEY, HOST, agreement, conflictPins, hostGraded, planOverlap, recallChecks, resolveWith, sameReason, seeded, awayPins, splitWeighted, guestSession, makePack, makeResult, mergeResult, parsePack, parseResult, remainingByTask } from "../src/lib/handoff";
 import type { GradeState, Pin, Session } from "../src/lib/types";
 import { emptyGrades } from "../src/lib/types";
 
@@ -366,6 +368,102 @@ ok(!!dbl && studentResults(session, dbl, defaultSettings)[0].text === defaultSet
   let msg = "";
   try { parsePack(JSON.stringify({ kind: "msg-handoff", version: 2 })); } catch (e) { msg = String(e); }
   ok(/newer version/.test(msg), "newer pack format: asks to update the app");
+}
+
+// ---- answer key: match painted marks, apply at each level, key files, rescan, then hand off the rest ----
+{
+  const P = (id: string, stu: string, slide: string, q: number | null, x: number, y = 0, cands: number[] = []) =>
+    ({ id, studentId: stu, slide, rawTitle: `t${id}`, details: "", q, candidates: cands, titleGuessed: false, xNm: x, yNm: y, annotationType: "pin" }) as Pin;
+  // Q1 on slide A; Q2 "either B or C"; pins at x = 0 (right), 100 (common wrong), 500 (elsewhere)
+  const pins = [
+    P("a1", "s1", "A", 1, 0), P("a2", "s2", "A", 1, 100), P("a3", "s3", "A", 1, 500), P("a4", "s4", "A", 1, 0),
+    P("b1", "s1", "B", 2, 0), P("c2", "s2", "C", 2, 0), P("b3", "s3", "B", 2, 300),
+    P("d1", "s5", "A", 1, 0), P("d2", "s5", "A", 1, 100), // student s5 has two pins for Q1 → never key-graded
+  ];
+  const base = (): Session => ({
+    version: 1, name: "Prac", createdAt: 0, savedAt: 0, sessionPath: "/p.msgrade", submissionsDir: "/subs", slidesDir: "/s",
+    questions: [{ num: 1, slides: ["A"], prompt: "", include: true }, { num: 2, slides: ["B", "C"], prompt: "", include: true }],
+    students: ["s1", "s2", "s3", "s4", "s5"].map((id) => ({ id, name: id, folder: id })),
+    pins: pins.map((p) => ({ ...p })), slides: [], grades: emptyGrades(), taskIndex: 0,
+  });
+  const circle = (x: number, r = 20): PaintOp[] => [{ kind: "brush", mode: "add", pts: [{ x, y: 0 }], rNm: r }];
+  const key: AnswerKey = {
+    ...emptyKey(),
+    marks: [
+      newMark(1, "A", "correct", "", circle(0)),
+      newMark(1, "A", "wrong", "Neutrophil", circle(100)),
+      newMark(2, "B", "correct", "", circle(0)),
+      newMark(2, "C", "correct", "", circle(0)),
+    ],
+  };
+  const s = base();
+  const gradeOf = (g: GradeState, id: string) => g.groups[g.pinGroup[id]];
+
+  ok(matchPin(key, s.pins[0], s.grades).kind === "match" && matchPin(key, s.pins[2], s.grades).kind === "none", "pin in a mark matches; elsewhere doesn't");
+  const p1 = planKey(s, key, 1);
+  ok(p1.grade.length === 5 && p1.unmatched === 2, `ungraded: ${p1.grade.length} graded by key, ${p1.unmatched} left (a3, b3); double pins skipped`);
+  const g1 = applyPlan(s, p1);
+  ok(gradeOf(g1, "a1").by === KEY && gradeOf(g1, "a1").status === "correct" && gradeOf(g1, "a2").text === "Neutrophil", "key grades: correct, and wrong with its reason");
+  ok(gradeOf(g1, "b1").taskId === "Q2|B" && gradeOf(g1, "c2").taskId === "Q2|C", "either-slide question: each slide's mark grades its own image");
+  ok(!g1.pinGroup.d1 && !g1.pinGroup.d2, "a student with two pins for a question is left to the double-pin rule");
+  ok(planKey(s, key, 0).grade.length === 0, "level 0 changes nothing now");
+
+  // a person grades a1 wrong, a TA grades a4 wrong; then the key is applied again at each level
+  const s2 = { ...s, grades: g1 };
+  s2.grades.groups.me = { id: "me", taskId: "Q1|A", status: "wrong", text: "mine", pinIds: ["a1"], createdAt: 1 };
+  s2.grades.pinGroup.a1 = "me";
+  s2.grades.groups.ta = { id: "ta", taskId: "Q1|A", status: "wrong", text: "ta", pinIds: ["a4"], createdAt: 1, by: "Jamie" };
+  s2.grades.pinGroup.a4 = "ta";
+  for (const gid of Object.keys(s2.grades.groups)) s2.grades.groups[gid] = { ...s2.grades.groups[gid], pinIds: s2.grades.groups[gid].pinIds.filter((x) => gid === "me" || gid === "ta" || (x !== "a1" && x !== "a4")) };
+  // move the wrong-answer mark away: the key's earlier grade on a2 no longer matches
+  const moved: AnswerKey = { ...key, marks: key.marks.map((m) => (m.kind === "wrong" ? { ...m, ops: circle(400) } : m)) };
+  const lv = [1, 2, 3, 4].map((l) => planKey(s2, moved, l as 1 | 2 | 3 | 4));
+  ok(lv[0].grade.length === 0 && lv[0].clear.length === 0, "level 1: nothing ungraded is left to grade");
+  ok(lv[1].clear.join() === "a2", "level 2: the key's grade on a pin no longer in any mark is removed");
+  ok(lv[2].grade.map((x) => x.pinId).join() === "a4" && lv[2].replaces === 1, "level 3: replaces another grader's grade, keeps mine");
+  ok(lv[3].grade.map((x) => x.pinId).sort().join() === "a1,a4" && lv[3].replaces === 2, "level 4: replaces mine too");
+
+  // overlapping marks that disagree → left for a person
+  const clash: AnswerKey = { ...key, marks: [...key.marks, newMark(1, "A", "wrong", "Mast cell", circle(0))] };
+  ok(matchPin(clash, s.pins[0], s.grades).kind === "conflict" && planKey(s, clash, 1).conflicts >= 2, "pin in a correct and a wrong mark is left for a person");
+
+  // an unlabelled pin on a slide two questions use: graded under the question whose mark it's in
+  const amb = { ...base(), questions: [...base().questions, { num: 3, slides: ["B"], prompt: "", include: true }] };
+  amb.pins.push(P("u1", "s4", "B", null, 0, 0, [2, 3]));
+  const ga = applyPlan(amb, planKey(amb, key, 1));
+  ok(gradeOf(ga, "u1")?.taskId === "Q2|B" && ga.assign.u1 === 2, "unlabelled pin assigned to the question whose mark it's in");
+
+  // key file round trip; marks for questions/slides the session lacks are skipped
+  const f = JSON.stringify(makeKeyFile(s, { ...key, marks: [...key.marks, newMark(9, "Z", "correct", "", circle(0))] }));
+  const back = parseKeyFile(f, s);
+  ok(back.marks.length === 4 && back.skipped === 1 && back.marks[1].reason === "Neutrophil", `key file: ${back.marks.length} marks, ${back.skipped} skipped`);
+  let kmsg = "";
+  try { parseKeyFile(JSON.stringify({ kind: "msg-key", version: 1, marks: [{ q: 1, slide: "A", kind: "correct", ops: [{ kind: "poly", mode: "add", pts: [{ x: "a" }] }] }] }), s); } catch (e) { kmsg = String(e); }
+  ok(!kmsg && parseKeyFile(JSON.stringify({ kind: "msg-key", version: 1, marks: [{ q: 1, slide: "A", kind: "correct", ops: [{ kind: "poly", mode: "add", pts: [{ x: "a" }] }] }] }), s).skipped === 1, "malformed marks are skipped, not trusted");
+
+  // rescan: a late student and a changed file; unchanged pins keep id + grade; new pins get the key
+  const scanned = {
+    students: [...s.students.map((x) => ({ ...x, id: `n${x.id}` })), { id: "n6", name: "s6", folder: "s6" }],
+    pins: [
+      ...s.pins.filter((p) => p.id !== "a3").map((p) => ({ ...p, id: `x${p.id}`, studentId: `n${p.studentId}` })),
+      { ...P("new1", "n6", "A", 1, 0), id: "xnew1" },
+      { ...P("new2", "ns3", "A", 1, 100), id: "xnew2" },
+    ],
+  };
+  const r = mergeRescan({ ...s, grades: g1 }, scanned);
+  ok(r.newStudents === 1 && r.added.length === 2 && r.removed === 1, `rescan: +${r.newStudents} student, +${r.added.length} pins, −${r.removed}`);
+  ok(r.pins.some((p) => p.id === "a1") && !!r.grades.pinGroup.a1 && !r.pins.some((p) => p.id === "a3"), "unchanged pins keep their id and grade; removed pin dropped");
+  const sr: Session = { ...s, students: r.students, pins: r.pins, grades: r.grades };
+  const auto = planKey(sr, key, 0, new Set(r.added));
+  ok(auto.grade.length === 2, "new submissions get the key (level 0 = only new pins)");
+
+  // the instructor's flow: the key grades what it can, the rest goes to a TA, who only gets untouched pins
+  const sk = { ...s, grades: g1, key };
+  const rest = remainingByTask(sk, buildTasks(sk.questions, new Set(["A", "B", "C"])));
+  const left = rest.flatMap((x) => x.pinIds).sort();
+  ok(left.join() === "a3,b3", `hand-off after the key: only ${left.join(", ")} remain`);
+  const pk = makePack(sk, "Jamie", rest.filter((x) => x.pinIds.length).map((x) => x.task.id), left);
+  ok(pk.pinIds.join() === "a3,b3" && pk.session.key?.marks.length === 4 && pk.session.key.mode === "suggest", "pack carries the key (as suggestions) and only the untouched pins");
 }
 
 // ---- help wiki (docs/help): parses, nested lists survive, every link/anchor/image exists ----

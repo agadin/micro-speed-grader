@@ -37,9 +37,36 @@ interface Props {
 
 const pct = (a: number, b: number) => (b ? Math.round((a / b) * 100) : 100);
 
+/** the selection-tool switcher (when 2+ tools are on) and the brush size: also used by the answer-key editor */
+export function ToolPicker() {
+  const { s, set } = useSettings();
+  const tool = activeTool(s);
+  const enabledTools = SELECT_TOOLS.filter((t) => s.tools[t]);
+  return (
+    <>
+      {enabledTools.length > 1 && (
+        <div className="seg full" role="radiogroup" aria-label="Selection tool">
+          {enabledTools.map((t) => (
+            <button key={t} className={tool === t ? "on acc" : ""} onClick={() => set({ selectTool: t })} title={`${TOOL_LABEL[t]} (B cycles tools)`}>
+              {t === "lasso" ? <IconLasso /> : t === "brush" ? <IconBrush /> : <IconPolygon />} {TOOL_LABEL[t]}
+            </button>
+          ))}
+        </div>
+      )}
+      {tool === "brush" && (
+        <SliderRow label="Brush" value={s.brushPx} min={BRUSH_MIN} max={BRUSH_MAX} unit="px" onChange={(v) => set({ brushPx: v })} />
+      )}
+    </>
+  );
+}
+
 /** each section's help article and the tooltip on its heading */
 const PANEL_HELP: Record<string, [string, string]> = {
   question: ["clusters/images", "The question and slide you're grading"],
+  "key-question": ["answer-key", "The question you're marking the answer for"],
+  "key-paint": ["answer-key/mark-the-answers", "Paint an area, then save it as correct or as a common wrong answer"],
+  "key-marks": ["answer-key/mark-the-answers", "Areas on this image: where the right and common wrong answers are"],
+  "key-settings": ["answer-key/grade-or-suggest", "What the key does with matching pins, and key files"],
   clusters: ["clusters/how-clusters-work", "How close pins must be to group into a cluster"],
   select: ["selecting", "Tools for picking out pins by hand"],
   display: ["grading/showing-the-pins-differently", "What's drawn on the slide"],
@@ -48,7 +75,7 @@ const PANEL_HELP: Record<string, [string, string]> = {
 };
 
 /** collapsible side panel with a disclosure-triangle header */
-function Panel({ id, title, meta, children, fixed }: { id: string; title: string; meta?: ReactNode; children: ReactNode; fixed?: boolean }) {
+export function Panel({ id, title, meta, children, fixed }: { id: string; title: string; meta?: ReactNode; children: ReactNode; fixed?: boolean }) {
   const { s, set } = useSettings();
   const closed = !fixed && s.collapsedPanels.includes(id);
   const [help, tip] = PANEL_HELP[id] ?? [undefined, undefined];
@@ -89,7 +116,6 @@ export function RightPanel(p: Props) {
   const { s, set } = useSettings();
   const ui = useStore();
   const sel = p.selectionCount;
-  const tool = activeTool(s);
   const enabledTools = SELECT_TOOLS.filter((t) => s.tools[t]);
 
   return (
@@ -127,18 +153,7 @@ export function RightPanel(p: Props) {
       </Panel>
 
       <Panel id="select" title="Select" meta={enabledTools.length > 1 ? <span className="kbd" title="B cycles tools">B</span> : undefined}>
-        {enabledTools.length > 1 && (
-          <div className="seg full" role="radiogroup" aria-label="Selection tool">
-            {enabledTools.map((t) => (
-              <button key={t} className={tool === t ? "on acc" : ""} onClick={() => set({ selectTool: t })} title={`${TOOL_LABEL[t]} (B cycles tools)`}>
-                {t === "lasso" ? <IconLasso /> : t === "brush" ? <IconBrush /> : <IconPolygon />} {TOOL_LABEL[t]}
-              </button>
-            ))}
-          </div>
-        )}
-        {tool === "brush" && (
-          <SliderRow label="Brush" value={s.brushPx} min={BRUSH_MIN} max={BRUSH_MAX} unit="px" onChange={(v) => set({ brushPx: v })} />
-        )}
+        <ToolPicker />
         {s.pinByPin && (
           <label className="drow" title="Grade one pin at a time; only that pin is shown (O)">
             <span className="check">
@@ -178,6 +193,14 @@ export function RightPanel(p: Props) {
             Faded pins from other questions
           </span>
         </label>
+        {!!ui.session?.key?.marks.length && (
+          <label className="drow" title="Shade the answer key's areas: green where the answer is right, red for common wrong answers">
+            <span className="check">
+              <input type="checkbox" checked={s.showKey} onChange={(e) => set({ showKey: e.target.checked })} />
+              Answer key areas
+            </span>
+          </label>
+        )}
         <div className="drow">
           <span className="plabel">Pin text</span>
           <div className="seg small">
@@ -217,7 +240,24 @@ export function RightPanel(p: Props) {
 
       <div className="side-grow" />
 
-      <Panel id="progress" title="Progress" fixed>
+      <Panel
+        id="progress"
+        title="Progress"
+        fixed
+        meta={
+          !!ui.session?.submissionsDir &&
+          !ui.session.guestPack && (
+            <button
+              className="rescan"
+              onClick={() => ui.set({ rescanAsk: Date.now() })}
+              title="Read the submissions folder again: add late and changed work (File ▸ Rescan Submissions)"
+              data-help="getting-started/new-and-changed-submissions"
+            >
+              Rescan submissions
+            </button>
+          )
+        }
+      >
         <Bar label="This image" a={p.progress.taskDone} b={p.progress.taskTotal} color="var(--accent)" />
         <Bar label="Images done" a={p.progress.tasksDone} b={p.progress.tasksTotal} />
         <Bar label="All pins" a={p.progress.pinsDone} b={p.progress.pinsTotal} />

@@ -3,7 +3,7 @@
 // The selection-tool clips come from record-help-gifs.mjs.
 import fs from "node:fs";
 import path from "node:path";
-import { APP, ROOT, closeSession, launch, newDemoSession, openSession, startTileServer } from "./harness.mjs";
+import { APP, ROOT, closeSession, launch, newDemoSession, openSession, pickTool, ringOf, startTileServer } from "./harness.mjs";
 import { cursorScript, motion, recordGif } from "./media-kit.mjs";
 
 const OUT = path.join(ROOT, "docs/help/img");
@@ -15,7 +15,7 @@ fs.mkdirSync(OUT, { recursive: true });
 const tiles = await startTileServer();
 const W = 1440, H = 900;
 const { browser, context, page, dialog } = await launch({ browser: "chromium", viewport: { width: W, height: H }, initScripts: [cursorScript] });
-const { glide, wait, at } = motion(page, { x: W / 2, y: H / 2 });
+const { glide, drag, wait, at } = motion(page, { x: W / 2, y: H / 2 });
 const key = async (k, after = 450) => (await page.keyboard.press(k), wait(after));
 const made = [];
 const ONLY = process.argv.slice(2);
@@ -57,6 +57,12 @@ async function shot(name, target, { pad: p = 0, jpeg = name.endsWith(".jpg") } =
   await cursor(true);
   made.push(`${name} ${(fs.statSync(file).size / 1e3).toFixed(0)} kB`);
   console.log("made", made.at(-1));
+  // when only some files were asked for, stop as soon as they're all made
+  if (ONLY.length && ONLY.every((n) => made.some((m) => m.startsWith(`${n} `)))) {
+    await browser.close();
+    tiles.stop();
+    process.exit(0);
+  }
 }
 /** record a GIF, or (when it isn't wanted this run) just do the actions */
 async function maybeGif(name, opts, fn) {
@@ -165,6 +171,34 @@ await page.locator(".ho-twice-l input").uncheck();
   made.push(`handoff-drag.gif ${r.kb} kB, ${r.frames} frames`);
 }
 await page.locator(".handoff-modal").getByRole("button", { name: "Close", exact: true }).click();
+
+// ---- answer key: paint the right answer and a common wrong one, then the apply dialog ----
+if (wanted("key-editor.jpg") || wanted("key-apply.png")) {
+  await page.locator(".topbar select").selectOption({ index: 1 });
+  await wait(1500);
+  await page.getByRole("button", { name: /Answer key/ }).click();
+  await page.locator(".key-panel").waitFor();
+  await pickTool(page, "Lasso");
+  const loop = (c, k = 1.3) => Array.from({ length: 25 }, (_, i) => [c.x + c.r * k * Math.cos((i / 24) * 2 * Math.PI), c.y + c.r * k * Math.sin((i / 24) * 2 * Math.PI)]);
+  await key("f", 1000);
+  await drag(loop(await ringOf(page)), "right", 20);
+  await key("c", 400);
+  await key("]", 1000);
+  await drag(loop(await ringOf(page)), "right", 20);
+  await key("w", 200);
+  await page.keyboard.type("Brown adipose tissue");
+  await key("Enter", 300);
+  await key("[", 1000);
+  await key("f", 1500);
+  await page.mouse.move(W / 2, H - 120);
+  await shot("key-editor.jpg");
+  await page.getByRole("button", { name: "Done", exact: true }).click();
+  await page.locator(".key-apply-modal").waitFor();
+  await wait(300);
+  await shot("key-apply.png", ".key-apply-modal");
+  await page.locator(".key-apply-modal .primary").click();
+  await wait(600);
+}
 
 // ---- preferences: grading text (the in-page fallback of the Preferences window) ----
 await page.locator('button[title="Preferences (⌘,)"]').click();
