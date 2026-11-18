@@ -8,6 +8,7 @@ import { webkit, chromium } from "playwright";
 
 export const APP = path.resolve(import.meta.dirname, "../..");
 export const ROOT = path.resolve(APP, "..");
+export const APP_URL = process.env.MSG_APP_URL ?? "http://localhost:1420/";
 const TILE_PORT = Number(process.env.MSG_TILE_PORT ?? 8787);
 const TILE = `http://127.0.0.1:${TILE_PORT}`;
 
@@ -149,7 +150,7 @@ export async function installShim(context) {
  *   initScripts: extra scripts run before the app (e.g. media-kit's drawn cursor)
  */
 export async function launch({
-  url = "http://localhost:1420/",
+  url = APP_URL,
   headless = true,
   viewport = { width: 1440, height: 900 },
   browser: which = process.env.UI_BROWSER,
@@ -181,7 +182,7 @@ export async function launch({
  * `beforeStart(page)` runs with the wizard filled in (e.g. to screenshot it).
  */
 export async function newDemoSession(page, dialog, { save, slides = path.join(ROOT, "images"), beforeStart } = {}) {
-  await page.goto("http://localhost:1420/");
+  await page.goto(APP_URL);
   await page.evaluate(() => localStorage.clear());
   await page.reload();
   await page.getByText("New grading session…").click();

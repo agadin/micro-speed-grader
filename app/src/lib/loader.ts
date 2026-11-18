@@ -1,6 +1,6 @@
 import type { Pin, Question, SlideRef, Student } from "./types";
 import { basename, listFiles, readText } from "./backend";
-import { matchTitle, parseNdpa, slideIdFromFilename } from "./ndpa";
+import { matchTitle, namedQuestion, parseNdpa, slideIdFromFilename } from "./ndpa";
 
 export const SLIDE_EXTS = [".ndpi", ".svs", ".tif", ".tiff", ".mrxs", ".scn", ".vms"];
 
@@ -22,16 +22,68 @@ export async function scanSlides(dir: string): Promise<SlideRef[]> {
 export interface ScanResult {
   students: Student[];
   pins: Pin[];
+  /** things the instructor should check before grading (the wizard's "N things to check") */
+  problems: ScanProblem[];
+  /** the problems as one line each (logs) */
   warnings: string[];
+}
+
+/** What can be wrong in a submissions folder, in the order the list shows them. */
+export const SCAN_PROBLEM_KINDS = [
+  "no-submission", // a student folder with nothing gradeable
+  "missing-slide", // a student has files, but none for an included question's slide
+  "no-slide-id", // file name has no slide ID (VMS…), so its pins are left out
+  "other-slide", // file for a slide no question in the exam uses
+  "unknown-question", // a pin's title names a question that isn't on that slide
+  "too-many-pins", // over MAX_PINS_PER_STUDENT_SLIDE: the rest were dropped
+  "too-large", // over MAX_NDPA_BYTES: skipped
+  "unreadable", // not valid annotation data: skipped
+] as const;
+export type ScanProblemKind = (typeof SCAN_PROBLEM_KINDS)[number];
+export interface ScanProblem {
+  kind: ScanProblemKind;
+  /** the student's display name */
+  student?: string;
+  /** path inside the submissions folder (the student's folder for student-level problems) */
+  file?: string;
+  detail: string;
+}
+
+/** Problems grouped by kind, in SCAN_PROBLEM_KINDS order, empty kinds left out. */
+export function groupProblems(problems: ScanProblem[]): { kind: ScanProblemKind; items: ScanProblem[] }[] {
+  return SCAN_PROBLEM_KINDS.map((kind) => ({ kind, items: problems.filter((p) => p.kind === kind) })).filter((g) => g.items.length);
+}
+
+/** What the new-session wizard still needs before it can start (empty when ready). */
+export function startBlockers(w: { examPath: string; questions: Question[]; subDir: string; slidesDir: string; sessionPath: string }): string[] {
+  const out: string[] = [];
+  if (!w.examPath) out.push("the exam");
+  else if (!w.questions.some((q) => q.include)) out.push("at least one included question");
+  if (!w.subDir) out.push("the submissions folder");
+  if (!w.slidesDir) out.push("the slides folder");
+  if (!w.sessionPath) out.push("a save location");
+  return out;
+}
+
+/** File access for the scan: the app's backend by default (the logic tests pass Node's). */
+export interface ScanIO {
+  listFiles(dir: string, suffixes?: string[]): Promise<string[]>;
+  readText(path: string, maxBytes?: number): Promise<string>;
 }
 
 /** Student annotation files are a few KB; refuse anything absurd before parsing. */
 export const MAX_NDPA_BYTES = 2 * 1024 * 1024;
 export const MAX_PINS_PER_STUDENT_SLIDE = 50;
 
-export async function scanSubmissions(dir: string, questions: Question[]): Promise<ScanResult> {
-  const files = await listFiles(dir, [".ndpa"]);
-  const warnings: string[] = [];
+const LOOSE = "(loose files)";
+const qList = (nums: number[]) => nums.map((n) => `Q${n}`).join(", ");
+const firstFew = (xs: string[], n = 3) => xs.slice(0, n).join(", ") + (xs.length > n ? "…" : "");
+
+export async function scanSubmissions(dir: string, questions: Question[], io: ScanIO = { listFiles, readText }): Promise<ScanResult> {
+  // every file, so a student folder holding only a PDF or a screenshot still shows up as "no submission"
+  const all = await io.listFiles(dir, []);
+  const files = all.filter((f) => f.toLowerCase().endsWith(".ndpa"));
+  const problems: ScanProblem[] = [];
   const root = dir.replace(/[\\/]+$/, "");
   const studentsByFolder = new Map<string, Student>();
   const pins: Pin[] = [];
@@ -41,37 +93,70 @@ export async function scanSubmissions(dir: string, questions: Question[]): Promi
   const questionsBySlide = new Map<string, number[]>();
   for (const q of included)
     for (const s of q.slides) questionsBySlide.set(s, [...(questionsBySlide.get(s) ?? []), q.num]);
+  // every question (included or not) per slide: a file or pin for a left-out question is not a problem
+  const examSlides = new Map<string, number[]>();
+  for (const q of questions) for (const s of q.slides) examSlides.set(s, [...(examSlides.get(s) ?? []), q.num]);
+
+  const relOf = (f: string) => f.slice(root.length).replace(/^[\\/]+/, "");
+  const folderOf = (rel: string) => {
+    const segs = rel.split(/[\\/]/);
+    return segs.length > 1 ? segs[0] : LOOSE;
+  };
+  /** per student folder: the included slides they handed a file in for, and their other (non-.ndpa) files */
+  const handedIn = new Map<string, Set<string>>();
+  const otherFiles = new Map<string, string[]>();
+  const isNdpa = new Set(files);
+  for (const f of all) {
+    const folder = folderOf(relOf(f));
+    if (folder === LOOSE && !isNdpa.has(f)) continue; // e.g. the exam PDF next to the student folders
+    if (!handedIn.has(folder)) handedIn.set(folder, new Set());
+    if (!isNdpa.has(f)) otherFiles.set(folder, [...(otherFiles.get(folder) ?? []), basename(f)]);
+  }
 
   for (const f of files) {
-    const rel = f.slice(root.length).replace(/^[\\/]+/, "");
-    const segs = rel.split(/[\\/]/);
-    const folder = segs.length > 1 ? segs[0] : "(loose files)";
+    const rel = relOf(f);
+    const folder = folderOf(rel);
     let student = studentsByFolder.get(folder);
     if (!student) {
       student = { id: `s${studentsByFolder.size + 1}`, name: prettyName(folder), folder };
       studentsByFolder.set(folder, student);
     }
+    const name = student.name;
+    const problem = (kind: ScanProblemKind, detail: string) => problems.push({ kind, student: name, file: rel, detail });
     const slide = slideIdFromFilename(basename(f));
-    if (!slide) continue;
-    const slideQs = questionsBySlide.get(slide);
-    if (!slideQs) continue; // slide not used by any included question
+    const slideQs = slide ? questionsBySlide.get(slide) : undefined;
+    if (!slide || !slideQs) {
+      // slide not used by any included question (one only a left-out question uses is fine)
+      if (!slide || !examSlides.has(slide)) {
+        if (!slide || !/^VMS\d+$/.test(slide)) problem("no-slide-id", "Its pins were left out");
+        else problem("other-slide", `No question in the exam uses ${slide}`);
+      }
+      continue;
+    }
+    handedIn.get(folder)!.add(slide);
     let anns;
     try {
-      anns = parseNdpa(await readText(f, MAX_NDPA_BYTES));
+      anns = parseNdpa(await io.readText(f, MAX_NDPA_BYTES));
     } catch (e) {
-      warnings.push(`${rel}: ${e}`);
+      const msg = String(e instanceof Error ? e.message : e);
+      if (/larger than/i.test(msg)) problem("too-large", `Larger than ${MAX_NDPA_BYTES / 1024 / 1024} MB`);
+      else problem("unreadable", "Not valid annotation data");
       continue;
     }
     // one student can't flood a slide with pins (keeps clustering and grading responsive)
     const key = `${student.id}|${slide}`;
     const have = pinsPerStudentSlide.get(key) ?? 0;
     if (have + anns.length > MAX_PINS_PER_STUDENT_SLIDE) {
-      warnings.push(`${rel}: only the first ${MAX_PINS_PER_STUDENT_SLIDE} pins on ${slide} were kept for this student`);
+      problem("too-many-pins", `${have + anns.length} pins on ${slide}; the first ${MAX_PINS_PER_STUDENT_SLIDE} were kept`);
       anns = anns.slice(0, Math.max(0, MAX_PINS_PER_STUDENT_SLIDE - have));
     }
     pinsPerStudentSlide.set(key, have + anns.length);
+    /** pins whose title names a question this slide isn't for */
+    const misnamed: { title: string; q: number }[] = [];
     for (const a of anns) {
       const m = matchTitle(a.title, slideQs);
+      const named = m.q === null ? namedQuestion(a.title) : null;
+      if (named !== null && !examSlides.get(slide)!.includes(named)) misnamed.push({ title: a.title, q: named });
       let q = m.q;
       let guessed = !m.clean;
       let candidates: number[] = [];
@@ -94,6 +179,46 @@ export async function scanSubmissions(dir: string, questions: Question[]): Promi
         annotationType: a.type,
       });
     }
+    if (misnamed.length) {
+      const one = misnamed.length === 1 ? misnamed[0] : null;
+      const where = one && questions.find((q) => q.num === one.q)?.slides;
+      problem(
+        "unknown-question",
+        `${one ? "Pin" : `${misnamed.length} pins`} titled ${firstFew(misnamed.map((x) => `“${x.title}”`))}, but ${slide} is for ${qList(slideQs)}` +
+          (one ? (where ? ` (Q${one.q} uses ${where.join(" or ")})` : ` (there is no Q${one.q})`) : ""),
+      );
+    }
+  }
+
+  // student folders with nothing to grade, and students with no file for a slide an included question needs
+  const pinCount = new Map<string, number>();
+  for (const p of pins) pinCount.set(p.studentId, (pinCount.get(p.studentId) ?? 0) + 1);
+  for (const [folder, handed] of handedIn) {
+    const student = studentsByFolder.get(folder);
+    const name = student?.name ?? prettyName(folder);
+    if (!student || !pinCount.get(student.id)) {
+      const other = otherFiles.get(folder) ?? [];
+      const detail = !student
+        ? `No .ndpa files${other.length ? ` (only ${firstFew(other)})` : ""}`
+        : handed.size
+          ? "Their files have no pins"
+          : "None of their .ndpa files is for a slide in the exam";
+      problems.push({ kind: "no-submission", student: name, file: folder, detail });
+      continue;
+    }
+    const missing = new Map<string, number[]>();
+    for (const q of included)
+      if (!q.slides.some((s) => handed.has(s))) {
+        const k = q.slides.join(" or ");
+        missing.set(k, [...(missing.get(k) ?? []), q.num]);
+      }
+    if (missing.size && folder !== LOOSE)
+      problems.push({
+        kind: "missing-slide",
+        student: name,
+        file: folder,
+        detail: `No file for ${[...missing].map(([s, nums]) => `${s} (${qList(nums)})`).join(", ")}`,
+      });
   }
 
   // Ambiguous pins: if the student already answered every other candidate
@@ -117,7 +242,8 @@ export async function scanSubmissions(dir: string, questions: Question[]): Promi
   }
 
   const students = [...studentsByFolder.values()].sort((a, b) => a.name.localeCompare(b.name));
-  return { students, pins, warnings };
+  const warnings = problems.map((p) => `${p.file ?? p.student ?? ""}: ${p.detail}`);
+  return { students, pins, problems, warnings };
 }
 
 function prettyName(folder: string): string {

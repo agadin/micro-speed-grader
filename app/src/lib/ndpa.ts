@@ -79,3 +79,9 @@ export function matchTitle(title: string, slideQuestions: number[]): { q: number
   if (nums.length === 1) return { q: nums[0], clean: false };
   return { q: null, clean: false };
 }
+
+/** The question number a pin's title names ("Q9", "question 9", "q#9"), whether or not it's on the slide. */
+export function namedQuestion(title: string): number | null {
+  const m = title.trim().slice(0, MAX_TITLE).match(/\bq(?:uestion)?\s*(?:#\s*)?(\d+)\b/i);
+  return m ? Number(m[1]) : null;
+}

@@ -5,7 +5,7 @@
 //   node tests/ui/walkthrough.mjs
 import fs from "node:fs";
 import path from "node:path";
-import { launch, startTileServer, closeSession, openSession, pickTool, ringOf, APP, ROOT } from "./harness.mjs";
+import { launch, startTileServer, closeSession, openSession, pickTool, ringOf, APP, APP_URL, ROOT } from "./harness.mjs";
 
 const OUT = path.join(APP, "tests/.out/ui");
 const WORK = path.join(APP, "tests/.out/ui-work");
@@ -73,7 +73,7 @@ async function rightDrag(points, mods = [], button = "right") {
   for (const m of mods) await page.keyboard.up(m);
 }
 
-await page.goto("http://localhost:1420/");
+await page.goto(APP_URL);
 await page.evaluate(() => localStorage.clear());
 await page.reload();
 
@@ -805,6 +805,60 @@ await step("help: styled tooltip → ? → article; help search; preferences sea
   expect(/Version \d+\.\d+\.\d+/.test(about), `about: ${about.slice(0, 80)}`);
   await page.keyboard.press("Escape");
   return `tooltip "${tipText}" → ${art.split("\n")[0]}; ${hits.length} hits for kr-20; ${topics} topics`;
+});
+
+await step("wizard: things to check before Start", async () => {
+  // a few demo students, each with something wrong (the last one is clean)
+  const subs = path.join(ROOT, "demo/submissions");
+  const fix = path.join(WORK, "problem-subs");
+  const names = fs.readdirSync(subs).filter((f) => !f.startsWith(".")).slice(0, 9);
+  for (const s of names) fs.cpSync(path.join(subs, s), path.join(fix, s), { recursive: true });
+  const [noId, big, empty, wrongQ, other, broken, many] = names.map((s) => path.join(fix, s));
+  fs.writeFileSync(path.join(noId, "my answers.ndpa"), fs.readFileSync(path.join(noId, "VMS109.ndpi.ndpa")));
+  fs.writeFileSync(path.join(big, "VMS133.ndpi.ndpa"), "x".repeat(2 * 1024 * 1024 + 1));
+  for (const f of fs.readdirSync(empty)) fs.rmSync(path.join(empty, f));
+  fs.writeFileSync(path.join(empty, "answers.pdf"), "pdf");
+  const v109 = path.join(wrongQ, "VMS109.ndpi.ndpa");
+  fs.writeFileSync(v109, fs.readFileSync(v109, "utf8").replace(/<title>[^<]*<\/title>/, "<title>Q9</title>"));
+  fs.rmSync(path.join(wrongQ, "VMS133.ndpi.ndpa"));
+  fs.copyFileSync(path.join(other, "VMS109.ndpi.ndpa"), path.join(other, "VMS999.ndpi.ndpa"));
+  fs.writeFileSync(path.join(broken, "VMS109.ndpi.ndpa"), "<annotations><ndpviewstate>");
+  const pin = (i) => `<ndpviewstate id="${i}"><title>Q3</title><annotation type="pin"><x>${i * 1000}</x><y>0</y></annotation></ndpviewstate>`;
+  fs.writeFileSync(path.join(many, "VMS133.ndpi.ndpa"), `<annotations>${Array.from({ length: 60 }, (_, i) => pin(i)).join("")}</annotations>`);
+
+  await closeSession(page);
+  await page.getByText("New grading session…").click();
+  const needs0 = await page.locator(".start-needs").innerText();
+  expect(/the exam/.test(needs0) && /submissions folder/.test(needs0) && /slides folder/.test(needs0), `before anything: ${needs0}`);
+  await dialog(path.join(ROOT, "demo/exam.json"));
+  await page.getByText("Choose exam PDF / JSON…").click();
+  await page.waitForTimeout(400);
+  await dialog(fix);
+  await page.locator(".step").nth(1).getByRole("button", { name: "Choose folder…" }).click();
+  await page.locator(".scan-row").waitFor({ timeout: 10000 });
+  const row = await page.locator(".scan-row").innerText();
+  expect(/8 things to check/.test(row), `row: ${row}`);
+  const needs = await page.locator(".start-needs").innerText();
+  expect(needs === "Still needed: the slides folder", `greyed-out Start says: ${needs}`);
+  expect(await page.getByRole("button", { name: "Start grading →" }).isDisabled(), "Start enabled without slides");
+  await snap("wizard-things-to-check");
+
+  await page.locator(".scan-row").getByRole("button", { name: "Review" }).click();
+  await page.locator(".scan-modal").waitFor();
+  const kinds = await page.locator(".scan-modal .sp-group").evaluateAll((els) => els.map((e) => e.dataset.kind));
+  const text = await page.locator(".scan-modal").innerText();
+  await snap("things-to-check");
+  expect(kinds.length === 8, `groups: ${kinds.join(", ")}`);
+  expect(/Rename the file so it includes the slide ID/.test(text) && text.includes("my answers.ndpa") && text.includes("“Q9”"), "explanations or file names missing");
+  // fix one file, check again
+  fs.rmSync(path.join(noId, "my answers.ndpa"));
+  await page.locator(".scan-modal").getByRole("button", { name: "Check again" }).click();
+  await page.locator(".scan-modal .modal-actions", { hasText: "7 things to check" }).waitFor({ timeout: 10000 });
+  await page.locator(".scan-modal").getByRole("button", { name: "Done" }).click();
+  const row2 = await page.locator(".scan-row").innerText();
+  expect(/7 things to check/.test(row2), `after fixing: ${row2}`);
+  await page.getByRole("button", { name: "Cancel" }).click();
+  return `${row.replace(/\s+/g, " ")} → ${row2.replace(/\s+/g, " ")} · ${kinds.join(", ")} · "${needs}"`;
 });
 
 await browser.close();

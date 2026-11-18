@@ -22,10 +22,13 @@ The exam's questions must start like `Q1. Using VMS109, …`. If the PDF is a sc
 The slides folder has no file whose name contains that slide ID. Check the file name, or choose the right folder. You can also fix the slide ID in the question table.
 
 **Start grading → stays grey.**
-Include at least one question and choose all three folders and the save location.
+The line next to it says what's still needed: the exam, a folder, the save location, or at least one ticked question.
+
+**"⚠ N things to check" under the submissions folder.**
+Some student files couldn't be used as they are, such as a file with no slide ID in its name or a student with nothing to grade. Click **Review** for what each one means and what to do. See [Things to check](getting-started.md#things-to-check).
 
 **A student's pins are missing.**
-Each student needs their own folder inside the submissions folder, and the `.ndpa` file name must contain the slide ID (`VMS109`). Pins whose title names another question appear on that question instead.
+Each student needs their own folder inside the submissions folder, and the `.ndpa` file name must contain the slide ID (`VMS109`). Pins whose title names another question appear on that question instead. Start a new session and look at **Things to check**: it lists files the app had to leave out.
 
 ## While grading
 
