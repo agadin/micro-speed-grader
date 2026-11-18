@@ -568,6 +568,8 @@ ok(!!dbl && studentResults(session, dbl, defaultSettings)[0].text === defaultSet
   ok(planKey(s2, keyAll, 4).grade.length === 0, "the answer key never grades a retired pin");
   const oldFile = JSON.parse(JSON.stringify(s)) as Session;
   ok(oldFile.retired === undefined && reviewRows(oldFile).length === 0 && mergeRescan(oldFile, scan).retired.length === 4, "old session files (no retired pins) load and rescan");
+}
+
 // ---- review: one student across the exam; ledger search and filters ----
 {
   const S = { ...session, grades: { groups: { ...g.groups }, pinGroup: { ...g.pinGroup }, assign: {} } } as Session;
@@ -733,6 +735,22 @@ ok(!!dbl && studentResults(session, dbl, defaultSettings)[0].text === defaultSet
   ok(startBlockers(w).join() === "the exam,the submissions folder,the slides folder,a save location", "start blockers: everything");
   ok(startBlockers({ ...w, examPath: "e", questions: no133.map((q: any) => ({ ...q, include: false })), subDir: "s", slidesDir: "i" }).join() === "at least one included question,a save location", "start blockers: no questions, no save path");
   ok(startBlockers({ examPath: "e", questions: no133, subDir: "s", slidesDir: "i", sessionPath: "p" }).length === 0, "start blockers: ready");
+}
+
+// ---- the stylesheet is well-formed (a broken merge once nested every rule after it) ----
+{
+  const css = fs.readFileSync(path.resolve("src/App.css"), "utf8").replace(/\/\*[\s\S]*?\*\//g, "");
+  let depth = 0, bad = 0, line = 1, at: number[] = [];
+  for (const ln of css.split("\n")) {
+    const t = ln.trim();
+    if (t.startsWith("@") && t.endsWith("{")) at.push(depth);
+    // a plain rule opening while inside another plain rule means a missing "}"
+    if (depth > 0 && !at.length && /^[.#a-z\[*:][^;]*\{$/i.test(t) && !bad) bad = line;
+    depth += (t.match(/\{/g)?.length ?? 0) - (t.match(/\}/g)?.length ?? 0);
+    while (at.length && depth <= at[at.length - 1]) at.pop();
+    line++;
+  }
+  ok(depth === 0 && !bad, `App.css braces balance${bad ? ` (unclosed rule before line ${bad})` : ""}`);
 }
 
 process.exit(fails ? 1 : 0);

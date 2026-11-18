@@ -3637,6 +3637,11 @@ body.drag-sorting * {
   background: #e5484d;
 }
 .key-what {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
 /* ---------- ledger: search and filters ---------- */
 .lfilters {
   display: flex;
@@ -4034,6 +4039,9 @@ select.lgrader {
 }
 .sp-fixed {
   border-color: rgba(143, 209, 122, 0.3);
+}
+
+/* ---------- student panel: actions and feedback ---------- */
 .sv-tag {
   margin-left: 6px;
   color: var(--tx-3);
