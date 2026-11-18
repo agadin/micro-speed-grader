@@ -27,6 +27,8 @@ export interface ViewerProps {
   states: Map<string, PinState>;
   /** pins two graders disagreed on (drawn with a ! badge) */
   flagged?: Set<string>;
+  /** new pins from a changed submission, waiting in Changed submissions (drawn with a blue ↻ badge) */
+  changed?: Set<string>;
   selection: Set<string>;
   cluster: Cluster | null;
   isolate: boolean;
@@ -439,6 +441,30 @@ export function SlideViewer(props: ViewerProps) {
         ctx.fillText("!", cx, cy + 3.2);
         ctx.textAlign = "start";
         ctx.font = `11px ${MONO}`;
+      }
+      if (p.changed?.has(pin.id)) {
+        // the student changed this answer since it was graded: a blue dot with ↻ below-left of its head
+        const hp = headPos(s.x, s.y);
+        const cx = hp.x - pinSize * 0.55 - 5, cy = hp.y - pinSize * 0.25 + (p.flagged?.has(pin.id) ? 14 : 0);
+        ctx.beginPath();
+        ctx.arc(cx, cy, 6.5, 0, Math.PI * 2);
+        ctx.fillStyle = "#3e8ef7";
+        ctx.fill();
+        ctx.lineWidth = 1.5;
+        ctx.strokeStyle = "rgba(0,0,0,0.75)";
+        ctx.stroke();
+        // a circular arrow: most of a ring plus an arrowhead
+        ctx.beginPath();
+        ctx.arc(cx, cy, 3, -Math.PI * 0.35, Math.PI * 1.35);
+        ctx.strokeStyle = "#fff";
+        ctx.lineWidth = 1.4;
+        ctx.stroke();
+        const ax = cx + 3 * Math.cos(-Math.PI * 0.35), ay = cy + 3 * Math.sin(-Math.PI * 0.35);
+        ctx.beginPath();
+        ctx.moveTo(ax + 2.2, ay - 1.2);
+        ctx.lineTo(ax, ay);
+        ctx.lineTo(ax + 0.4, ay + 2.4);
+        ctx.stroke();
       }
       if (st === "double" || pin.q === null) {
         const t = st === "double" ? "2" : "?";

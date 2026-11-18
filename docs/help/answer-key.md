@@ -89,4 +89,4 @@ The pack also carries your key as suggestions, so other graders see the same are
 
 ## New submissions
 
-When late work arrives, choose **File ▸ Rescan Submissions** (or **Rescan submissions** under Progress). New pins that land in an area are graded by the key straight away, unless the key is set to **Suggest only**. See [New and changed submissions](getting-started.md#new-and-changed-submissions).
+When late work arrives, choose **File ▸ Rescan Submissions** (or **Rescan submissions** under Progress). New pins that land in an area are graded by the key straight away, unless the key is set to **Suggest only**. That includes a student's changed answer: it's graded by the key, but still listed in [Changed submissions](getting-started.md#review-changed-submissions) so you can carry the old grade over instead. See [New and changed submissions](getting-started.md#new-and-changed-submissions).

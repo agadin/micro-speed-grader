@@ -26,7 +26,8 @@ import { RightPanel, type Progress } from "./RightPanel";
 import { KeyPanel } from "./KeyPanel";
 import { KeyApplyDialog } from "./KeyApplyDialog";
 import { planKey, applyPlan, suggest } from "../lib/answerKey";
-import { mergeRescan } from "../lib/rescan";
+import { mergeRescan, reviewPinIds, rescanMessage, reviewRows } from "../lib/rescan";
+import { ChangesDialog } from "./ChangesDialog";
 import { scanSubmissions } from "../lib/loader";
 import { ExportDialog } from "./ExportDialog";
 import {
@@ -201,6 +202,9 @@ export function Grader({ session }: { session: Session }) {
   );
   /** pins of this image that are out with another grader */
   const conflicts = useMemo(() => conflictPins(session.grades), [session.grades]);
+  /** Changed submissions still to review, and their new pins (badged on the slide) */
+  const changes = useMemo(() => reviewRows(session), [session]);
+  const changedPins = useMemo(() => reviewPinIds(changes), [changes]);
   // ---- Rescan submissions: late and changed work, graded by the key when it's set up to ----
   const rescan = async () => {
     if (guestPack || !session.submissionsDir) return;
@@ -209,21 +213,16 @@ export function Grader({ session }: { session: Session }) {
       const scan = await scanSubmissions(session.submissionsDir, session.questions);
       const r = mergeRescan(session, scan);
       let grades = r.grades;
-      let keyed = 0;
       const k = session.key;
       if (k && k.mode === "grade" && k.autoNew && r.added.length) {
         const next = { ...session, students: r.students, pins: r.pins, grades };
         const plan = planKey(next, k, 0, new Set(r.added));
-        keyed = plan.grade.length;
         grades = applyPlan(next, plan);
       }
       st.applyRescan(r, grades);
-      const parts = [
-        r.newStudents ? `${r.newStudents} new student${r.newStudents === 1 ? "" : "s"}` : "",
-        r.added.length ? `${r.added.length} new pin${r.added.length === 1 ? "" : "s"}${keyed ? ` (${keyed} graded by the answer key)` : ""}` : "",
-        r.removed ? `${r.removed} pin${r.removed === 1 ? "" : "s"} no longer in the files (their grades were removed)` : "",
-      ].filter(Boolean);
-      st.set({ notice: { kind: "info", text: parts.length ? `Rescan: ${parts.join(", ")}.` : "Rescan: no new or changed submissions." } });
+      const msg = rescanMessage(r, grades);
+      const pending = reviewRows({ ...session, students: r.students, pins: r.pins, retired: r.retired, grades }).length;
+      st.set({ notice: { kind: "info", text: msg, review: pending > 0 } });
     } catch (e) {
       st.set({ notice: { kind: "info", text: `Could not read the submissions folder: ${e}` } });
     }
@@ -652,7 +651,7 @@ export function Grader({ session }: { session: Session }) {
         t.tagName === "SELECT")
     )
       return;
-    if (st.menu || st.settingsOpen || st.exportOpen || st.handoffOpen || st.conflictsOpen || st.keyApplyOpen) return;
+    if (st.menu || st.settingsOpen || st.exportOpen || st.handoffOpen || st.conflictsOpen || st.changesOpen || st.keyApplyOpen) return;
     const mod = isMac ? e.metaKey : e.ctrlKey;
     const k = e.key;
     if (mod && k.toLowerCase() === "z") {
@@ -837,6 +836,16 @@ export function Grader({ session }: { session: Session }) {
                 Disagreements <b>{conflicts.length}</b>
               </button>
             )}
+            {changes.length > 0 && (
+              <button
+                className="btn changes-btn"
+                onClick={() => st.set({ changesOpen: true })}
+                title="Pins that changed or left the files since you graded them: carry the grade over, grade them yourself, or restore them"
+                data-help="getting-started/review-changed-submissions"
+              >
+                Changed submissions <b>{changes.length}</b>
+              </button>
+            )}
             <button
               className={`btn ${st.keyMode ? "light" : "ghost"}`}
               onClick={() => st.set(st.keyMode ? { keyMode: false, keyApplyOpen: !!key?.marks.length } : { keyMode: true, menu: null, selection: [] })}
@@ -895,6 +904,7 @@ export function Grader({ session }: { session: Session }) {
               otherPins={otherPins}
               states={states}
               flagged={flagged}
+              changed={changedPins}
               selection={selection}
               cluster={cluster}
               isolate={st.isolate}
@@ -975,6 +985,10 @@ export function Grader({ session }: { session: Session }) {
                 {st.notice.kind === "conflict" ? (
                   <button className="btn ghost small" onClick={() => st.set({ conflictsOpen: true, notice: null })}>
                     Show
+                  </button>
+                ) : st.notice.review ? (
+                  <button className="btn ghost small" onClick={() => st.set({ changesOpen: true, notice: null })}>
+                    Review
                   </button>
                 ) : st.notice.kind === "override" ? (
                   <>
@@ -1221,6 +1235,7 @@ export function Grader({ session }: { session: Session }) {
         />
       )}
       {st.keyApplyOpen && <KeyApplyDialog session={session} onClose={() => st.set({ keyApplyOpen: false })} />}
+      {st.changesOpen && <ChangesDialog session={session} tasks={tasks} onClose={() => st.set({ changesOpen: false })} />}
       {st.conflictsOpen && <ConflictsDialog session={session} tasks={tasks} onClose={() => st.set({ conflictsOpen: false })} />}
       {st.handoffOpen && (
         <HandoffDialog session={session} tasks={tasks} onClose={() => st.set({ handoffOpen: false })} />

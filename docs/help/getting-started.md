@@ -58,10 +58,23 @@ Students who hand in late, or resubmit, don't mean starting over. Choose **File 
 
 - adds new students and new annotation files;
 - keeps every pin that hasn't changed, along with its grade;
-- removes pins that are no longer in the files, and their grades;
+- for a pin that's no longer in the files, keeps its grade but stops counting the pin. If the student has a new pin for the same question, that's a **changed** answer; if not, it's **removed**;
 - grades the new pins with the [answer key](answer-key.md#new-submissions), if you have one set to grade.
 
-A message over the slide says what changed, for example *Rescan: 2 new students, 9 new pins (7 graded by the answer key).* Rescanning can't be undone (the undo history starts again), but it never changes a grade on a pin that's still there.
+A message over the slide says what changed, for example *Rescan: 2 new students, 9 new pins (7 graded by the answer key), 3 changed, 1 removed.* When there's something to look at, click **Review** in the message (or **Changed submissions** in the top bar). Rescanning can't be undone (the undo history starts again), but it never changes a grade on a pin that's still there.
+
+## Review changed submissions
+
+**Changed submissions** lists the pins students changed or took out after they were graded, grouped by question, one row per student. **Was** shows the old grade and who gave it (for example *✗ Neutrophil · Jamie*); **Now** shows the new pin. For each row:
+
+- **Carry grade over**: give the new pin the old grade. Use it when the student only nudged their pin.
+- **Grade myself**: go to the new pin, selected, and grade it like any other.
+- **Restore** (removed pins): the old pin counts again, with its grade. It stays even though the files no longer have it.
+- **Accept removal**: the pin stays out, and the student has no answer for that question unless they have another pin.
+
+**Carry all over** and **Accept all removals** do a whole question at once. A row disappears once it's handled, including when you grade the new pin yourself. Each action is one step you can undo with **⌘Z**.
+
+Until a row is handled, its new pin has a blue **↻** badge on the slide. If the [answer key](answer-key.md#new-submissions) graded the new pin, the row says so and stays listed: **Carry grade over** replaces the key's grade, or **Keep key's grade** closes the row. A grade you or another grader gave the new pin is never replaced. If the student now has two pins for the question, the [double-pin rule](grading.md#double-pins) decides, so the old grade isn't carried over.
 
 ## Saving and backups
 
