@@ -1685,6 +1685,13 @@ button.big {
 .vtool {
   container-type: inline-size;
 }
+@container (max-width: 1200px) {
+  .vtool .ruler-btn .lbl,
+  .vtool .ruler-btn .kbd,
+  .vtool .keys-toggle .lbl {
+    display: none;
+  }
+}
 @container (max-width: 1050px) {
   .vtool .lbl,
   .vtool .seg .kbd,
@@ -4094,4 +4101,48 @@ select.lgrader {
   font: 12px/1.5 var(--sans);
   white-space: pre-wrap;
   word-break: break-word;
+}
+
+/* ---------- ruler (bottom toolbar) ---------- */
+.ruler-box {
+  display: inline-flex;
+  align-items: center;
+  gap: 2px;
+  border-radius: var(--r-ctl);
+}
+.ruler-box.on {
+  background: rgba(255, 224, 102, 0.12);
+}
+.ruler-btn {
+  background: transparent;
+  border-color: transparent;
+  box-shadow: none;
+  color: var(--tx-2);
+  padding: 0 8px;
+}
+.ruler-btn.on {
+  color: #ffe066;
+}
+.ruler-n {
+  min-width: 18px;
+  padding: 0 5px;
+  border-radius: 999px;
+  background: rgba(255, 224, 102, 0.22);
+  color: #ffe066;
+  font: 600 11px var(--mono);
+  text-align: center;
+}
+.ruler-clear {
+  height: 22px;
+  padding: 0 8px;
+  background: none;
+  border: 0;
+  box-shadow: none;
+  color: var(--tx-2);
+  font-size: 12px;
+}
+.ruler-clear:hover:not(:disabled) {
+  background: none;
+  color: var(--tx-1);
+  text-decoration: underline;
 }

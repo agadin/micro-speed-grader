@@ -919,6 +919,37 @@ await step("rescan a changed folder: late student, moved pin, removed pin → Ch
   return `${note} · screenshot ${path.basename(shotPath)}`;
 });
 
+await step("ruler: R, drag a distance, click an outline; nothing is graded", async () => {
+  const before = JSON.stringify(session().grades);
+  await page.keyboard.press("r");
+  await page.locator(".ruler-box.on").waitFor({ timeout: 2000 });
+  const v = await viewer();
+  const cx = v.x + v.width * 0.45, cy = v.y + v.height * 0.45;
+  // a distance: drag with the selecting button
+  await rightDrag([[cx - 120, cy], [cx + 120, cy]]);
+  await page.waitForTimeout(200);
+  expect((await page.locator(".ruler-n").innerText()) === "1", "no distance measured");
+  // an area: click four corners, then the first again
+  const click = async (x, y) => {
+    await page.mouse.move(x, y);
+    await page.mouse.down({ button: "right" });
+    await page.mouse.up({ button: "right" });
+    await page.waitForTimeout(400); // not a double-click
+  };
+  for (const [x, y] of [[cx - 60, cy + 40], [cx + 60, cy + 40], [cx + 60, cy + 140], [cx - 60, cy + 140], [cx - 60, cy + 40]]) await click(x, y);
+  expect((await page.locator(".ruler-n").innerText()) === "2", `outline not measured: ${await page.locator(".ruler-n").innerText()}`);
+  await page.mouse.move(cx, cy - 150);
+  await snap("ruler");
+  expect(JSON.stringify(session().grades) === before && !(await page.locator(".ctx-menu").count()), "measuring changed grades or opened the grade menu");
+  await page.keyboard.press("Backspace");
+  expect((await page.locator(".ruler-n").innerText()) === "1", "⌫ didn't remove the last measurement");
+  await page.keyboard.press("Escape");
+  expect((await page.locator(".ruler-n").count()) === 0, "Esc didn't clear");
+  await page.keyboard.press("Escape");
+  expect((await page.locator(".ruler-box.on").count()) === 0, "Esc didn't switch the ruler off");
+  return "distance + outline measured, ⌫ / Esc / Esc";
+});
+
 await step("help: styled tooltip → ? → article; help search; preferences search and About", async () => {
   // hover a control: the app's own tooltip (not the native one) with a ? to its article
   const exportBtn = page.locator(".topbar").getByRole("button", { name: "Export" });

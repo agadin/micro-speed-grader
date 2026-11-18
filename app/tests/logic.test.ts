@@ -14,6 +14,7 @@ import { exportTable, kr20, parseStudentName, EXPORT_PRESETS, testStats, safeFil
 import { MAX_ANNOTATIONS } from "../src/lib/ndpa";
 import { parseMarkdown, slug } from "../src/lib/markdown";
 import { applyPlan, emptyKey, makeKeyFile, matchPin, newMark, parseKeyFile, planKey, type AnswerKey } from "../src/lib/answerKey";
+import { area, dist, fmtArea, fmtLength, measureLabel, perimeter } from "../src/lib/measure";
 import { canCarry, carryOver, dismissRows, mergeRescan, rescanMessage, restorePins, reviewPinIds, reviewRows } from "../src/lib/rescan";
 import { KEY, HOST, agreement, conflictPins, hostGraded, planOverlap, recallChecks, resolveWith, sameReason, seeded, awayPins, splitWeighted, guestSession, makePack, makeResult, mergeResult, parsePack, parseResult, remainingByTask } from "../src/lib/handoff";
 import { AUTO, autoRows, filterGroups, findStudents, graderOptions, isFiltered, noFilter, rowPasses, studentLabel, studentSummary, type LedgerFilter } from "../src/lib/review";
@@ -735,6 +736,17 @@ ok(!!dbl && studentResults(session, dbl, defaultSettings)[0].text === defaultSet
   ok(startBlockers(w).join() === "the exam,the submissions folder,the slides folder,a save location", "start blockers: everything");
   ok(startBlockers({ ...w, examPath: "e", questions: no133.map((q: any) => ({ ...q, include: false })), subDir: "s", slidesDir: "i" }).join() === "at least one included question,a save location", "start blockers: no questions, no save path");
   ok(startBlockers({ examPath: "e", questions: no133, subDir: "s", slidesDir: "i", sessionPath: "p" }).length === 0, "start blockers: ready");
+}
+
+// ---- ruler: lengths, areas and how they read ----
+{
+  const sq = [{ x: 0, y: 0 }, { x: 100_000, y: 0 }, { x: 100_000, y: 100_000 }, { x: 0, y: 100_000 }]; // 100 µm square
+  ok(area(sq) === 1e10 && fmtArea(area(sq)) === "10,000 µm²", `area of a 100 µm square: ${fmtArea(area(sq))}`);
+  ok(fmtLength(perimeter(sq)) === "400 µm" && fmtLength(dist(sq[0], sq[2])) === "141 µm", "perimeter and diagonal");
+  ok(fmtLength(8_400) === "8.40 µm" && fmtLength(24_500) === "24.5 µm" && fmtLength(1_240_000) === "1.24 mm", "lengths read as µm or mm");
+  ok(fmtArea(3.1e10) === "31,000 µm²" && fmtArea(3.1e11) === "0.31 mm²", "areas switch to mm² from 100,000 µm²");
+  ok(area([...sq].reverse()) === 1e10, "outline drawn either way round");
+  ok(measureLabel({ kind: "line", pts: [sq[0], sq[1]] }) === "100 µm" && measureLabel({ kind: "area", pts: sq }).startsWith("10,000 µm² · perimeter 400 µm"), "labels");
 }
 
 // ---- the stylesheet is well-formed (a broken merge once nested every rule after it) ----

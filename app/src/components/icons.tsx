@@ -46,3 +46,4 @@ export const IconHandoff = () => <S d="M6 5.5m-2 0a2 2 0 1 0 4 0a2 2 0 1 0-4 0M2
 export const IconInfo = () => <S d="M8 8m-5.5 0a5.5 5.5 0 1 0 11 0a5.5 5.5 0 1 0-11 0M8 7.3v3.7M8 5.2v.1" />;
 export const IconKey = () => <S d="M5.5 10.5m-2.8 0a2.8 2.8 0 1 0 5.6 0a2.8 2.8 0 1 0-5.6 0M7.5 8.5 13 3M11 5l1.6 1.6M9.6 6.4l1.4 1.4" />;
 export const IconPerson = () => <S d="M8 5.5m-2.5 0a2.5 2.5 0 1 0 5 0a2.5 2.5 0 1 0-5 0M3 14c0-2.8 2.2-4.5 5-4.5s5 1.7 5 4.5" />;
+export const IconRuler = () => <S d="M2.5 10.5 10.5 2.5l3 3-8 8zM5 8l1.4 1.4M7 6l1 1M9 4l1.4 1.4" />;

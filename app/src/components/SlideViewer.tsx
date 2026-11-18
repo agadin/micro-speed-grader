@@ -5,6 +5,7 @@ import type { Cluster } from "../lib/cluster";
 import type { PinState } from "../lib/grading";
 import { activeTool, type Settings } from "../lib/settings";
 import { pointInPolygon, type PaintOp } from "../lib/paint";
+import { area, centre, fmtArea, fmtLength, measureLabel, type Measure } from "../lib/measure";
 import { tileBase } from "../lib/backend";
 import { drawMarker } from "../lib/markers";
 
@@ -57,6 +58,11 @@ export interface ViewerProps {
   layers?: { ops: PaintOp[]; color: string; alpha: number }[];
   /** pins that "painted ✓ / rest ✗" would mark wrong: drawn with a dashed red ring */
   pendingWrong?: Set<string>;
+  /** ruler mode: the selecting button measures (drag = distance, clicks = outline) instead of selecting */
+  ruler?: boolean;
+  /** measurements to draw (slide coordinates) */
+  measures?: Measure[];
+  onMeasure?: (m: Measure) => void;
 }
 
 type Pt = { x: number; y: number };
@@ -99,6 +105,9 @@ export function SlideViewer(props: ViewerProps) {
   const hoverRef = useRef<Pt | null>(null);
   /** polygon in progress: vertices in slide nm (so panning / zooming between clicks is fine) */
   const polyRef = useRef<{ pts: { x: number; y: number }[]; add: boolean; inverse: boolean } | null>(null);
+  /** ruler: a distance being dragged (screen px), and an outline being clicked (nm) */
+  const rulerDrag = useRef<{ start: { x: number; y: number }; cur: { x: number; y: number } } | null>(null);
+  const rulerPoly = useRef<{ pts: { x: number; y: number }[]; last: number } | null>(null);
   /** spotlight: the pin under the cursor (others are hidden while it is) */
   const spotRef = useRef<string | null>(null);
   const paintCanvas = useRef<HTMLCanvasElement | null>(null);
@@ -573,6 +582,7 @@ export function SlideViewer(props: ViewerProps) {
       ctx.restore();
     }
 
+    drawMeasures(ctx);
     drawHud(ctx, w, h);
     drawNavigator();
   }
@@ -616,6 +626,89 @@ export function SlideViewer(props: ViewerProps) {
     ctx.setTransform(1, 0, 0, 1, 0, 0);
     ctx.globalAlpha = alpha;
     ctx.drawImage(pc, 0, 0);
+    ctx.restore();
+  }
+
+  /** ruler measurements: numbered lines and outlines with their length / area, plus the one being drawn */
+  function drawMeasures(ctx: CanvasRenderingContext2D) {
+    const p = propsRef.current;
+    const done = p.measures ?? [];
+    const RD = rulerDrag.current;
+    const RP = rulerPoly.current;
+    if (!done.length && !RD && !RP) return;
+    const label = (txt: string, x: number, y: number) => {
+      ctx.font = `600 11.5px ${SANS}`;
+      const w = ctx.measureText(txt).width + 12;
+      ctx.fillStyle = "rgba(15,15,18,0.86)";
+      ctx.beginPath();
+      ctx.roundRect(x - w / 2, y - 10, w, 20, 6);
+      ctx.fill();
+      ctx.fillStyle = "#fff";
+      ctx.textAlign = "center";
+      ctx.fillText(txt, x, y + 4);
+      ctx.textAlign = "start";
+    };
+    const stroke = (pts: { x: number; y: number }[], close: boolean, live = false) => {
+      ctx.beginPath();
+      pts.forEach((q, i) => (i ? ctx.lineTo(q.x, q.y) : ctx.moveTo(q.x, q.y)));
+      if (close) ctx.closePath();
+      ctx.lineWidth = 4;
+      ctx.strokeStyle = "rgba(0,0,0,0.55)";
+      ctx.stroke();
+      ctx.lineWidth = 2;
+      ctx.setLineDash(live ? [6, 4] : []);
+      ctx.strokeStyle = "#ffe066";
+      ctx.stroke();
+      ctx.setLineDash([]);
+    };
+    const tick = (a: { x: number; y: number }, b: { x: number; y: number }) => {
+      // short end bars square to the line
+      const len = Math.hypot(b.x - a.x, b.y - a.y) || 1;
+      const nx = (-(b.y - a.y) / len) * 6, ny = ((b.x - a.x) / len) * 6;
+      for (const q of [a, b]) stroke([{ x: q.x - nx, y: q.y - ny }, { x: q.x + nx, y: q.y + ny }], false);
+    };
+    ctx.save();
+    done.forEach((m, i) => {
+      const pts = m.pts.map((q) => nmToScreen(q.x, q.y));
+      if (m.kind === "line") {
+        stroke(pts, false);
+        tick(pts[0], pts[1]);
+        label(`${i + 1}  ${measureLabel(m)}`, (pts[0].x + pts[1].x) / 2, (pts[0].y + pts[1].y) / 2 - 16);
+      } else {
+        ctx.beginPath();
+        pts.forEach((q, j) => (j ? ctx.lineTo(q.x, q.y) : ctx.moveTo(q.x, q.y)));
+        ctx.closePath();
+        ctx.fillStyle = "rgba(255,224,102,0.14)";
+        ctx.fill();
+        stroke(pts, true);
+        const c = centre(m.pts);
+        const cs = nmToScreen(c.x, c.y);
+        label(`${i + 1}  ${measureLabel(m)}`, cs.x, cs.y);
+      }
+    });
+    if (RD) {
+      stroke([RD.start, RD.cur], false, true);
+      tick(RD.start, RD.cur);
+      const nm = Math.hypot(RD.cur.x - RD.start.x, RD.cur.y - RD.start.y) / pxPerNm();
+      label(fmtLength(nm), (RD.start.x + RD.cur.x) / 2, (RD.start.y + RD.cur.y) / 2 - 16);
+    }
+    if (RP) {
+      const pts = RP.pts.map((q) => nmToScreen(q.x, q.y));
+      const h = hoverRef.current;
+      const live = h ? [...pts, h] : pts;
+      stroke(live, false, true);
+      for (const q of pts) {
+        ctx.beginPath();
+        ctx.arc(q.x, q.y, 3.5, 0, Math.PI * 2);
+        ctx.fillStyle = "#ffe066";
+        ctx.fill();
+      }
+      if (h && RP.pts.length >= 2) {
+        const nmPts = [...RP.pts, screenToNm(h)];
+        const c = nmToScreen(centre(nmPts).x, centre(nmPts).y);
+        label(fmtArea(area(nmPts)), c.x, c.y);
+      }
+    }
     ctx.restore();
   }
 
@@ -832,6 +925,11 @@ export function SlideViewer(props: ViewerProps) {
       e.stopPropagation();
       e.preventDefault();
       const p = rel(e);
+      if (propsRef.current.ruler) {
+        rulerDrag.current = { start: p, cur: p };
+        host.setPointerCapture(e.pointerId);
+        return;
+      }
       const tool = activeTool(propsRef.current.settings);
       if (tool === "polygon") {
         // corners are placed on release (see up)
@@ -858,6 +956,16 @@ export function SlideViewer(props: ViewerProps) {
     const move = (e: PointerEvent) => {
       const p = rel(e);
       hoverRef.current = p;
+      if (propsRef.current.ruler) {
+        host.style.cursor = "crosshair";
+        if (rulerDrag.current) {
+          e.stopPropagation();
+          rulerDrag.current.cur = p;
+          requestDraw();
+          return;
+        }
+        if (rulerPoly.current) requestDraw();
+      }
       if (polyRef.current) requestDraw();
       if (propsRef.current.settings.spotlight && !lassoRef.current && !dragRef.current) {
         const id = hitTest(p.x, p.y)?.id ?? null;
@@ -944,6 +1052,41 @@ export function SlideViewer(props: ViewerProps) {
         requestDraw();
         return;
       }
+      const RD = rulerDrag.current;
+      if (RD && e.button === selBtn()) {
+        e.stopPropagation();
+        rulerDrag.current = null;
+        try {
+          host.releasePointerCapture(e.pointerId);
+        } catch {
+          /* ignore */
+        }
+        const p = rel(e);
+        if (Math.hypot(p.x - RD.start.x, p.y - RD.start.y) >= 6) {
+          // a drag: a distance
+          rulerPoly.current = null;
+          propsRef.current.onMeasure?.({ kind: "line", pts: [screenToNm(RD.start), screenToNm(p)] });
+        } else {
+          // a click: a corner of an outline; close it on the first corner or with a double-click
+          const now = Date.now();
+          const RP = rulerPoly.current;
+          if (!RP) rulerPoly.current = { pts: [screenToNm(p)], last: now };
+          else {
+            const first = nmToScreen(RP.pts[0].x, RP.pts[0].y);
+            const lastPt = RP.pts[RP.pts.length - 1];
+            const last = nmToScreen(lastPt.x, lastPt.y);
+            const onFirst = Math.hypot(p.x - first.x, p.y - first.y) < 10;
+            const dbl = now - RP.last < 350 && Math.hypot(p.x - last.x, p.y - last.y) < 8;
+            if (RP.pts.length >= 3 && (onFirst || dbl)) closeRuler();
+            else if (!dbl) {
+              RP.pts.push(screenToNm(p));
+              RP.last = now;
+            }
+          }
+        }
+        requestDraw();
+        return;
+      }
       if (polyDown && e.button === selBtn()) {
         e.stopPropagation();
         polyDown = null;
@@ -1012,7 +1155,26 @@ export function SlideViewer(props: ViewerProps) {
       requestDraw();
     };
     // polygon keys: ↵ closes, Esc cancels, ⌫ removes the last vertex (captured before the grader sees them)
+    const closeRuler = () => {
+      const RP = rulerPoly.current;
+      rulerPoly.current = null;
+      if (RP && RP.pts.length >= 3) propsRef.current.onMeasure?.({ kind: "area", pts: RP.pts });
+    };
     const key = (e: KeyboardEvent) => {
+      const RP = rulerPoly.current;
+      if (RP) {
+        // an outline in progress: ↵ closes, Esc cancels, ⌫ removes the last corner
+        if (e.key === "Enter") closeRuler();
+        else if (e.key === "Escape") rulerPoly.current = null;
+        else if (e.key === "Backspace" || e.key === "Delete") {
+          RP.pts.pop();
+          if (!RP.pts.length) rulerPoly.current = null;
+        } else return;
+        e.preventDefault();
+        e.stopImmediatePropagation();
+        requestDraw();
+        return;
+      }
       const PG = polyRef.current;
       if (!PG) return;
       if (e.key === "Enter") closePolygon();
@@ -1088,6 +1250,11 @@ export function SlideViewer(props: ViewerProps) {
   useEffect(() => {
     polyRef.current = null;
   }, [tool, props.info?.id]);
+  // an outline being measured is dropped when the ruler is switched off or the slide changes
+  useEffect(() => {
+    rulerPoly.current = null;
+    rulerDrag.current = null;
+  }, [props.ruler, props.info?.id]);
 
   useEffect(() => {
     const v = viewerRef.current;

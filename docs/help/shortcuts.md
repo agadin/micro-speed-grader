@@ -40,6 +40,7 @@ Press **?** while grading to show the shortcuts sheet over the slide. On Windows
 | Key | Action |
 | --- | --- |
 | Space | Show or hide pins (can be changed) |
+| R | Ruler on / off: drag to measure a distance, click corners to measure an area |
 | M | Minimap (can be changed) |
 | I | Isolate the selection |
 | B | Next selection tool |

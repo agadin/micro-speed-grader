@@ -26,6 +26,7 @@ import { RightPanel, type Progress } from "./RightPanel";
 import { KeyPanel } from "./KeyPanel";
 import { KeyApplyDialog } from "./KeyApplyDialog";
 import { planKey, applyPlan, suggest } from "../lib/answerKey";
+import type { Measure } from "../lib/measure";
 import { mergeRescan, reviewPinIds, rescanMessage, reviewRows } from "../lib/rescan";
 import { ChangesDialog } from "./ChangesDialog";
 import { problemKey, scanSubmissions, type ScanProblem } from "../lib/loader";
@@ -42,6 +43,7 @@ import {
   IconExport,
   IconHandoff,
   IconKey,
+  IconRuler,
   IconPerson,
   IconRedo,
   IconSliders,
@@ -124,6 +126,7 @@ function KeySheet({ tool, swap, pinByPin, onClose }: { tool: SelectTool; swap: b
         [["M"], "minimap"],
         [["I"], "isolate selection"],
         [["Click"], "grade one pin"],
+        [["R"], "ruler: drag = distance, click corners = area"],
         [["/"], "find student"],
         [["?"], "this sheet"],
       ],
@@ -206,6 +209,10 @@ export function Grader({ session }: { session: Session }) {
   );
   /** pins of this image that are out with another grader */
   const conflicts = useMemo(() => conflictPins(session.grades), [session.grades]);
+  // ---- ruler: measurements on this image (not saved; cleared when the image changes) ----
+  const [ruler, setRuler] = useState(false);
+  const [measures, setMeasures] = useState<Measure[]>([]);
+  useEffect(() => setMeasures([]), [task?.id]);
   /** Changed submissions still to review, and their new pins (badged on the slide) */
   const changes = useMemo(() => reviewRows(session), [session]);
   const changedPins = useMemo(() => reviewPinIds(changes), [changes]);
@@ -726,6 +733,9 @@ export function Grader({ session }: { session: Session }) {
     if (k === "s") return jumpKind(onSingles ? "clusters" : "singles");
     if (k === "/" && !guestPack) return (e.preventDefault(), st.set({ studentView: { id: "" } }));
     if (k === "?") return setSettings({ showKeyHints: !settings.showKeyHints });
+    if (k === "r") return setRuler((on) => !on);
+    if (ruler && (k === "Backspace" || k === "Delete") && measures.length) return (e.preventDefault(), setMeasures((m) => m.slice(0, -1)));
+    if (ruler && k === "Escape") return measures.length ? setMeasures([]) : setRuler(false);
     if (k === "Escape") return (setPaint([]), st.set({ isolate: false }));
     // editing the key: the side panel handles C / W; nothing here grades
     if (st.keyMode) return;
@@ -964,6 +974,9 @@ export function Grader({ session }: { session: Session }) {
               paint={paint}
               onPaint={(op) => setPaint((ops) => [...ops, op])}
               paintAlways={st.keyMode}
+              ruler={ruler}
+              measures={measures}
+              onMeasure={(m) => setMeasures((ms) => [...ms, m])}
               layers={keyLayers}
               pendingWrong={pendingWrong}
               onSelect={(ids) => st.set({ selection: ids })}
@@ -1211,6 +1224,23 @@ export function Grader({ session }: { session: Session }) {
                 >
                   Cluster <span className="kbd">F</span>
                 </button>
+              </div>
+              <div className={`ruler-box${ruler ? " on" : ""}`} data-help="clusters/measure-distances-and-areas">
+                <button
+                  className={`ruler-btn${ruler ? " on" : ""}`}
+                  onClick={() => setRuler((on) => !on)}
+                  title="Ruler: drag to measure a distance, click corners to measure an area (R)"
+                >
+                  <IconRuler /> <span className="lbl">Ruler</span> <span className="kbd">R</span>
+                </button>
+                {ruler && measures.length > 0 && (
+                  <>
+                    <span className="ruler-n">{measures.length}</span>
+                    <button className="ruler-clear" onClick={() => setMeasures([])} title="Clear the measurements (Esc)">
+                      Clear
+                    </button>
+                  </>
+                )}
               </div>
               <button
                 className={`keys-toggle ${settings.showKeyHints ? "on" : ""}`}
