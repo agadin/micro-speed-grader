@@ -1,0 +1,126 @@
+\section{Keyboard shortcuts}\label{sec:shortcuts}
+\tocoff
+
+\phantomsection\label{sec:shortcuts:keyboard-shortcuts}
+
+Press \keycap{?} while grading to show the shortcuts sheet over the slide. On Windows, use \keycap{Ctrl} where this page says \keycap{\cmdsym{}}.
+
+\shot{0.35\linewidth}{img/shortcuts.jpg}{The shortcuts sheet}
+
+\begin{multicols}{2}
+\subsection{Grading}\label{sec:shortcuts:grading}
+
+\begingroup\renewcommand{\arraystretch}{1.35}
+\noindent\begin{tabularx}{\linewidth}{>{\raggedright\arraybackslash}p{0.4\linewidth}Y}
+\toprule
+\textbf{Key} & \textbf{Action} \\
+\midrule
+\keycap{C} & Mark the selection correct (with painted pins: painted \checksym{}, rest \crosssym{}) \\
+\keycap{\shiftsym{}}\keyplus{}\keycap{C} & Correct with a note \\
+\keycap{W} & Wrong, with a reason \\
+\keycap{\returnsym{}} & Open the grade menu \\
+\keycap{X} & Invert the selection \\
+\keycap{\cmdsym{}}\keyplus{}\keycap{Z} & Undo \\
+\keycap{\shiftsym{}}\keyplus{}\keycap{\cmdsym{}}\keyplus{}\keycap{Z} or \keycap{\cmdsym{}}\keyplus{}\keycap{Y} & Redo \\
+\bottomrule
+\end{tabularx}\endgroup\par\medskip
+
+\subsection{Moving around}\label{sec:shortcuts:moving-around}
+
+\begingroup\renewcommand{\arraystretch}{1.35}
+\noindent\begin{tabularx}{\linewidth}{>{\raggedright\arraybackslash}p{0.4\linewidth}Y}
+\toprule
+\textbf{Key} & \textbf{Action} \\
+\midrule
+\keycap{]} or \keycap{N} & Next cluster \\
+\keycap{[} or \keycap{P} & Previous cluster \\
+\keycap{\cmdsym{}}\keyplus{}\keycap{\ensuremath{\rightarrow}} / \keycap{\cmdsym{}}\keyplus{}\keycap{\ensuremath{\leftarrow}} & Next / previous image \\
+\keycap{F} & Zoom to the selection or cluster \\
+\keycap{H} & Whole slide \\
+\keycap{S} & Switch between clusters and singles \\
+\keycap{O} & Pin by pin on or off (when enabled) \\
+\keycap{\ensuremath{\rightarrow}} / \keycap{\ensuremath{\leftarrow}} & Next / previous pin (pin by pin) \\
+\bottomrule
+\end{tabularx}\endgroup\par\medskip
+
+\subsection{View and tools}\label{sec:shortcuts:view-and-tools}
+
+\begingroup\renewcommand{\arraystretch}{1.35}
+\noindent\begin{tabularx}{\linewidth}{>{\raggedright\arraybackslash}p{0.4\linewidth}Y}
+\toprule
+\textbf{Key} & \textbf{Action} \\
+\midrule
+\keycap{Space} & Show or hide pins (can be changed) \\
+\keycap{R} & Ruler on / off: drag to measure a distance, click corners to measure an area \\
+\keycap{M} & Minimap (can be changed) \\
+\keycap{I} & Isolate the selection \\
+\keycap{B} & Next selection tool \\
+\keycap{-} / \keycap{=} & Smaller / bigger brush \\
+\keycap{Esc} & Clear painted area and isolation \\
+\keycap{?} & Shortcuts sheet \\
+\keycap{K} & Use the answer key's suggestion for this cluster (Suggest only) \\
+\keycap{/} & Find a student (see \href{https://github.com/agadin/micro-speed-grader/blob/main/docs/help/students.md}{Look up a student}\,\onlinemark{}) \\
+\bottomrule
+\end{tabularx}\endgroup\par\medskip
+
+\subsection{In the student panel}\label{sec:shortcuts:in-the-student-panel}
+
+\begingroup\renewcommand{\arraystretch}{1.35}
+\noindent\begin{tabularx}{\linewidth}{>{\raggedright\arraybackslash}p{0.4\linewidth}Y}
+\toprule
+\textbf{Key} & \textbf{Action} \\
+\midrule
+\ensuremath{\uparrow} \ensuremath{\downarrow} then \returnsym{} & Choose a student from the search results \\
+\keycap{\returnsym{}} & Mark wrong with the reason typed \\
+\keycap{Esc} & Clear the search, cancel a reason, or close the panel \\
+\bottomrule
+\end{tabularx}\endgroup\par\medskip
+
+\subsection{While selecting}\label{sec:shortcuts:while-selecting}
+
+\begingroup\renewcommand{\arraystretch}{1.35}
+\noindent\begin{tabularx}{\linewidth}{YY}
+\toprule
+\textbf{Tool} & \textbf{Keys} \\
+\midrule
+Lasso & \cmdsym{}-drag add \textperiodcentered{} \shiftsym{}-drag outside \textperiodcentered{} \optsym{}-drag rectangle \textperiodcentered{} \cmdsym{}-click add/remove a pin \\
+Brush & \shiftsym{} add \textperiodcentered{} \optsym{} remove \\
+Polygon & \returnsym{} close \textperiodcentered{} \deletesym{} remove last corner \textperiodcentered{} Esc cancel \textperiodcentered{} \cmdsym{} first click add \textperiodcentered{} \shiftsym{} outside \\
+\bottomrule
+\end{tabularx}\endgroup\par\medskip
+
+\subsection{In the grade menu and reason box}\label{sec:shortcuts:in-the-grade-menu-and-reason-box}
+
+\begingroup\renewcommand{\arraystretch}{1.35}
+\noindent\begin{tabularx}{\linewidth}{>{\raggedright\arraybackslash}p{0.4\linewidth}Y}
+\toprule
+\textbf{Key} & \textbf{Action} \\
+\midrule
+\keycap{C} or \keycap{\returnsym{}} & Mark correct \\
+\keycap{\shiftsym{}}\keyplus{}\keycap{C} & Correct with note \\
+\keycap{W} & Mark wrong \\
+\keycap{O} & Only these correct (painted pins) \\
+\keycap{X} / \keycap{I} / \keycap{U} & Invert / isolate / remove grade \\
+1--9 & Pick a suggested reason (\cmdsym{}1--9 while typing) \\
+\ensuremath{\uparrow} \ensuremath{\downarrow} then \tabsym{} & Choose and complete a suggestion \\
+\keycap{Esc} & Back / close \\
+\bottomrule
+\end{tabularx}\endgroup\par\medskip
+
+\subsection{Menu bar}\label{sec:shortcuts:menu-bar}
+
+\begingroup\renewcommand{\arraystretch}{1.35}
+\noindent\begin{tabularx}{\linewidth}{>{\raggedright\arraybackslash}p{0.4\linewidth}Y}
+\toprule
+\textbf{Key} & \textbf{Action} \\
+\midrule
+\keycap{\cmdsym{}}\keyplus{}\keycap{N} & New grading session \\
+\keycap{\cmdsym{}}\keyplus{}\keycap{O} & Open session \\
+\keycap{\cmdsym{}}\keyplus{}\keycap{E} & Export grades \\
+\keycap{\cmdsym{}}\keyplus{}\keycap{W} & Close session (or the Help or Preferences window) \\
+\keycap{\cmdsym{}}\keyplus{}\keycap{,} & Preferences \\
+\keycap{\cmdsym{}}\keyplus{}\keycap{?} & This help \\
+\bottomrule
+\end{tabularx}\endgroup\par\medskip
+\end{multicols}
+\tocon

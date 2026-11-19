@@ -1,0 +1,87 @@
+\section{Answer key}\label{sec:answer-key}
+
+\phantomsection\label{sec:answer-key:answer-key}
+
+Most students put their pin in one of a few places: the right structure, or one of two or three common mistakes. Mark those places once, and every pin that lands in them is graded for you. That includes work handed in late. What's left is the unusual answers, which need a person.
+
+\shot{0.72\linewidth}{img/key-editor.jpg}{Marking the answer key}
+
+\subsection{Mark the answers}\label{sec:answer-key:mark-the-answers}
+
+\begin{enumerate}[topsep=2pt, itemsep=2pt]
+\item Click \textbf{Answer key} in the top bar. The slide stays as it is, with the students' pins showing, so you can see where most of them clicked.
+\item Paint the area where the answer is, with the lasso, brush or polygon (right-drag, or whichever button selects for you). Paint several strokes to build up one area. To rub part of it out, hold \keycap{\optsym{}} with the brush, or \keycap{\shiftsym{}} with the lasso or polygon.
+\item The panel shows how many student pins are inside. Save the area:
+\begin{itemize}[topsep=1pt]
+\item \textbf{\checksym{} Correct here} (\keycap{C}): pins in this area are right.
+\item \textbf{\crosssym{} Wrong}: type what the students marked instead, for example \emph{Neutrophil}, and press \keycap{\returnsym{}}. That reason goes into their feedback, exactly like a reason you type while grading. \keycap{W} jumps to the box.
+\end{itemize}
+\item Repeat for every common answer, then move to the next image with the menu in the top bar or \keycap{\cmdsym{}}\keyplus{}\keycap{\ensuremath{\rightarrow}}.
+\item Click \textbf{Done}. You're asked what the key should apply to (see below).
+\end{enumerate}
+
+\textbf{On this image} lists the areas you've made, with how many pins each one covers. The trash button deletes one. The chips underneath show which other images have areas; click one to go there.
+
+\subsubsection{Questions with two slides}\label{sec:answer-key:questions-with-two-slides}
+
+A question like \emph{"Using VMS262 or VMS263, \ldots{}"} has an image for each slide. Mark the answer on each one: switch slides with the menu in the top bar. A pin on VMS263 is checked against the VMS263 areas only.
+
+\subsubsection{When areas overlap}\label{sec:answer-key:when-areas-overlap}
+
+If a pin lands in areas that say different things (a correct area and a wrong one, or two wrong answers with different reasons), the key leaves that pin for you.
+
+\subsection[Apply the key\alsotoc{sec:answer-key:grade-or-suggest}{Grade or suggest}\alsotoc{sec:answer-key:in-a-new-session}{In a new session}]{Apply the key}\label{sec:answer-key:apply-the-key}
+
+\shot{0.30\linewidth}{img/key-apply.png}{Choosing what the key applies to}
+
+When you click \textbf{Done} (or change the key later), you choose how far the key reaches. Each choice shows how many pins it would change, so you can see before you commit.
+
+\textbf{Leave existing grades alone}
+
+\begin{itemize}[topsep=2pt, itemsep=2pt]
+\item \textbf{Only new submissions}: change nothing now. Pins added later with \href{https://github.com/agadin/micro-speed-grader/blob/main/docs/help/getting-started.md\#new-and-changed-submissions}{Rescan submissions}\,\onlinemark{} are graded by the key.
+\item \textbf{Ungraded pins}: grade every pin nobody has graded yet, and new submissions. This is the usual choice.
+\end{itemize}
+
+\textbf{Also change grades already given}
+
+\begin{itemize}[topsep=2pt, itemsep=2pt]
+\item \textbf{\ldots{}and the key's earlier grades}: also redo pins the key graded before. Use this after moving, adding or deleting an area: pins the key graded that are no longer in any area become ungraded again.
+\item \textbf{\ldots{}and other graders' grades, but keep mine}: also replace grades from people you \hyperref[sec:handoff]{handed work to}. Grades you gave yourself stay.
+\item \textbf{Everything, including my own grades}: the key is the final word on every pin in an area.
+\end{itemize}
+
+Grades from the key show \textbf{Answer key} in the \href{https://github.com/agadin/micro-speed-grader/blob/main/docs/help/ledger.md}{ledger}\,\onlinemark{}, and you can change or remove them like any other grade. Applying the key is one step you can undo with \keycap{\cmdsym{}}\keyplus{}\keycap{Z}.
+
+The key never grades:
+
+\begin{itemize}[topsep=2pt, itemsep=2pt]
+\item a student who placed more than one pin for the question (the \hyperref[sec:grading:double-pins]{double-pin rule} applies);
+\item pins that are out with another grader, or that are being \hyperref[sec:handoff:grade-some-pins-twice]{graded twice}.
+\end{itemize}
+
+\tocoff
+\subsection{Grade or suggest}\label{sec:answer-key:grade-or-suggest}
+\tocon
+
+In the key panel, \textbf{When a pin lands in an area} has two settings:
+
+\begin{itemize}[topsep=2pt, itemsep=2pt]
+\item \textbf{Grade it} (the default): matching pins get the key's grade straight away.
+\item \textbf{Suggest only}: nothing is graded automatically. While you grade, a bar over the slide shows what the key says about the current cluster (for example \emph{Answer key \checksym{} 18 \crosssym{} Neutrophil 3, 2 not in the key}). Press \keycap{K} or click \textbf{Use key} to accept it.
+\end{itemize}
+
+The areas are shaded on the slide while you grade: green where the answer is right, red for common wrong answers. Turn that off with \textbf{Answer key areas} in the right panel's Display section.
+
+\tocoff
+\subsection{In a new session}\label{sec:answer-key:in-a-new-session}
+\tocon
+
+The last step of \textbf{New grading session} is \textbf{Answer key (optional)}:
+
+\begin{itemize}[topsep=2pt, itemsep=2pt]
+\item \textbf{Import key\ldots{}} loads a key saved from another session. Its areas grade matching pins as soon as grading starts.
+\item \textbf{Start by marking the answer key} opens the key editor first, so you can mark the common answers before grading anything.
+\end{itemize}
+
+{\small\textbf{Also in the online help:} \href{https://github.com/agadin/micro-speed-grader/blob/main/docs/help/answer-key.md\#reuse-a-key}{Reuse a key}\,\onlinemark{} \textperiodcentered{} \href{https://github.com/agadin/micro-speed-grader/blob/main/docs/help/answer-key.md\#with-other-graders}{With other graders}\,\onlinemark{} \textperiodcentered{} \href{https://github.com/agadin/micro-speed-grader/blob/main/docs/help/answer-key.md\#new-submissions}{New submissions}\,\onlinemark{}}

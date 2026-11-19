@@ -1,0 +1,171 @@
+\section{Grade with other people}\label{sec:handoff}
+
+\phantomsection\label{sec:handoff:grade-with-other-people}
+
+Split a grading session with one or more other graders. You (the \textbf{host}) keep the session. Each other grader (a \textbf{guest}) gets part of the remaining work as a file. They grade it on their own computer and send back a results file. You merge it in.
+
+There is no server and no account. The files travel however you like: email, Google Drive, a shared folder or a USB stick.
+
+\begin{codebox}\begin{alltt}
+ host -- Exam - Jamie.msgpack --\ensuremath{\blacktriangleright} guest grades only that work
+ host \ensuremath{\blacktriangleleft}-- Exam - Jamie.msgresult -- guest
+\end{alltt}\end{codebox}
+
+\shot{0.38\linewidth}{img/handoff.png}{Splitting the work between three people}
+
+\subsection[Before you start\alsotoc{sec:handoff:host-split-the-work}{Host: split the work}]{Before you start}\label{sec:handoff:before-you-start}
+
+\begin{itemize}[topsep=2pt, itemsep=2pt]
+\item Both people need Micro Speed Grader installed.
+\item The guest needs their own copy of the course slides folder (the same \texttt{.ndpi} files as the host). The pack holds the students' pins and answers, not the slide images, so it stays small.
+\item The guest does \textbf{not} need the exam file or the submissions folder. Everything they need is inside the pack.
+\end{itemize}
+
+\tocoff
+\subsection{Host: split the work}\label{sec:handoff:host-split-the-work}
+\tocon
+
+\begin{enumerate}[topsep=2pt, itemsep=2pt]
+\item Open your session and click \textbf{Hand off} in the top bar (next to Export).
+\item Type the first grader's name. Click \textbf{+ Add grader} for each extra person (\ensuremath{\times} removes one).
+\item Choose who grades what. Each card is one image: a question on one slide. The number on a card is how many pins on it are still ungraded. Each person has a column with their pin total.
+\begin{itemize}[topsep=1pt]
+\item \textbf{Drag a card} to someone's column.
+\item Or \textbf{click a card}: with one other grader it swaps sides; with more, a menu asks who should get it.
+\item Or type each person's \textbf{share} in the \textbf{\%} field on their name, for example 50\% for you and 25\% each for two TAs. Changing one share rescales the others so they still add up to 100\%, and the cards re-split to match. The bar shows the split actually achieved.
+\item \textbf{Split evenly} gives everyone, you included, the same share. \textbf{Give all away} sets your share to 0\%. \textbf{Keep all} gives everything back to you.
+\end{itemize}
+
+An image is never split, so every answer to a given image is marked by the same person. With only a few images, the split can only get close to the shares you asked for. The coloured bar at the top shows how many pins each person will grade.
+\item Click \textbf{Create pack (N pins)\ldots{}} (or \textbf{Create N packs\ldots{}} for several graders). With one grader you choose where to save the file; with several, you choose a folder and get one \texttt{.msgpack} per person, named after them. Send each person their own file.
+\end{enumerate}
+
+If you have an \hyperref[sec:answer-key]{answer key}, apply it first: pins it grades are no longer "remaining", so you only hand off the answers the key couldn't place. The pack carries the key as suggestions.
+
+The handed-off pins are now \textbf{locked} in your session:
+
+\begin{itemize}[topsep=2pt, itemsep=2pt]
+\item They're drawn faint on the slide and can't be graded.
+\item The image list shows \texttt{\ensuremath{\rightarrow} name} beside images that are out.
+\item A banner on the image says how many pins are with the guest.
+\end{itemize}
+
+You can keep grading everything else, and you can hand off more later. Each pack only contains work that isn't already out.
+
+\subsection{Guest: grade the pack}\label{sec:handoff:guest-grade-the-pack}
+
+\begin{enumerate}[topsep=2pt, itemsep=2pt]
+\item On the start screen, click \textbf{Got work from another grader?} and choose the \texttt{.msgpack} file.
+\item Choose your slides folder. If slides the pack needs are missing, the app names them.
+\item Choose where to save your work. This creates an ordinary session file (\texttt{.msgrade}) that auto-saves, so you can close the app and resume later from the start screen.
+\item Grade as usual. You only see the images you were given. Pins that belong to the host are shown faint and can't be graded.
+\item The top bar shows \textbf{Send results \textperiodcentered{} done/total}. When you're finished (or whenever the host asks), click it and save the \texttt{.msgresult} file. Send that file back to the host.
+\end{enumerate}
+
+You can send results more than once. Each file holds everything you've graded in the pack so far, and importing a newer file updates your earlier grades.
+
+Some of your pins may also be graded by someone else (see \hyperref[sec:handoff:grade-some-pins-twice]{Grade some pins twice}). You aren't told which, and you never see the other person's grade: grade every pin as you normally would.
+
+\subsection[Host: merge the results\alsotoc{sec:handoff:replacing-another-graders-grade}{Replacing another grader's grade}]{Host: merge the results}\label{sec:handoff:host-merge-the-results}
+
+\begin{enumerate}[topsep=2pt, itemsep=2pt]
+\item Open \textbf{Hand off} and click \textbf{Import results\ldots{}}, then choose the \texttt{.msgresult} file.
+\item The guest's grades are merged into your session. The pack shows as \emph{returned}, with the number of grades merged.
+\end{enumerate}
+
+With several graders, import each person's results file as it arrives, in any order.
+
+Merging is a single step you can undo with \keycap{\cmdsym{}}\keyplus{}\keycap{Z}.
+
+Only pins that were in that pack are taken from the file. If you already graded one of those pins yourself (for example after a recall), \textbf{your grade is kept} and the guest's is skipped. The confirmation message says how many were skipped.
+
+\subsubsection{Sending results again}\label{sec:handoff:sending-results-again}
+
+If a grader sends a second results file (say a partial one first, then the finished one), import the new file too. Their earlier grades are updated to match; anything you graded yourself in the meantime still keeps your grade.
+
+\subsubsection{Submissions that change while a pack is out}\label{sec:handoff:submissions-that-change-while-a-pack-is-out}
+
+If you \href{https://github.com/agadin/micro-speed-grader/blob/main/docs/help/getting-started.md\#new-and-changed-submissions}{rescan}\,\onlinemark{} while a pack is out and a student has changed or removed a pin that's in it, the guest's grade for that pin can no longer count: it's for an answer the student no longer has.
+
+\begin{itemize}[topsep=2pt, itemsep=2pt]
+\item The rescan message says how many changed pins are in a pack that's still out.
+\item Under \textbf{Packs}, the pack shows \textbf{N pins changed since sent}.
+\item The student's new pin is not in the pack: you grade it yourself.
+\item When you import the results, the message says how many of the guest's grades were for pins that changed. Those grades are kept with the old pins in \href{https://github.com/agadin/micro-speed-grader/blob/main/docs/help/getting-started.md\#review-changed-submissions}{Changed submissions}\,\onlinemark{}, where \textbf{Carry grade over} gives the new pin the guest's grade and \textbf{Restore} brings a removed pin back with it.
+\end{itemize}
+
+\subsubsection{Who graded what}\label{sec:handoff:who-graded-what}
+
+Every grade remembers who gave it. In the \href{https://github.com/agadin/micro-speed-grader/blob/main/docs/help/ledger.md}{ledger}\,\onlinemark{}, grades from other graders show their name beside the reason, for example \textbf{Jamie}. Pins two people agreed on show both names, such as \textbf{Jamie \& Sam}. Grades with no name are yours.
+
+\tocoff
+\subsection{Replacing another grader's grade}\label{sec:handoff:replacing-another-graders-grade}
+\tocon
+
+You can regrade, edit or remove any grade, including ones another grader gave. When you do, a notice appears over the slide: \emph{12 pins were graded by Jamie. Your grade replaced theirs.}
+
+\begin{itemize}[topsep=2pt, itemsep=2pt]
+\item \textbf{Undo} puts their grade back.
+\item \textbf{Don't warn again} turns the notice off until you quit the app.
+\end{itemize}
+
+The pins then count as yours.
+
+\subsection{Grade some pins twice}\label{sec:handoff:grade-some-pins-twice}
+
+To check that everyone is marking the same way, give some pins to two people. Each grades them \textbf{blind}, without seeing the other's grade, and the app compares the two.
+
+\begin{figure}[H]\centering
+\subshot[fig:twice]{0.42}{img/handoff-twice.png}{Grading some pins twice}\hspace{0.04\linewidth}%
+\subshot[fig:disagreements]{0.42}{img/disagreements.png}{The Disagreements window}
+\caption{Checking that graders agree}\label{fig:agree}
+\end{figure}
+
+\begin{enumerate}[topsep=2pt, itemsep=2pt]
+\item In \textbf{Hand off}, split the work as usual.
+\item Tick \textbf{Grade some pins twice} and choose a share of the pins, from 5\% to 50\%. That share is picked at random from every image, and each picked pin also goes to a second person.
+\item Choose whether to \textbf{Include me}:
+\begin{itemize}[topsep=1pt]
+\item \textbf{On}: you're one of the graders. Some of your own images' pins also go to another grader, and you get some of theirs to grade in your session.
+\item \textbf{Off}: overlaps are only between the other graders. Your own images are graded by you alone, and you only settle disagreements.
+\end{itemize}
+\item Each person's column shows how many extra pins they grade second (\textbf{+N twice}), and the bar at the top shows them as a striped end on that person's colour. Click \textbf{Create packs} as usual.
+\end{enumerate}
+
+Grading twice needs at least two people taking part.
+
+When both grades for a pin are in:
+
+\begin{itemize}[topsep=2pt, itemsep=2pt]
+\item \textbf{They agree}: the pin gets that grade. Two wrong answers agree when their reasons mean the same thing: case, punctuation, plurals and small typos are ignored, and reasons that share a main word (\emph{Neutrophil} and \emph{neutrophils}, or \emph{Dermis, not epidermis} and \emph{epidermis}) count as the same. A blank reason agrees with anything.
+\item \textbf{They disagree} (one says correct and the other wrong, or the reasons are clearly different, such as \emph{Neutrophil} and \emph{Lymphocyte}): the pin stays ungraded and is flagged for you.
+\end{itemize}
+
+If you're one of the graders, you grade your overlap pins in your own session as normal. When your grade disagrees with one already returned, a notice tells you straight away.
+
+\subsection{Settle disagreements}\label{sec:handoff:settle-disagreements}
+
+When there are disagreements, a red \textbf{Disagreements} button with a count appears (Figure~\ref{fig:disagreements}) in the top bar, and those pins get a red \textbf{!} dot on the slide. Click the button to see them, grouped by image and by what each person said, for example \emph{Q2 \textperiodcentered{} VMS109 --- Jamie: \checksym{} Correct, Sam: \crosssym{} Neutrophil --- 12 pins}.
+
+For each group:
+
+\begin{itemize}[topsep=2pt, itemsep=2pt]
+\item Click a grader's grade to \textbf{use} it for all those pins.
+\item \textbf{Grade myself} shows the pins on the slide, selected, so you can grade them yourself. Your grade settles them.
+\end{itemize}
+
+Settling is a normal step you can undo with \keycap{\cmdsym{}}\keyplus{}\keycap{Z}. Pins with disagreements count as ungraded in the export until you settle them, and the Export window shows how many are left.
+
+\subsubsection{How often graders agree}\label{sec:handoff:how-often-graders-agree}
+
+The Disagreements window also shows, for each pair of graders, how many pins they both graded, how often they agreed, and \textbf{\ensuremath{\kappa}} (Cohen's kappa on correct / wrong: how much more they agree than chance would). Above 0.8 is very good. Below 0.6, shown in red, suggests the two read the question differently and are worth a quick calibration chat. \ensuremath{\kappa} shows \textbf{---} when one of them gave every shared pin the same grade, because there's then nothing to measure beyond the agreement percentage.
+
+\subsection{Taking work back (recall)}\label{sec:handoff:taking-work-back-recall}
+
+Under \textbf{Packs} in the Hand off window, click \textbf{Recall} next to a pack that's still out. Its pins unlock in your session right away, so you can grade them or hand them to someone else.
+
+If the guest sends results for a recalled pack later, you can still import them. Only pins you haven't graded since get merged. If you handed those pins to someone else meanwhile and both people graded them, the two grades are compared like \hyperref[sec:handoff:grade-some-pins-twice]{pins graded twice}: agreements are kept and disagreements come to you.
+
+Recalling a pack with pins that were to be graded twice leaves those pins to the other grader alone.
+
+{\small\textbf{Also in the online help:} \href{https://github.com/agadin/micro-speed-grader/blob/main/docs/help/handoff.md\#whats-in-the-files}{What's in the files}\,\onlinemark{} \textperiodcentered{} \href{https://github.com/agadin/micro-speed-grader/blob/main/docs/help/handoff.md\#troubleshooting}{Troubleshooting}\,\onlinemark{}}

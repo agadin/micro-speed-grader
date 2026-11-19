@@ -1,0 +1,53 @@
+\section{Selecting pins}\label{sec:selecting}
+
+\phantomsection\label{sec:selecting:selecting-pins}
+
+Usually the app's cluster selection is all you need: press \keycap{C} or \keycap{W}. When a cluster holds a mix of right and wrong answers, select the pins yourself first. Turn tools on and off in \href{https://github.com/agadin/micro-speed-grader/blob/main/docs/help/preferences.md\#selection}{Preferences \menuarrow{} Selection}\,\onlinemark{}.
+
+\subsection[The mouse\alsotoc{sec:selecting:lasso}{Lasso, brush and polygon}]{The mouse}\label{sec:selecting:the-mouse}
+
+By default the \textbf{right} button selects and the \textbf{left} button pans the slide. Swap them in \href{https://github.com/agadin/micro-speed-grader/blob/main/docs/help/preferences.md\#mouse--keys}{Preferences \menuarrow{} Mouse \& keys}\,\onlinemark{} (\textbf{Left selects}). Scroll to zoom.
+
+When more than one tool is on, the \textbf{Select} section of the right panel shows a switcher. \keycap{B} cycles through the tools.
+
+\tocoff
+\subsection{Lasso, brush and polygon}\label{sec:selecting:lasso}
+\tocon\label{sec:selecting:brush}\label{sec:selecting:polygon}
+
+\begin{figure}[H]\centering
+\subshot{0.32}{img/lasso-use.png}{Lasso}\hfill
+\subshot{0.32}{img/brush-use.png}{Brush}\hfill
+\subshot{0.32}{img/polygon-use.png}{Polygon}
+\caption{The three selection tools, partway through selecting some of a cluster's pins}\label{fig:tools}
+\end{figure}
+
+{\setlist[itemize]{leftmargin=1em, topsep=3pt, itemsep=2pt, after=\vspace{-\baselineskip}}
+\noindent\begin{tabularx}{\linewidth}{@{}Y@{\hspace{1.2em}}Y@{\hspace{1.2em}}Y@{}}
+\toprule
+\textbf{Lasso} & \textbf{Brush} & \textbf{Polygon} \\
+\midrule
+Drag a loop around the pins. When you let go, the grade menu opens beside them.
+\begin{itemize}
+\item \keycap{\cmdsym{}}-drag adds to the selection (the menu stays closed).
+\item \keycap{\shiftsym{}}-drag selects everything \emph{outside} the loop.
+\item \keycap{\optsym{}}-drag draws a rectangle.
+\item \keycap{\cmdsym{}}-click a pin adds or removes just that pin.
+\item \keycap{X} inverts the selection.
+\end{itemize}
+&
+Paint over the pins. Painting replaces the selection and opens the menu.
+\begin{itemize}
+\item \keycap{\shiftsym{}} adds and \keycap{\optsym{}} removes, without opening the menu.
+\item \keycap{-} and \keycap{=} make the brush smaller or bigger. The size slider is in the \textbf{Select} section.
+\end{itemize}
+&
+Click to place corners around the pins. Close the shape by clicking the first corner, double-clicking, or pressing \keycap{\returnsym{}}.
+\begin{itemize}
+\item \keycap{\deletesym{}} removes the last corner; \keycap{Esc} cancels.
+\item \keycap{\cmdsym{}} on the first click adds to the selection; \keycap{\shiftsym{}} selects the outside.
+\end{itemize}
+\\
+\bottomrule
+\end{tabularx}}\par\medskip
+
+{\small\textbf{Also in the online help:} \href{https://github.com/agadin/micro-speed-grader/blob/main/docs/help/selecting.md\#paint-with-pins-hidden}{Paint with pins hidden}\,\onlinemark{} \textperiodcentered{} \href{https://github.com/agadin/micro-speed-grader/blob/main/docs/help/selecting.md\#pin-by-pin}{Pin by pin}\,\onlinemark{} \textperiodcentered{} \href{https://github.com/agadin/micro-speed-grader/blob/main/docs/help/selecting.md\#spotlight-and-small-pins}{Spotlight and small pins}\,\onlinemark{} \textperiodcentered{} \href{https://github.com/agadin/micro-speed-grader/blob/main/docs/help/selecting.md\#moving-the-cluster-ring}{Moving the cluster ring}\,\onlinemark{} \textperiodcentered{} \href{https://github.com/agadin/micro-speed-grader/blob/main/docs/help/selecting.md\#click-to-add--remove}{Click to add / remove}\,\onlinemark{}}

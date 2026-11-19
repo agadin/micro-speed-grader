@@ -1,0 +1,91 @@
+\section{Grading}\label{sec:grading}
+
+\phantomsection\label{sec:grading:grading}
+
+You grade one \textbf{image} at a time: one question on one slide, with every student's pin for that question. Pins that sit close together are grouped into \textbf{clusters}, biggest first, so the common answers come up first and you can grade dozens of students with one key.
+
+\shot{0.36\linewidth}{img/grade-cluster.png}{Grading a cluster: select, then C for correct or W for wrong with a reason}
+
+\subsection{The grading screen}\label{sec:grading:the-grading-screen}
+
+The grading screen (Figure~\ref{fig:overview}) has five parts:
+
+\begin{itemize}[topsep=2pt, itemsep=2pt]
+\item \textbf{Top bar}: the session name, the image menu (\emph{Q1 \textperiodcentered{} VMS109}, with \emph{image 2 of 5} below it), undo and redo, the save status, \textbf{Find student} (see \href{https://github.com/agadin/micro-speed-grader/blob/main/docs/help/students.md}{Look up a student}\,\onlinemark{}), \textbf{Hand off}, \textbf{Export}, Preferences, help and close.
+\item \textbf{The slide}, with the students' pins, the current cluster's dashed ring, a minimap (top left) and a scale bar.
+\item \textbf{Bottom toolbar}: previous/next cluster, how many pins are selected, \textbf{Correct}, \textbf{Wrong\ldots{}}, the \textbf{Whole slide / Cluster} zoom switch and \textbf{Shortcuts}.
+\item \textbf{Right panel}: the question text, cluster settings, selection tools, display options, recent reasons and progress. Click a section's heading to fold it away.
+\item \textbf{Ledger} (bottom): every grade you've given. See \href{https://github.com/agadin/micro-speed-grader/blob/main/docs/help/ledger.md}{The ledger and undo}\,\onlinemark{}.
+\end{itemize}
+
+\subsection{Grade a cluster}\label{sec:grading:grade-a-cluster}
+
+The app opens on the biggest cluster and selects its ungraded pins.
+
+\begin{enumerate}[topsep=2pt, itemsep=2pt]
+\item Look at what the pins in the ring are on. Zoom with the scroll wheel; \keycap{F} zooms back to the cluster, \keycap{H} shows the whole slide.
+\item If they're right, press \keycap{C} (or click \textbf{Correct}). They turn green and the next cluster comes up.
+\item If they're wrong, press \keycap{W} (or click \textbf{Wrong\ldots{}}), type what they marked instead (for example \emph{Neutrophil}) and press \keycap{\returnsym{}}. That reason goes into those students' feedback.
+\item When the ring holds a mix, select just the right pins first, with the lasso, brush or polygon. See \hyperref[sec:selecting]{Selecting pins}.
+\end{enumerate}
+
+Press \keycap{]} to skip to the next cluster and \keycap{[} to go back. When an image is done, the next image comes up from the \textbf{Next image} button or \keycap{\cmdsym{}}\keyplus{}\keycap{\ensuremath{\rightarrow}}.
+
+\subsubsection{Correct with a note}\label{sec:grading:correct-with-a-note}
+
+\keycap{\shiftsym{}}\keyplus{}\keycap{C} (or \shiftsym{}-click \textbf{Correct}) marks the selection correct and lets you add a note, such as \emph{Correct, but borderline}. The note shows in the student's feedback as \emph{Correct (note)}.
+
+\subsection[The grade menu\alsotoc{sec:grading:reasons-for-wrong-answers}{Reasons for wrong answers}]{The grade menu}\label{sec:grading:the-grade-menu}
+
+\begin{figure}[H]\centering
+\subshot[fig:grade-menu]{0.3}{img/grade-menu.jpg}{The grade menu}\hspace{0.06\linewidth}%
+\subshot[fig:reason-box]{0.3}{img/reason-box.jpg}{Giving a reason}
+\caption{Grading the selection}\label{fig:grade}
+\end{figure}
+
+Click a pin, press \keycap{\returnsym{}}, or right-click without dragging to open the grade menu for the selection (Figure~\ref{fig:grade-menu}):
+
+\begingroup\renewcommand{\arraystretch}{1.35}
+\noindent\begin{tabularx}{\linewidth}{YYY}
+\toprule
+\textbf{Item} & \textbf{Key} & \textbf{What it does} \\
+\midrule
+Mark correct & C & Grade the selection correct \\
+Correct with note\ldots{} & \shiftsym{}C & Correct, with a note for the student \\
+Mark wrong\ldots{} & W & Grade it wrong and give a reason \\
+Invert selection & X & Select the other ungraded pins on this image instead \\
+Isolate & I & Hide every other pin \\
+Remove grade & U & Make the selected pins ungraded again \\
+Close & Esc & Close the menu \\
+\bottomrule
+\end{tabularx}\endgroup\par\medskip
+
+\tocoff
+\subsection{Reasons for wrong answers}\label{sec:grading:reasons-for-wrong-answers}
+\tocon
+
+When you mark pins wrong, the reason box (Figure~\ref{fig:reason-box}) suggests reasons you've used before: this question's first, then the rest of the exam.
+
+\begin{itemize}[topsep=2pt, itemsep=2pt]
+\item Press \keycap{1}--\keycap{9} (on an empty box) to pick a suggestion, or \keycap{\cmdsym{}}\keyplus{}\keycap{1}--\keycap{\cmdsym{}}\keyplus{}\keycap{9} while typing.
+\item \keycap{\ensuremath{\uparrow}} \keycap{\ensuremath{\downarrow}} highlight a suggestion and \keycap{\tabsym{}} completes it.
+\item \keycap{\returnsym{}} applies, \keycap{Esc} goes back.
+\end{itemize}
+
+The \textbf{Recent reasons} section of the right panel lists this question's last few reasons with how many pins each has. Click one to mark the current selection wrong with that reason.
+
+By default a reason is required. To allow blank reasons (students then read \emph{Incorrect}), turn off \textbf{Wrong answers need a reason} in \href{https://github.com/agadin/micro-speed-grader/blob/main/docs/help/preferences.md\#grading-text}{Preferences \menuarrow{} Grading text}\,\onlinemark{}.
+
+\subsection{Pins that grade themselves}\label{sec:grading:pins-that-grade-themselves}
+
+\begin{itemize}[topsep=2pt, itemsep=4pt]
+\item \phantomsection\label{sec:grading:double-pins}\textbf{Double pins.} A student who placed more than one pin for the same question gets a \keycap{2} badge on their pins. They're counted as done and marked wrong with \emph{Multiple pins submitted (only one allowed)}, shown in the ledger as an \textbf{AUTO} row. If you grade one of their pins yourself, your most recent grade counts instead.
+\item \phantomsection\label{sec:grading:no-answer}\textbf{No answer.} A student with no pin for a question is marked wrong with \emph{No answer} in the export. There's nothing to grade on the slide.
+\item \phantomsection\label{sec:grading:unlabelled-pins}\textbf{Unlabelled pins (\keycap{?}).} A pin whose title doesn't say which question it answers, on a slide that several questions use, shows a \keycap{?} badge and appears on each of those questions. Grade it on the question it answers: that also assigns it. \textbf{Remove grade} undoes the assignment. See Appendix~\ref{app:pins}.
+\end{itemize}
+
+\subsection{Progress}\label{sec:grading:progress}
+
+The \textbf{Progress} section shows three bars: \textbf{This image}, \textbf{Images done} and \textbf{All pins}. When every pin is graded a banner offers \textbf{Export grades}. See \hyperref[sec:export]{Exporting grades}.
+
+{\small\textbf{Also in the online help:} \href{https://github.com/agadin/micro-speed-grader/blob/main/docs/help/grading.md\#showing-the-pins-differently}{Showing the pins differently}\,\onlinemark{}}

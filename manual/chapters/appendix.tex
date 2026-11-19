@@ -1,0 +1,65 @@
+\appendix
+\section{How pins are matched to questions}\label{app:pins}\label{sec:getting-started:how-student-pins-are-read}
+
+When it reads the submissions folder, the app works out who placed each pin, on which slide, and which question it answers.
+
+\begin{itemize}[topsep=2pt, itemsep=2pt]
+\item \textbf{Student.} Each first-level folder in the submissions folder is one student. Its name becomes the student's name, and a number in it becomes their UID.
+\item \textbf{Slide.} The slide ID comes from the \texttt{.ndpa} file name (\texttt{VMS109.ndpi.ndpa} is for VMS109).
+\item \textbf{Answers.} Pins and shapes (circles, outlines) are answers; a shape counts as a pin at its centre. Rulers, arrows and text notes aren't (see \emph{Count as answers} below).
+\item \textbf{Limits.} To stop a damaged file from slowing the app: 2 MB per annotation file, 200 annotations per file and 50 pins per student per slide.
+\end{itemize}
+
+\subsection*{Which question a pin answers}
+
+Only the questions that use the pin's slide are considered. The app reads the pin's title (the label the student typed in NDP.view) and tries these rules in order, stopping at the first that gives an answer:
+
+\begin{enumerate}[topsep=2pt, itemsep=2pt]
+\item \textbf{The title is just the question}: \emph{Q3}, \emph{q3} or \emph{Q 3}.
+\item \textbf{The title names the question} anywhere in it: \emph{Question 3: sweat gland}, \emph{my answer Q3}, \emph{Q\#3}.
+\item \textbf{The title has exactly one number that is a question on this slide}: \emph{3}, \emph{\#3}, \emph{pin 3}, \emph{3) sweat gland}. Other numbers are ignored, so \emph{VMS109 \#3} still means Q3 (unless the exam has a question 109 on that slide).
+\item \textbf{Nothing in the title decides it.}
+\begin{itemize}[topsep=1pt]
+\item On a slide that \textbf{only one question uses}, the pin belongs to that question, whatever its title says.
+\item On a slide that \textbf{several questions use}, if the student's other pins on that slide already answer all but one of its questions, the pin answers \textbf{the one that's left}. A student who labels one pin \emph{Q3} on a slide used by Q3 and Q13 has their other, unlabelled pin counted as Q13.
+\item Otherwise the pin is \emph{unlabelled}: it appears on each question it could answer with a \keycap{?} badge. Grading it under one question assigns it to that question; \textbf{Remove grade} undoes that.
+\end{itemize}
+\end{enumerate}
+
+A title that names a question the slide isn't for (\emph{Q9} on a slide used only by Q3 and Q13) is listed in \hyperref[sec:getting-started:things-to-check]{Things to check} as \textbf{Pin names a question not on that slide}, and the pin is then placed by rule~4.
+
+\begin{table}[H]\centering
+\begin{tabularx}{\linewidth}{@{}l>{\raggedright\arraybackslash}p{0.27\linewidth}Y@{}}
+\toprule
+\textbf{Pin title} & \textbf{Slide used by Q3 and Q13}\textsuperscript{*} & \textbf{Slide used only by Q5} \\
+\midrule
+\emph{Q3} & Q3 (rule 1) & Q5 (rule 4); flagged: names Q3 \\
+\emph{Question 13 -- duct} & Q13 (rule 2) & Q5 (rule 4); flagged: names Q13 \\
+\emph{\#3} or \emph{3} & Q3 (rule 3) & Q5 (rule 4) \\
+\emph{3 or 13} & unlabelled \keycap{?} on Q3 and Q13 & Q5 (rule 4) \\
+\emph{sweat gland} & unlabelled \keycap{?} on Q3 and Q13 & Q5 (rule 4) \\
+\emph{Q9} & unlabelled \keycap{?} on Q3 and Q13; flagged & Q5 (rule 4); flagged \\
+\bottomrule
+\end{tabularx}
+\par\smallskip{\footnotesize\textsuperscript{*}For a student with no other pin on that slide. With the default settings in Preferences \menuarrow{} Reading submissions.}
+\caption{Where some pin titles end up}\label{tab:titles}
+\end{table}
+
+\subsection*{Changing the rules}
+
+These rules can be changed in \href{https://github.com/agadin/micro-speed-grader/blob/main/docs/help/preferences.md\#reading-submissions}{Preferences \menuarrow{} Reading submissions}\,\onlinemark{}. The defaults are in bold.
+
+\begin{itemize}[topsep=2pt, itemsep=3pt]
+\item \textbf{Count as answers}: pins only, \textbf{pins and shapes} (circles and outlines count as a pin at their centre), or every annotation (rulers, arrows and text notes too). With every annotation, a student who measured something in NDP.view has a second ``pin'' for that question.
+\item \textbf{Bare numbers} (rule 3): \textbf{on}, or off. Turn it off when titles often contain numbers that aren't question numbers: then only titles that say \emph{Q3} or \emph{question 3} count, and the rest are placed by rule 4.
+\item \textbf{Title names another question}: \textbf{use the pin for its slide's question}, or leave the pin out, so the student has no answer for that question unless they have another pin. Either way the pin is listed in Things to check.
+\item \textbf{Leftover question} (rule 4): \textbf{on}, or off. Off, a pin is never given to the student's remaining question; it stays unlabelled for you to decide.
+\item \textbf{Unlabelled pins} (whatever is still unlabelled after the leftover rule): \textbf{show on each question, with a \keycap{?}}, give them to the lowest-numbered question, or leave them out.
+\item \textbf{Several pins for one question}: \textbf{mark them wrong automatically}, or leave them for you to grade. Left for you, the pins keep their \keycap{2} badge but stay ungraded (and count as ungraded in the export) until you grade one of them. Either way, a grade you give one of them is what counts.
+\end{itemize}
+
+New sessions use these settings, and each session keeps the ones it was made with, so a later rescan reads it the same way. (Sessions made before version 0.3.8 count every annotation.) Changing a setting while a session is open reads its submissions again with the new rules, after saving a copy of the session next to it. A graded pin that now answers a different question loses its grade for the old one; pins that are left out are set aside with their grades. \textbf{Several pins for one question} applies straight away, without reading anything again. A hand-off pack carries the host's setting, so other graders treat several pins the same way.
+
+\subsection*{More than one pin for a question}
+
+If a student ends up with two or more pins for the same question, by any of the rules above, they're all marked wrong as \emph{Multiple pins submitted (only one allowed)} unless you grade one of them yourself, or set \emph{Several pins for one question} to leave them for you (see \hyperref[sec:grading:double-pins]{Double pins}). An unlabelled \keycap{?} pin doesn't count towards this until it's assigned. Likewise, a student whose only pin for a question is an unlabelled one is shown as ungraded for it (not \emph{No answer}) until you grade that pin.

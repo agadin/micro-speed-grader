@@ -1,8 +1,12 @@
-// Builds the LaTeX user manual from the in-app help pages (docs/help/*.md), with the app's own
-// Markdown parser so sections and anchors match the Help window exactly.
+// The LaTeX user manual. manual/ is a hand-edited LaTeX project (main.tex, chapters/, img/):
 //   cd app && npm run manual
-// Writes manual/build/ (main.tex, version.tex, chapters/, img/, icon.png), compiles it when
-// tectonic or latexmk is installed, and zips it as manual/micro-speed-grader-manual-<version>-draft.zip.
+// copies it to manual/build/ with a fresh version.tex (version, commit, date), compiles it when
+// tectonic or latexmk is installed, and zips it as manual/micro-speed-grader-manual-<version>-draft.zip
+// (ready to upload to Overleaf).
+//   npm run manual -- --regenerate
+// first rewrites manual/chapters/ and manual/img/ from the in-app help (docs/help/*.md), with the
+// app's own Markdown parser so sections and anchors match the Help window. That throws away the
+// hand edits in chapters/ (git keeps them): use it to start over, or to see what changed in the help.
 import fs from "node:fs";
 import path from "node:path";
 import { execFileSync } from "node:child_process";
@@ -81,7 +85,7 @@ const label = (file: string, anchor = "") => `sec:${file}${anchor ? ":" + anchor
 const labels = new Set<string>();
 const refs: string[] = [];
 /** the pages printed in full; the rest get a summary card pointing at the full page online */
-const FULL = new Set(["index", "getting-started", "grading", "selecting", "answer-key", "export", "shortcuts"]);
+const FULL = new Set(["index", "getting-started", "grading", "selecting", "answer-key", "export", "shortcuts", "handoff"]);
 /** sections of the full pages left to the online help (by heading id) */
 const ONLINE_ONLY: Record<string, string[]> = {
   "getting-started": ["new-and-changed-submissions", "review-changed-submissions", "updates"],
@@ -89,6 +93,7 @@ const ONLINE_ONLY: Record<string, string[]> = {
   selecting: ["paint-with-pins-hidden", "pin-by-pin", "spotlight-and-small-pins", "moving-the-cluster-ring"],
   "answer-key": ["reuse-a-key", "with-other-graders", "new-submissions"],
   export: ["time-spent"],
+  handoff: ["whats-in-the-files", "troubleshooting"],
 };
 const printed = (f: string, anchor: string) => FULL.has(f) && !(anchor && (ONLINE_ONLY[f] ?? []).includes(anchor));
 const online = (f: string, anchor = "") => `${REPO}/blob/main/docs/help/${f}.md${anchor ? "#" + anchor : ""}`;
@@ -123,14 +128,16 @@ function inline(s: string): string {
 }
 
 // ---------------- images ----------------
-const imgDir = path.join(OUT, "img");
+const REGEN = process.argv.includes("--regenerate") || !fs.existsSync(path.join(SRC, "chapters"));
+const CH = path.join(SRC, "chapters");
+const imgDir = path.join(SRC, "img");
 function probe(file: string) {
   const out = execFileSync("ffprobe", ["-v", "error", "-select_streams", "v:0", "-show_entries", "stream=width,height,nb_frames", "-of", "csv=p=0", file], { encoding: "utf8" });
   const [w, h, n] = out.trim().split(",").map(Number);
   return { w, h, n };
 }
 /** copy the picture (an animation becomes its last-but-a-bit frame, which shows the result) and size it */
-function image(src: string, alt: string) {
+function picture(src: string) {
   const from = path.join(HELP, src);
   const base = path.basename(src).replace(/\.gif$/i, ".png");
   const to = path.join(imgDir, base);
@@ -140,11 +147,21 @@ function image(src: string, alt: string) {
     const frame = Math.max(0, Math.round((n || 1) * 0.85) - 1);
     execFileSync("ffmpeg", ["-v", "error", "-y", "-i", from, "-vf", `select=eq(n\\,${frame})`, "-frames:v", "1", to]);
   } else fs.copyFileSync(from, to);
+  return { base, to, anim };
+}
+function image(src: string, alt: string) {
+  const { base, to } = picture(src);
   // screenshots are 2× (retina): a 1600 px wide one fills the text width, smaller ones stay smaller
   const { w } = probe(to);
   const frac = Math.min(0.72, w / 2000);
-  const cap = inline(alt) + (anim ? ` \\textcolor{black!45}{(animated in the online help)}` : "");
+  const cap = inline(alt);
   return `\\shot{${frac.toFixed(2)}\\linewidth}{img/${base}}{${cap}}`;
+}
+
+/** a small picture of a page that's only summarised */
+function thumb(src: string, alt: string) {
+  const { base } = picture(src);
+  return `\\par\\smallskip{\\centering\\tcbox[enhanced, boxsep=0pt, left=0pt, right=0pt, top=0pt, bottom=0pt, arc=4pt, boxrule=0.5pt, colframe=black!22, colback=white, clip upper]{\\includegraphics[width=0.7\\linewidth, height=4.2cm, keepaspectratio]{img/${base}}}\\par{\\scriptsize\\color{black!55}${inline(alt)}}\\par}\\smallskip`;
 }
 
 // ---------------- blocks ----------------
@@ -189,7 +206,6 @@ function chapter(file: string, doc: Doc) {
   const title = file === "index" ? "Introduction" : doc.meta.title;
   out.push(`\\section{${inline(title)}}\\label{${label(file)}}`);
   labels.add(label(file));
-  if (doc.meta.blurb && file !== "index") out.push(`{\\color{black!55}\\itshape ${inline(doc.meta.blurb)}}\\par\\medskip`);
   const skipped: string[] = [];
   let skipping = false;
   for (const b of doc.blocks) {
@@ -224,14 +240,16 @@ function card(file: string, doc: Doc) {
   const first = doc.blocks.find((b) => b.t === "p") as { text: string } | undefined;
   const topics = doc.blocks.filter((b) => b.t === "h" && b.depth === 2).map((b) => inline((b as { text: string }).text));
   const url = online(file);
+  const pic = doc.blocks.find((b) => b.t === "img") as { src: string; alt: string } | undefined;
   labels.add(label(file));
   return [
     `\\begin{pagecard}\\phantomsection\\addcontentsline{toc}{subsection}{${inline(doc.meta.title)}}\\label{${label(file)}}`,
     `{\\large\\bfseries\\color{accent}${inline(doc.meta.title)}}\\par\\smallskip`,
     first ? inline(first.text) + "\\par" : "",
+    pic ? thumb(pic.src, pic.alt) : "",
     topics.length ? `{\\small\\color{black!60}Covers: ${topics.join(" \\textperiodcentered{} ")}}` : "",
     "\\tcblower",
-    `\\centering${href(url, "\\qrcode[height=1.75cm, nolink]{" + url + "}")}\\\\[3pt]{\\scriptsize ${href(url, "Full page online")}}`,
+    `\\centering${href(url, "\\qrcode[height=1.75cm, nolink]{" + url + "}")}\\\\[3pt]{\\scriptsize\\raggedright ${href(url, "\\nolinkurl{" + url.replace(/^https:\/\//, "") + "}")}}`,
     "\\end{pagecard}",
     "",
   ].join("\n");
@@ -252,10 +270,7 @@ try {
 const date = new Date().toLocaleDateString("en-GB", { day: "numeric", month: "long", year: "numeric" });
 
 fs.rmSync(OUT, { recursive: true, force: true });
-fs.mkdirSync(path.join(OUT, "chapters"), { recursive: true });
-fs.mkdirSync(imgDir, { recursive: true });
-fs.copyFileSync(path.join(SRC, "main.tex"), path.join(OUT, "main.tex"));
-fs.copyFileSync(path.join(ROOT, "app/src-tauri/icons/icon.png"), path.join(OUT, "icon.png"));
+fs.mkdirSync(OUT, { recursive: true });
 fs.writeFileSync(
   path.join(OUT, "version.tex"),
   [
@@ -269,30 +284,39 @@ fs.writeFileSync(
   ].join("\n"),
 );
 
-const pages = fs
-  .readdirSync(HELP)
-  .filter((f) => f.endsWith(".md"))
-  .map((f) => ({ id: f.replace(/\.md$/, ""), doc: parseMarkdown(fs.readFileSync(path.join(HELP, f), "utf8")) }))
-  .sort((a, b) => Number(a.doc.meta.order ?? 99) - Number(b.doc.meta.order ?? 99));
-const all: string[] = [];
-for (const p of pages.filter((p) => FULL.has(p.id))) {
-  fs.writeFileSync(path.join(OUT, "chapters", `${p.id}.tex`), chapter(p.id, p.doc));
-  all.push(`\\input{chapters/${p.id}}`);
-}
-const rest = pages.filter((p) => !FULL.has(p.id));
-fs.writeFileSync(
-  path.join(OUT, "chapters", "more.tex"),
-  `\\bigskip\n\\section{More in the online help}\\label{sec:more}\n` +
-    `These pages of the Help are summarised here. Scan a code, or click a title's link, to read the full page; it's also in the app under \\textbf{Help}.\\par\\medskip\n\n` +
-    rest.map((p) => card(p.id, p.doc)).join("\n"),
-);
-all.push("\\input{chapters/more}");
-fs.writeFileSync(path.join(OUT, "chapters", "all.tex"), all.join("\n") + "\n");
+let broken: string[] = [];
+if (REGEN) {
+  fs.mkdirSync(CH, { recursive: true });
+  fs.mkdirSync(imgDir, { recursive: true });
+  const pages = fs
+    .readdirSync(HELP)
+    .filter((f) => f.endsWith(".md"))
+    .map((f) => ({ id: f.replace(/\.md$/, ""), doc: parseMarkdown(fs.readFileSync(path.join(HELP, f), "utf8")) }))
+    .sort((a, b) => Number(a.doc.meta.order ?? 99) - Number(b.doc.meta.order ?? 99));
+  const all: string[] = [];
+  for (const p of pages.filter((p) => FULL.has(p.id))) {
+    fs.writeFileSync(path.join(CH, `${p.id}.tex`), chapter(p.id, p.doc));
+    all.push(`\\input{chapters/${p.id}}`);
+  }
+  const rest = pages.filter((p) => !FULL.has(p.id));
+  fs.writeFileSync(
+    path.join(CH, "more.tex"),
+    `\\bigskip\n\\section{More in the online help}\\label{sec:more}\n` +
+      `These pages of the Help are summarised here. Scan a code, or click a title's link, to read the full page; it's also in the app under \\textbf{Help}.\\par\\medskip\n\n` +
+      rest.map((p) => card(p.id, p.doc)).join("\n"),
+  );
+  all.push("\\input{chapters/more}");
+  fs.writeFileSync(path.join(CH, "all.tex"), all.join("\n") + "\n");
 
-const broken = [...new Set(refs)].filter((r) => !labels.has(r));
-console.log(`${pages.length - rest.length} pages in full, ${rest.length} summarised, ${fs.readdirSync(imgDir).length} images, version ${version} (${commit}${ahead ? `, ${ahead} commits after v${version}` : ""})`);
-if (unknown.size) console.log(`characters with no LaTeX mapping: ${[...unknown].join(" ")}`);
-if (broken.length) console.log(`links to missing sections: ${broken.join(", ")}`);
+  broken = [...new Set(refs)].filter((r) => !labels.has(r));
+  console.log(`${pages.length - rest.length} pages in full, ${rest.length} summarised, ${fs.readdirSync(imgDir).length} images, version ${version} (${commit}${ahead ? `, ${ahead} commits after v${version}` : ""})`);
+  if (unknown.size) console.log(`characters with no LaTeX mapping: ${[...unknown].join(" ")}`);
+  if (broken.length) console.log(`links to missing sections: ${broken.join(", ")}`);
+}
+// the LaTeX project as edited by hand
+fs.copyFileSync(path.join(SRC, "main.tex"), path.join(OUT, "main.tex"));
+fs.cpSync(CH, path.join(OUT, "chapters"), { recursive: true });
+fs.cpSync(imgDir, path.join(OUT, "img"), { recursive: true });
 
 // compile when a TeX engine is installed
 const has = (cmd: string) => {

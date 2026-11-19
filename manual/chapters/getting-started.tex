@@ -1,0 +1,98 @@
+\section{Getting started}\label{sec:getting-started}
+
+\phantomsection\label{sec:getting-started:getting-started}
+
+\subsection{What you need}\label{sec:getting-started:what-you-need}
+
+\begin{itemize}[topsep=2pt, itemsep=2pt]
+\item \textbf{The exam}: the exam PDF, or a JSON file listing the questions. Each question names the slide (or slides) it uses, for example \texttt{Q1. Using VMS109, place a pin on an eccrine sweat gland}.
+\item \textbf{The student submissions folder}: one folder per student, each holding that student's \texttt{.ndpa} annotation files (the pins they placed in NDP.view).
+\item \textbf{The slides folder}: the whole-slide images the exam uses (\texttt{.ndpi}, \texttt{.svs}, \texttt{.tif}, \texttt{.tiff}, \texttt{.mrxs}, \texttt{.scn} or \texttt{.vms}). File names must contain the slide ID, such as \texttt{VMS109}.
+\end{itemize}
+
+\subsection{The start screen}\label{sec:getting-started:the-start-screen}
+
+\begin{figure}[H]\centering
+\subshot[fig:start-screen]{0.3}{img/start.png}{The start screen}\hspace{0.06\linewidth}%
+\subshot[fig:new-session]{0.55}{img/new-session.png}{Setting up a new session}
+\caption{Starting out}\label{fig:start}
+\end{figure}
+
+The start screen (Figure~\ref{fig:start-screen}) offers:
+
+\begin{itemize}[topsep=2pt, itemsep=2pt]
+\item \textbf{New grading session\ldots{}} sets up a new session from the three things above.
+\item \textbf{Open session\ldots{}} opens a \texttt{.msgrade} session file.
+\item \textbf{Resume} lists the last ten sessions you opened, with when each was last saved. Click one to carry on; the \textbf{\ensuremath{\times}} only removes it from the list (the file stays where it is).
+\item \textbf{Got work from another grader?} opens a hand-off pack someone sent you. See \hyperref[sec:handoff]{Grade with other people}.
+\end{itemize}
+
+\subsection{Create a session}\label{sec:getting-started:create-a-session}
+
+The \textbf{New grading session} window (Figure~\ref{fig:new-session}) takes you through five steps:
+
+\begin{enumerate}[topsep=2pt, itemsep=2pt]
+\item \textbf{Exam questions}: click \textbf{Choose exam PDF / JSON\ldots{}}. To fix what was read, or to add questions it missed, click \textbf{Edit questions\ldots{}} (see \href{https://github.com/agadin/micro-speed-grader/blob/main/docs/help/exam-questions.md}{Set up exam questions}\,\onlinemark{}). No exam file? Choose \textbf{Set up the questions by hand}. The app reads every line shaped like \texttt{Q1. Using VMS123, \ldots{}} and lists the questions in a table. Edit the session name if you like.
+\item \textbf{Student submissions folder}: click \textbf{Choose folder\ldots{}} and pick the folder that holds one folder per student. The app shows how many student folders and annotation files it found.
+\item \textbf{Slide images folder}: click \textbf{Choose folder\ldots{}} and pick the folder of slides. Each question's slides are marked \textbf{\checksym{}} when found or \textbf{missing} when not.
+\item \textbf{Save session as}: click \textbf{Choose\ldots{}} and pick where to keep the session file. It's pre-filled next to the submissions folder.
+\item Click \textbf{Start grading \ensuremath{\rightarrow}}.
+\end{enumerate}
+
+\textbf{Start grading \ensuremath{\rightarrow}} stays greyed out until at least one question is included and all three folders and the save location are chosen. Until then, the line next to it says what's still needed (hover over the button for the same list).
+
+\subsubsection{Choosing which questions to grade}\label{sec:getting-started:choosing-which-questions-to-grade}
+
+The table has a checkbox per question. Choosing the slides folder ticks only the questions whose slides were found. Untick a question to leave it out; the score is out of the number of included questions (shown under the table as \emph{N of M questions included}).
+
+You can correct the \textbf{Slides} cell if the exam lists the wrong slide ID: type the IDs separated by commas or spaces.
+
+How the app works out which student, slide and question each pin belongs to is described in Appendix~\ref{app:pins}.
+
+\subsubsection{Answer key (optional)}\label{sec:getting-started:answer-key-optional}
+
+The last step lets you import an \hyperref[sec:answer-key]{answer key} saved from another session, or start by marking one. Pins that land in the key's areas are graded for you.
+
+\subsection[Things to check\alsotoc{sec:getting-started:saving-and-backups}{Saving and backups}]{Things to check}\label{sec:getting-started:things-to-check}
+
+Once the exam and the submissions folder are chosen, the app reads every student's files. If anything looks wrong, step 2 shows \textbf{\warnsym{} N things to check \textperiodcentered{} Review}. Click \textbf{Review} to see each problem, what it means and what to do, with the students and files it affects. Long lists are cut short: click \textbf{Show all} to see the rest.
+
+The top of the list shows how far you've got: how many were found, fixed, acknowledged and left. Work through it like this:
+
+\begin{itemize}[topsep=2pt, itemsep=2pt]
+\item \textbf{This file is for\ldots{}}: for a file with no slide ID, or the wrong one, choose the slide it's really for. The app reads it as that slide from then on (including when you \href{https://github.com/agadin/micro-speed-grader/blob/main/docs/help/getting-started.md\#new-and-changed-submissions}{rescan}\,\onlinemark{}); the file itself isn't renamed. It moves to \textbf{Fixed}, where \textbf{Undo} takes it back.
+\item \textbf{Show file} / \textbf{Show folder} opens it in Finder, so you can look at it or add what's missing. Then click \textbf{Check again}.
+\item \textbf{OK} marks one item as checked; \textbf{Acknowledge all} does a whole group, or everything left. Acknowledged items stay listed, crossed out, and \textbf{Undo} puts one back.
+\end{itemize}
+
+When nothing is left, step 2 shows \textbf{\checksym{} All N checked}. You can start grading at any time, whether or not everything is checked. Fixes and acknowledgements are saved with the session.
+
+\begingroup\renewcommand{\arraystretch}{1.35}
+\noindent\begin{tabularx}{\linewidth}{YYY}
+\toprule
+\textbf{Problem} & \textbf{What it means} & \textbf{What to do} \\
+\midrule
+\textbf{Nothing to grade} & A student's folder has no pins the app can use (no \texttt{.ndpa} files, or none for the exam's slides). & Check whether the student submitted. If they did, put their \texttt{.ndpa} files in their folder. \\
+\textbf{Missing a slide} & The student has no file for a slide an included question uses, so they have no answer for it. & If the file is there under another name, rename it so it includes the slide ID. \\
+\textbf{No slide ID in the file name} & The app can't tell which slide the file is for, so its pins are left out. & Rename the file so it includes the slide ID, e.g. \texttt{VMS109.ndpi.ndpa}. \\
+\textbf{Slide not in the exam} & No question uses that slide, so its pins are left out. & Usually nothing. If the student typed the wrong slide ID, rename the file. \\
+\textbf{Pin names a question not on that slide} & A pin titled, say, \emph{Q9} is on a slide that's only for Q2. It's still graded with that slide's questions. & Look at it when you grade that slide: the student may have mislabelled the pin or used the wrong slide. \\
+\textbf{Too many pins} & Only the first 50 pins per student per slide are kept. & Open the file in NDP.view if you need the rest. \\
+\textbf{File too large} & Annotation files over 2 MB are skipped; a real one is a few KB. & It's probably damaged. Ask the student to save it again from NDP.view. \\
+\textbf{File can't be read} & The file isn't valid annotation data, so it was skipped. & Ask the student to save it again from NDP.view. \\
+\bottomrule
+\end{tabularx}\endgroup\par\medskip
+
+Files for a question you've left out (unticked) aren't checked.
+
+\tocoff
+\subsection{Saving and backups}\label{sec:getting-started:saving-and-backups}
+\tocon
+
+There's no Save button: the session saves itself a moment after every change, and whenever you change image or close the session. The top bar shows \textbf{Saving\ldots{}}, then \textbf{\checksym{} Saved}.
+
+Each save keeps the previous version next to it as \texttt{yoursession.msgrade.bak}. If the session file is ever damaged, opening it falls back to the backup automatically.
+
+To stop for the day, click the close button at the right of the top bar (\textbf{Save and close session}). Next time, click the session under \textbf{Resume}.
+
+{\small\textbf{Also in the online help:} \href{https://github.com/agadin/micro-speed-grader/blob/main/docs/help/getting-started.md\#new-and-changed-submissions}{New and changed submissions}\,\onlinemark{} \textperiodcentered{} \href{https://github.com/agadin/micro-speed-grader/blob/main/docs/help/getting-started.md\#review-changed-submissions}{Review changed submissions}\,\onlinemark{} \textperiodcentered{} \href{https://github.com/agadin/micro-speed-grader/blob/main/docs/help/getting-started.md\#updates}{Updates}\,\onlinemark{}}

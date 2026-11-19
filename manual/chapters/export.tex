@@ -1,0 +1,74 @@
+\section{Exporting grades}\label{sec:export}
+\tocoff
+
+\phantomsection\label{sec:export:exporting-grades}
+
+Click \textbf{Export} in the top bar (or \textbf{File \menuarrow{} Export Grades\ldots{}}, \keycap{\cmdsym{}}\keyplus{}\keycap{E}). You can export at any time; ungraded answers are flagged.
+
+\shot{0.52\linewidth}{img/export-csv.png}{The Export window}
+
+The strip at the top summarises the class: students, questions, the mean score, KR-20 reliability, and how many answers are still ungraded.
+
+\subsection{Grades CSV}\label{sec:export:grades-csv}
+
+Click \textbf{Export grades.csv} to write the file into the folder shown at the bottom (by default an \texttt{export} folder next to the session file; \textbf{Choose\ldots{}} to change it).
+
+\subsubsection{Choosing columns}\label{sec:export:choosing-columns}
+
+Each column can be turned on or off, renamed, and dragged into a different order. You can also drag the column headers in the preview table. The \textbf{Columns} menu has two presets:
+
+\begin{itemize}[topsep=2pt, itemsep=2pt]
+\item \textbf{Item analysis}: UID, surname, first name, number correct, questions asked, the comment, and one 1/0 column per question.
+\item \textbf{Simple (Student, Grade, Comment)}.
+\end{itemize}
+
+\begingroup\renewcommand{\arraystretch}{1.35}
+\noindent\begin{tabularx}{\linewidth}{YY}
+\toprule
+\textbf{Column} & \textbf{Contains} \\
+\midrule
+UID & The student number from the folder name \\
+Surname, First name & Split from the folder name \\
+Student & The full folder name \\
+Correct answers & Number right \\
+Questions asked & Number of included questions \\
+Grade & For example \emph{4/5} \\
+Percent & 0--100 \\
+Comment & The student's feedback text (\href{https://github.com/agadin/micro-speed-grader/blob/main/docs/help/feedback.md}{What students see}\,\onlinemark{}) \\
+Item scores & One column per question: 1 correct, 0 wrong \\
+\bottomrule
+\end{tabularx}\endgroup\par\medskip
+
+Options:
+
+\begin{itemize}[topsep=2pt, itemsep=2pt]
+\item \textbf{UID}: the number from the folder name, or blank.
+\item \textbf{Ungraded items}: leave blank, or count as 0.
+\item \textbf{Also write feedback/\textless{}student\textgreater{}.txt}: one text file per student, ready to upload as feedback.
+\end{itemize}
+
+The layout is saved and also editable in \href{https://github.com/agadin/micro-speed-grader/blob/main/docs/help/preferences.md\#export}{Preferences \menuarrow{} Export}\,\onlinemark{}.
+
+The CSV is UTF-8 and opens directly in Excel. Text that a spreadsheet could mistake for a formula is written safely.
+
+\subsection{Statistics}\label{sec:export:statistics}
+
+\shot{0.52\linewidth}{img/export-stats.png}{Item statistics}
+
+The \textbf{Statistics} tab shows how the exam performed:
+
+\begin{itemize}[topsep=2pt, itemsep=2pt]
+\item \textbf{KR-20}: the test's reliability (0--1), with a reading from \emph{very low} to \emph{good}.
+\item \textbf{Mean} and \textbf{SD} of the scores.
+\item For each question:
+\begin{itemize}[topsep=1pt]
+\item \textbf{Difficulty (p)}: the share of students who got it right.
+\item \textbf{Point-biserial (corrected)}: how well the question separates strong from weak students. Below 0.2 is shown in red.
+\item \textbf{KR-20 if deleted}: reliability without that question. Red when leaving it out would make the test more reliable.
+\end{itemize}
+\end{itemize}
+
+If some answers are ungraded, choose \textbf{Leave those students out} or \textbf{Count ungraded as wrong}. At least two fully graded students are needed. \textbf{Save item-stats.csv} writes the table to the export folder.
+
+{\small\textbf{Also in the online help:} \href{https://github.com/agadin/micro-speed-grader/blob/main/docs/help/export.md\#time-spent}{Time spent}\,\onlinemark{}}
+\tocon
