@@ -996,6 +996,16 @@ await step("help: styled tooltip → ? → article; help search; preferences sea
   await page.locator(".prefs-results button", { hasText: "Cluster radius" }).click();
   const h2 = await page.locator(".prefs-content h2").innerText();
   expect(h2 === "Clusters & zoom", `search went to ${h2}`);
+  // Reading submissions: changing a rule while the session is open reads the submissions again
+  await page.locator(".prefs-nav button", { hasText: "Reading submissions" }).click();
+  await snap("prefs-reading");
+  const unl = page.locator(".prefs-content select").nth(2);
+  await unl.selectOption("first");
+  await page.locator(".notice-banner").filter({ hasText: "Submissions read again" }).waitFor({ timeout: 15000 });
+  const reread = await page.locator(".notice-banner").innerText();
+  expect(/before reading rules/.test(reread), `notice: ${reread}`);
+  await unl.selectOption("all");
+  await page.locator(".notice-banner").filter({ hasText: "Submissions read again" }).waitFor({ timeout: 15000 });
   await page.locator(".prefs-nav button", { hasText: "About" }).click();
   const about = await page.locator(".about").innerText();
   await snap("prefs-about");

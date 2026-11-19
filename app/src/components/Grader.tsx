@@ -1,6 +1,6 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { useStore } from "../lib/store";
-import { activeTool, keyLabel, SELECT_TOOLS, useSettings, type SelectTool, BRUSH_MAX, BRUSH_MIN } from "../lib/settings";
+import { activeTool, keyLabel, SELECT_TOOLS, readingRules, useSettings, type SelectTool, BRUSH_MAX, BRUSH_MIN } from "../lib/settings";
 import { pinsInPaint, type PaintOp } from "../lib/paint";
 import {
   buildTasks,
@@ -18,7 +18,8 @@ import { safeFileName } from "../lib/exportCsv";
 import { save } from "@tauri-apps/plugin-dialog";
 import { HandoffDialog } from "./HandoffDialog";
 import { ConflictsDialog } from "./ConflictsDialog";
-import type { Session, SlideInfo } from "../lib/types";
+import { autoWrongDoubles, sameReadingRules, sessionRules, type Session, type SlideInfo, type ReadingRules } from "../lib/types";
+import { planQuestionEdit } from "../lib/examEdit";
 import { SlideViewer, type ViewerApi } from "./SlideViewer";
 import { ContextMenu } from "./ContextMenu";
 import { Ledger } from "./Ledger";
@@ -222,7 +223,7 @@ export function Grader({ session }: { session: Session }) {
     if (guestPack || !session.submissionsDir) return;
     st.set({ notice: { kind: "info", text: "Reading the submissions folder…" } });
     try {
-      const scan = await scanSubmissions(session.submissionsDir, session.questions, undefined, session.fileSlides ?? {});
+      const scan = await scanSubmissions(session.submissionsDir, session.questions, undefined, session.fileSlides ?? {}, sessionRules(session));
       const r = mergeRescan(session, scan);
       // problems in the folder that haven't been acknowledged ("Things to check")
       const ack = new Set(session.scanAck ?? []);
@@ -270,6 +271,56 @@ export function Grader({ session }: { session: Session }) {
       st.setScanFixes(session.fileSlides ?? {}, [...a]);
     },
   };
+  // ---- Preferences ▸ Reading submissions changed while this session is open: read it again with them ----
+  const prefRules = useMemo(
+    () => readingRules(settings),
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+    [settings.readCount, settings.titleBareNumbers, settings.titleOtherQuestion, settings.readLeftover, settings.titleUnlabelled, settings.readMultiple],
+  );
+  const rulesSeen = useRef(prefRules);
+  useEffect(() => {
+    // only a change made while the session is open (opening a session never re-reads it)
+    if (rulesSeen.current === prefRules) return;
+    rulesSeen.current = prefRules;
+    if (guestPack || !session.submissionsDir) return;
+    if (sameReadingRules(prefRules, sessionRules(session))) return;
+    void applyReadingRules(prefRules);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [prefRules]);
+  const applyReadingRules = async (rules: ReadingRules) => {
+    // only "Several pins for one question" changed: nothing to read again
+    if (sameReadingRules({ ...rules, multiple: sessionRules(session).multiple }, sessionRules(session))) {
+      st.setReadingRules(
+        rules,
+        rules.multiple === "grade"
+          ? "Students with several pins for a question are now left for you to grade."
+          : "Students with several pins for a question are now marked wrong automatically, unless you grade one of their pins.",
+      );
+      return;
+    }
+    st.set({ notice: { kind: "info", text: "Reading the submissions folder with the new reading rules…" } });
+    try {
+      const scan = await scanSubmissions(session.submissionsDir, session.questions, undefined, session.fileSlides ?? {}, rules);
+      const plan = planQuestionEdit(session, session.questions, scan);
+      const stamp = new Date().toISOString().slice(0, 16).replace(/[-:T]/g, "");
+      const backup = session.sessionPath.replace(/\.msgrade$/i, "") + ` (before reading rules ${stamp}).msgrade`;
+      await writeText(backup, JSON.stringify(session));
+      const n = (k: number, one: string, many = one + "s") => `${k} ${k === 1 ? one : many}`;
+      const parts = [
+        plan.regraded ? `${n(plan.regraded, "graded pin")} now ${plan.regraded === 1 ? "answers" : "answer"} another question (${plan.regraded === 1 ? "its grade was" : "their grades were"} cleared)` : "",
+        plan.retired ? `${n(plan.retired, "pin")} left out` : "",
+        plan.newPins ? `${n(plan.newPins, "pin")} added` : "",
+      ].filter(Boolean);
+      st.applyReadingRules(
+        rules,
+        plan.merged,
+        plan.grades,
+        `Submissions read again with the new rules: ${parts.length ? parts.join(", ") : "no pins changed question"}. A copy of the session from before was saved as “${backup.split(/[\\/]/).pop()}”.`,
+      );
+    } catch (e) {
+      st.set({ notice: { kind: "info", text: `Could not apply the new reading rules, so nothing was changed: ${e}` } });
+    }
+  };
   const rescanAsk = st.rescanAsk;
   useEffect(() => {
     if (rescanAsk) void rescan();
@@ -298,11 +349,14 @@ export function Grader({ session }: { session: Session }) {
     () => (task ? doublePinIds(session.pins, task.q, g) : new Set<string>()),
     [session.pins, task, g],
   );
+  // several pins for one question: marked wrong automatically, or (Preferences ▸ Reading submissions) left to grade
+  const autoDoubles = autoWrongDoubles(session);
   const states = useMemo(() => {
     const m = new Map<string, PinState>();
-    for (const p of taskPins) m.set(p.id, pinState(p, g, doubles));
+    const auto = autoDoubles ? doubles : new Set<string>();
+    for (const p of taskPins) m.set(p.id, pinState(p, g, auto));
     return m;
-  }, [taskPins, g, doubles]);
+  }, [taskPins, g, doubles, autoDoubles]);
   const ungraded = useMemo(
     () => taskPins.filter((p) => states.get(p.id) === "ungraded"),
     [taskPins, states],
@@ -388,7 +442,7 @@ export function Grader({ session }: { session: Session }) {
   const progress: Progress = useMemo(() => {
     const allDoubles = new Set<string>();
     for (const q of session.questions)
-      if (q.include)
+      if (q.include && autoDoubles)
         doublePinIds(session.pins, q.num, g).forEach((id) =>
           allDoubles.add(id),
         );
@@ -961,6 +1015,7 @@ export function Grader({ session }: { session: Session }) {
               otherPins={otherPins}
               states={states}
               flagged={flagged}
+              multi={doubles}
               changed={changedPins}
               selection={selection}
               cluster={cluster}

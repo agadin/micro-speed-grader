@@ -43,9 +43,14 @@ You can correct the **Slides** cell if the exam lists the wrong slide ID: type t
 
 - Each first-level folder in the submissions folder is one student. Its name becomes the student's name, and a number in it becomes their UID.
 - The slide ID comes from the `.ndpa` file name (`VMS109`).
-- A pin's title is matched to a question number (*Q3*, *question 3*, *#3*…). On a slide that only one question uses, every pin belongs to that question.
-- If a slide is used by several questions and the pin's title doesn't say which, the pin is shown on every candidate question with a **?** badge. Grading it assigns it to the question you graded it under.
-- Shapes other than pins (circles, outlines) count as a pin at their centre.
+- A pin's title (the label the student typed in NDP.view) is matched to a question. Only the questions that use the pin's slide count, and the first rule that fits wins:
+  1. The title is just the question: *Q3*, *Q 3*.
+  2. The title names the question anywhere: *Question 3: sweat gland*, *my answer Q3*, *Q#3*.
+  3. The title has exactly one number that's a question on this slide: *3*, *#3*, *pin 3*. (Other numbers are ignored, so *VMS109 #3* means Q3.)
+  4. Nothing decides it. On a slide that only one question uses, the pin belongs to that question. On a slide several questions use, if the student's other pins on that slide already answer all but one of its questions, the pin answers the one that's left. Otherwise it's *unlabelled*: shown on every question it could answer with a **?** badge, and grading it assigns it to the question you graded it under.
+- A title that names a question its slide isn't for (*Q9* on a slide only Q5 uses) is placed by rule 4 and listed in [Things to check](#things-to-check).
+- Pins and shapes (circles, outlines) are answers; a shape counts as a pin at its centre. Rulers, arrows and text notes aren't answers.
+- Which annotations count, rule 3, the leftover question in rule 4, pins that name another question, unlabelled pins and several pins for one question can all be changed in [Preferences ▸ Reading submissions](preferences.md#reading-submissions).
 - Limits that stop a damaged file from slowing the app: 2 MB per annotation file, 200 annotations per file and 50 pins per student per slide.
 
 ### Answer key (optional)

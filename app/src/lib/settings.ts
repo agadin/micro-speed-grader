@@ -1,5 +1,6 @@
 import { create } from "zustand";
 import { COLUMN_INFO, EXPORT_PRESETS, type ExportColumn } from "./exportCsv";
+import type { ReadingRules } from "./types";
 
 /** flag / pushpin mirror NDP.view's annotation icons */
 export type PinStyle = "flag" | "pushpin" | "dot" | "cross";
@@ -19,6 +20,13 @@ export interface Settings {
   singleFieldUm: number;
   clusterPaddingUm: number;
   wrongNeedsReason: boolean;
+  /** reading submissions: how pin titles are matched to questions (new sessions take these) */
+  readCount: ReadingRules["count"];
+  titleBareNumbers: boolean;
+  titleOtherQuestion: ReadingRules["otherQuestion"];
+  readLeftover: boolean;
+  titleUnlabelled: ReadingRules["unlabelled"];
+  readMultiple: ReadingRules["multiple"];
   wrongDefaultText: string;
   doubleMessage: string;
   noAnswerMessage: string;
@@ -91,6 +99,16 @@ export interface Settings {
   };
 }
 
+/** the pin-title rules in Preferences, as a session stores them */
+export const readingRules = (s: Settings): ReadingRules => ({
+  count: s.readCount === "pins" || s.readCount === "all" ? s.readCount : "shapes",
+  bareNumbers: s.titleBareNumbers !== false,
+  otherQuestion: s.titleOtherQuestion === "omit" ? "omit" : "slide",
+  leftover: s.readLeftover !== false,
+  unlabelled: s.titleUnlabelled === "first" || s.titleUnlabelled === "omit" ? s.titleUnlabelled : "all",
+  multiple: s.readMultiple === "grade" ? "grade" : "wrong",
+});
+
 /** paint brush size range, px */
 export const BRUSH_MIN = 6;
 export const BRUSH_MAX = 200;
@@ -106,6 +124,12 @@ export const defaultSettings: Settings = {
   singleFieldUm: 250,
   clusterPaddingUm: 40,
   wrongNeedsReason: true,
+  readCount: "shapes",
+  titleBareNumbers: true,
+  titleOtherQuestion: "slide",
+  readLeftover: true,
+  titleUnlabelled: "all",
+  readMultiple: "wrong",
   wrongDefaultText: "Incorrect",
   doubleMessage: "Multiple pins submitted (only one allowed)",
   noAnswerMessage: "No answer",

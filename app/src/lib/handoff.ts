@@ -9,7 +9,7 @@
  * Neither sees the other's grade. When both verdicts are in they're compared; agreements become
  * the grade, disagreements are left ungraded and flagged for the host to resolve.
  */
-import type { GradeState, Group, Pin, RetiredPin, Session, SlideRef, Task } from "./types";
+import { autoWrongDoubles, type GradeState, type Group, type Pin, type RetiredPin, type Session, type SlideRef, type Task } from "./types";
 import { cloneGrades, detach, doublePinIds, pinMap, pinsForTask } from "./grading";
 import { uid } from "./util";
 import { IDLE_CAP, MAX_EVENTS, type TimeEvent } from "./timing";
@@ -75,7 +75,7 @@ export interface PackFile {
   guest: string;
   taskIds: string[];
   pinIds: string[];
-  session: Pick<Session, "name" | "questions" | "students" | "pins" | "grades" | "key"> & {
+  session: Pick<Session, "name" | "questions" | "students" | "pins" | "grades" | "key" | "readingRules"> & {
     /** slide ids and the host's file names: the guest relinks them to their own folder */
     slides: { id: string; file: string }[];
   };
@@ -143,7 +143,8 @@ export function remainingByTask(s: Session, tasks: Task[]): { task: Task; pinIds
   const checks = g.checks ?? {};
   const doubles = new Map<number, Set<string>>();
   return tasks.map((task) => {
-    if (!doubles.has(task.q)) doubles.set(task.q, doublePinIds(s.pins, task.q, g));
+    // several pins for one question are graded automatically, unless the session leaves them to the grader
+    if (!doubles.has(task.q)) doubles.set(task.q, autoWrongDoubles(s) ? doublePinIds(s.pins, task.q, g) : new Set<string>());
     const dbl = doubles.get(task.q)!;
     const pinIds = pinsForTask(s.pins, task, g)
       .filter((p) => !g.pinGroup[p.id] && !dbl.has(p.id) && !away.has(p.id) && !checks[p.id])
@@ -253,6 +254,8 @@ export function makePack(s: Session, guest: string, taskIds: string[], pinIds: s
       // the answer key travels with the pack as suggestions: the host's key already graded what it matches
       ...(s.key?.marks.length ? { key: { ...s.key, mode: "suggest" as const, autoNew: false } } : {}),
       slides: s.slides.map((r) => ({ id: r.id, file: r.path.split(/[\\/]/).pop() ?? r.path })),
+      // so the guest treats several pins for one question the way the host does
+      ...(s.readingRules ? { readingRules: s.readingRules } : {}),
     },
   };
 }
@@ -284,6 +287,7 @@ export function guestSession(p: PackFile, slides: SlideRef[], sessionPath: strin
     slides: slides.filter((r) => p.session.slides.some((x) => x.id === r.id)),
     grades: { groups: p.session.grades.groups, pinGroup: p.session.grades.pinGroup, assign: p.session.grades.assign },
     ...(p.session.key ? { key: p.session.key } : {}),
+    ...(p.session.readingRules ? { readingRules: p.session.readingRules } : {}),
     taskIndex: 0,
     guestPack: { id: p.id, host: p.host, guest: p.guest, taskIds: p.taskIds, pinIds: p.pinIds, createdAt: p.createdAt },
   };

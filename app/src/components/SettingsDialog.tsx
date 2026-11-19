@@ -6,13 +6,13 @@ import { helpImage, hitRef, searchHelp } from "../lib/help";
 import { showHelp } from "../lib/backend";
 import { exportTable, type ExportRow } from "../lib/exportCsv";
 import { clamp } from "../lib/util";
-import { IconCircleDash, IconExport, IconInfo, IconKeyboard, IconLasso, IconPin, IconText } from "./icons";
+import { IconCircleDash, IconExport, IconInfo, IconKeyboard, IconLasso, IconPin, IconTarget, IconText } from "./icons";
 import { AboutPane } from "./AboutPane";
 import { Modal } from "./Modal";
 import { CsvPreviewTable, ExportLayoutEditor } from "./ExportLayout";
 import { flash, SearchField, SliderRow } from "./controls";
 
-type Pane = "pins" | "select" | "input" | "clusters" | "text" | "export" | "about";
+type Pane = "pins" | "select" | "input" | "clusters" | "reading" | "text" | "export" | "about";
 const PANES: { id: Pane; label: string; icon: ReactNode; lede: string }[] = [
   { id: "pins", label: "Pins", icon: <IconPin />, lede: "How student pins are drawn on the slide." },
   {
@@ -23,6 +23,12 @@ const PANES: { id: Pane; label: string; icon: ReactNode; lede: string }[] = [
   },
   { id: "input", label: "Mouse & keys", icon: <IconKeyboard />, lede: "Which button pans and which selects, zooming, and the keys you can rebind." },
   { id: "clusters", label: "Clusters & zoom", icon: <IconCircleDash />, lede: "How pins are grouped and how far the view zooms in." },
+  {
+    id: "reading",
+    label: "Reading submissions",
+    icon: <IconTarget />,
+    lede: "Which annotations count as answers, and how each one is matched to a question. New sessions use these, and each session keeps its own. Changing one while a session is open reads its submissions again (a copy of the session is saved first).",
+  },
   { id: "text", label: "Grading text", icon: <IconText />, lede: "What students read in their feedback." },
   {
     id: "export",
@@ -38,6 +44,7 @@ const HELP_ANCHOR: Record<Pane, string> = {
   select: "selection",
   input: "mouse--keys",
   clusters: "clusters--zoom",
+  reading: "reading-submissions",
   text: "grading-text",
   export: "export",
   about: "about",
@@ -66,6 +73,12 @@ const SETTINGS_INDEX: { label: string; pane: Pane; words?: string }[] = [
   { label: "Padding", pane: "clusters", words: "zoom margin" },
   { label: "Next cluster", pane: "clusters", words: "auto zoom automatically" },
   { label: "Animation", pane: "clusters", words: "smooth zoom pan" },
+  { label: "Count as answers", pane: "reading", words: "annotation pin circle outline ruler arrow text shape measure" },
+  { label: "Bare numbers", pane: "reading", words: "pin title question number match label q3 #3" },
+  { label: "Leftover question", pane: "reading", words: "unlabelled infer guess remaining pin title" },
+  { label: "Several pins for one question", pane: "reading", words: "double multiple two pins wrong automatically" },
+  { label: "Title names another question", pane: "reading", words: "pin title wrong question slide misnamed leave out" },
+  { label: "Unlabelled pins", pane: "reading", words: "pin title question mark shared slide candidates lowest first leave out" },
   { label: "Wrong answers need a reason", pane: "text", words: "required blank incorrect" },
   { label: "Student sees", pane: "text", words: "feedback wording comment text mistakes only all questions" },
   { label: "Score line", pane: "text", words: "score total percent" },
@@ -366,6 +379,61 @@ export function SettingsDialog({ onClose, asWindow = false }: { onClose: () => v
                 smooth zoom and pan
               </label>,
               "off: jumps instantly",
+            )}
+          </div>
+        )}
+
+        {pane === "reading" && (
+          <div className="group">
+            {row(
+              "Count as answers",
+              <select value={s.readCount} onChange={(e) => set({ readCount: e.target.value as Settings["readCount"] })}>
+                <option value="pins">Pins only</option>
+                <option value="shapes">Pins and shapes (circles, outlines)</option>
+                <option value="all">Every annotation (rulers, arrows, text too)</option>
+              </select>,
+              "a shape counts as a pin at its centre",
+            )}
+            {row(
+              "Bare numbers",
+              <label className="check">
+                <input type="checkbox" checked={s.titleBareNumbers} onChange={(e) => set({ titleBareNumbers: e.target.checked })} />
+                a title like “3” or “#3” counts as Q3
+              </label>,
+              "off: only titles that say Q3 or question 3 count",
+            )}
+            {row(
+              "Title names another question",
+              <select value={s.titleOtherQuestion} onChange={(e) => set({ titleOtherQuestion: e.target.value as Settings["titleOtherQuestion"] })}>
+                <option value="slide">Use the pin for its slide's question</option>
+                <option value="omit">Leave the pin out</option>
+              </select>,
+              "e.g. “Q9” on a slide only Q5 uses. Either way it's listed in Things to check",
+            )}
+            {row(
+              "Leftover question",
+              <label className="check">
+                <input type="checkbox" checked={s.readLeftover} onChange={(e) => set({ readLeftover: e.target.checked })} />
+                an unlabelled pin answers the student's one question left on that slide
+              </label>,
+              "off: it's unlabelled, for you to decide",
+            )}
+            {row(
+              "Unlabelled pins",
+              <select value={s.titleUnlabelled} onChange={(e) => set({ titleUnlabelled: e.target.value as Settings["titleUnlabelled"] })}>
+                <option value="all">Show on each question, with a ?</option>
+                <option value="first">Give to the lowest-numbered question</option>
+                <option value="omit">Leave them out</option>
+              </select>,
+              "a pin on a slide several questions use, whose title doesn't say which",
+            )}
+            {row(
+              "Several pins for one question",
+              <select value={s.readMultiple} onChange={(e) => set({ readMultiple: e.target.value as Settings["readMultiple"] })}>
+                <option value="wrong">Mark them wrong automatically</option>
+                <option value="grade">Leave them for me to grade</option>
+              </select>,
+              "either way, grading one of them yourself counts",
             )}
           </div>
         )}

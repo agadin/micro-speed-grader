@@ -34,6 +34,19 @@ Which selection tools are on. Each has a short demo. At least one of **Lasso**, 
 - **Padding** around a cluster when zooming to it.
 - **Next cluster: zoom to it automatically**, and **smooth zoom and pan**.
 
+## Reading submissions
+
+Which annotations count as answers, and how each is matched to a question (the rules are in [How student pins are read](getting-started.md#how-student-pins-are-read)):
+
+- **Count as answers**: **Pins only**, **Pins and shapes** (the default: circles and outlines count at their centre), or **Every annotation** (rulers, arrows and text notes too).
+- **Bare numbers**: on (the default), a title like *3* or *#3* counts as Q3 when Q3 uses that slide. Off: only titles that say *Q3* or *question 3* count.
+- **Title names another question**, such as *Q9* on a slide only Q5 uses: **Use the pin for its slide's question** (the default), or **Leave the pin out**, so the student has no answer for it unless they have another pin. Either way it's listed in [Things to check](getting-started.md#things-to-check).
+- **Leftover question**: on (the default), an unlabelled pin answers the student's one question left on that slide (they labelled Q3, so the other pin is Q13). Off: it stays unlabelled for you to decide.
+- **Unlabelled pins**, on a slide several questions use, with a title that doesn't say which: **Show on each question, with a ?** (the default; grading it assigns it), **Give to the lowest-numbered question**, or **Leave them out**.
+- **Several pins for one question**: **Mark them wrong automatically** (the default; see [Double pins](grading.md#double-pins)) or **Leave them for me to grade**. Either way, grading one of them yourself is what counts.
+
+New sessions use these settings, and each session keeps the ones it was made with, so a later rescan reads it the same way. (Sessions made before version 0.3.8 count every annotation.) Changing a setting while a session is open reads its submissions again with the new rules. A copy of the session is saved first, next to it. Pins that now answer a different question lose the grade they had for the old one, and pins that are left out are set aside with their grades. **Several pins for one question** applies straight away without reading anything again.
+
 ## Grading text
 
 The feedback students read, edited in place. See [What students see](feedback.md).

@@ -21,7 +21,7 @@ import { canCarry, carryOver, dismissRows, mergeRescan, rescanMessage, restorePi
 import { KEY, HOST, agreement, changedSinceSent, conflictPins, hostGraded, planOverlap, recallChecks, resolveWith, sameReason, seeded, awayPins, splitWeighted, guestSession, makePack, makeResult, mergeResult, parsePack, parseResult, remainingByTask } from "../src/lib/handoff";
 import { AUTO, autoRows, filterGroups, findStudents, graderOptions, isFiltered, noFilter, rowPasses, studentLabel, studentSummary, type LedgerFilter } from "../src/lib/review";
 import type { GradeState, Pin, Question, Session } from "../src/lib/types";
-import { emptyGrades } from "../src/lib/types";
+import { DEFAULT_READING_RULES, emptyGrades, sessionRules, type ReadingRules } from "../src/lib/types";
 
 (globalThis as any).DOMParser = new JSDOM().window.DOMParser;
 const root = path.resolve(process.argv[2]);
@@ -765,6 +765,96 @@ ok(!!dbl && studentResults(session, dbl, defaultSettings)[0].text === defaultSet
   ok(startBlockers({ ...w, questions: [{ num: 1, slides: ["VMS1"], prompt: "", include: true }], subDir: "s", slidesDir: "i", sessionPath: "p" }).length === 0, "start blockers: questions set up by hand count as the exam");
   ok(startBlockers({ ...w, examPath: "e", questions: no133.map((q: any) => ({ ...q, include: false })), subDir: "s", slidesDir: "i" }).join() === "at least one included question,a save location", "start blockers: no questions, no save path");
   ok(startBlockers({ examPath: "e", questions: no133, subDir: "s", slidesDir: "i", sessionPath: "p" }).length === 0, "start blockers: ready");
+}
+
+// ---- pin titles → questions: the rules, and Preferences ▸ Reading submissions ----
+{
+  ok(matchTitle("#3", [3, 13]).q === 3 && matchTitle("#3", [3, 13], false).q === null, "bare numbers: on by default, can be turned off");
+  ok(matchTitle("Q3", [3, 13], false).q === 3 && matchTitle("my answer q13", [3, 13], false).q === 13, "bare numbers off: Q3 / q13 still count");
+  ok(matchTitle("VMS109 #3", [3, 13]).q === 3 && matchTitle("3 or 13", [3, 13]).q === null, "other numbers ignored; two candidates is no answer");
+  const dir = path.resolve("tests/.out/title-rules");
+  fs.rmSync(dir, { recursive: true, force: true });
+  for (const st of ["000001 - Doe, Jo", "000002 - Roe, Al"]) fs.mkdirSync(path.join(dir, st), { recursive: true });
+  const ann = (titles: string[]) =>
+    `<annotations>${titles.map((t, i) => `<ndpviewstate id="${i}"><title>${t}</title><annotation type="pin"><x>${i * 1000}</x><y>0</y></annotation></ndpviewstate>`).join("")}</annotations>`;
+  // VMS1 is used by Q3 and Q13, VMS2 only by Q5
+  // Jo labels Q3 (twice), so Jo's unlabelled pin is the leftover Q13; Al labels nothing
+  fs.writeFileSync(path.join(dir, "000001 - Doe, Jo", "VMS1.ndpi.ndpa"), ann(["Q3", "#3", "duct"]));
+  fs.writeFileSync(path.join(dir, "000002 - Roe, Al", "VMS1.ndpi.ndpa"), ann(["3 or 13", "sweat gland", "Q9"]));
+  // Al also measured something and circled something on VMS2
+  fs.writeFileSync(
+    path.join(dir, "000002 - Roe, Al", "VMS2.ndpi.ndpa"),
+    `<annotations><ndpviewstate id="1"><title>ruler</title><annotation type="linearmeasure"><pointlist><point><x>0</x><y>0</y></point><point><x>9</x><y>0</y></point></pointlist></annotation></ndpviewstate>` +
+      `<ndpviewstate id="2"><title>circled</title><annotation type="circle"><x>500</x><y>500</y><radius>9</radius></annotation></ndpviewstate></annotations>`,
+  );
+  fs.writeFileSync(path.join(dir, "000001 - Doe, Jo", "VMS2.ndpi.ndpa"), ann(["Q9", "anything"]));
+  const qs: Question[] = [
+    { num: 3, slides: ["VMS1"], prompt: "", include: true },
+    { num: 5, slides: ["VMS2"], prompt: "", include: true },
+    { num: 13, slides: ["VMS1"], prompt: "", include: true },
+  ];
+  const walk = (d: string): string[] => fs.readdirSync(d, { withFileTypes: true }).flatMap((e) => (e.isDirectory() ? walk(path.join(d, e.name)) : [path.join(d, e.name)]));
+  const io: ScanIO = { listFiles: async (d) => walk(d).sort(), readText: async (f) => fs.readFileSync(f, "utf8") };
+  const read = async (rules?: Partial<ReadingRules>) => {
+    const r = await scanSubmissions(dir, qs, io, {}, { ...DEFAULT_READING_RULES, ...rules });
+    const where = (title: string, slide: string) => {
+      const p = r.pins.find((x) => x.rawTitle === title && x.slide === slide);
+      return !p ? "out" : p.q !== null ? `Q${p.q}` : `?${p.candidates.join("/")}`;
+    };
+    return { r, where };
+  };
+  const d = await read();
+  const all = [d.where("Q3", "VMS1"), d.where("#3", "VMS1"), d.where("duct", "VMS1"), d.where("3 or 13", "VMS1"), d.where("sweat gland", "VMS1"), d.where("Q9", "VMS1"), d.where("Q9", "VMS2"), d.where("anything", "VMS2")].join();
+  ok(all === "Q3,Q3,Q13,?3/13,?3/13,?3/13,Q5,Q5", `default rules: as documented (${all})`);
+  ok(d.r.problems.filter((p) => p.kind === "unknown-question").length === 2, "pins naming another question are flagged");
+  const bare = await read({ bareNumbers: false });
+  ok(bare.where("#3", "VMS1") === "Q13" && bare.where("Q3", "VMS1") === "Q3", `bare numbers off: #3 is unlabelled, so Jo's leftover Q13 (${bare.where("#3", "VMS1")})`);
+  const omit = await read({ otherQuestion: "omit" });
+  ok(omit.where("Q9", "VMS1") === "out" && omit.where("Q9", "VMS2") === "out" && omit.where("anything", "VMS2") === "Q5", "another question: left out");
+  ok(omit.r.problems.some((p) => p.kind === "unknown-question" && /left out/.test(p.detail)), "left-out pins say so in Things to check");
+  const first = await read({ unlabelled: "first" });
+  ok(first.where("sweat gland", "VMS1") === "Q3" && first.where("3 or 13", "VMS1") === "Q3" && first.where("duct", "VMS1") === "Q13", "unlabelled: lowest-numbered question, after the leftover rule");
+  const gone = await read({ unlabelled: "omit" });
+  ok(gone.where("sweat gland", "VMS1") === "out" && gone.where("Q9", "VMS1") === "out" && gone.where("duct", "VMS1") === "Q13" && gone.where("Q9", "VMS2") === "Q5", "unlabelled: left out, after the leftover rule");
+
+  // which annotations count
+  ok(d.where("circled", "VMS2") === "Q5" && d.where("ruler", "VMS2") === "out", "default: pins and shapes count, a ruler doesn't");
+  const pinsOnly = await read({ count: "pins" });
+  ok(pinsOnly.where("circled", "VMS2") === "out" && pinsOnly.where("Q9", "VMS2") === "Q5", "pins only");
+  const every = await read({ count: "all" });
+  ok(every.where("ruler", "VMS2") === "Q5", "every annotation counts (the old behaviour, kept for older sessions)");
+  ok(sessionRules({}).count === "all" && sessionRules({ readingRules: DEFAULT_READING_RULES }).count === "shapes", "a session saved before these settings reads every annotation");
+  // the leftover rule can be turned off
+  const noLeft = await read({ leftover: false });
+  ok(noLeft.where("duct", "VMS1") === "?3/13", "leftover off: Jo's unlabelled pin stays unlabelled");
+  // several pins for one question: Jo has two Q3 pins
+  const jo = d.r.students.find((x) => x.folder.includes("Doe"))!;
+  const base: Session = {
+    version: 1, name: "t", createdAt: 0, savedAt: 0, sessionPath: "/t.msgrade", submissionsDir: dir, slidesDir: "",
+    questions: qs, students: d.r.students, pins: d.r.pins, slides: [], grades: emptyGrades(), taskIndex: 0,
+  };
+  const q3 = (s: Session) => studentResults(s, jo, defaultSettings).find((r) => r.q === 3)!;
+  ok(q3({ ...base, readingRules: DEFAULT_READING_RULES }).status === "wrong", "several pins: marked wrong by default");
+  ok(q3({ ...base, readingRules: { ...DEFAULT_READING_RULES, multiple: "grade" } }).status === "ungraded", "several pins: left to grade");
+  ok(
+    autoRows({ ...base, readingRules: { ...DEFAULT_READING_RULES, multiple: "grade" } }, buildTasks(qs, new Set(["VMS1", "VMS2"]))).length === 0 &&
+      autoRows({ ...base, readingRules: DEFAULT_READING_RULES }, buildTasks(qs, new Set(["VMS1", "VMS2"]))).length === 2, // Jo: Q3 on VMS1, Q5 on VMS2
+    "several pins left to grade: no AUTO row in the ledger",
+  );
+
+  // changing the rules in an open session: a graded unlabelled pin that now answers another question loses that grade
+  const s: Session = {
+    version: 1, name: "t", createdAt: 0, savedAt: 0, sessionPath: "/t.msgrade", submissionsDir: dir, slidesDir: "",
+    questions: qs, students: d.r.students, pins: d.r.pins, slides: [], grades: emptyGrades(), taskIndex: 0,
+  };
+  const sg = d.r.pins.find((p) => p.rawTitle === "sweat gland")!;
+  s.grades.assign[sg.id] = 13;
+  s.grades.groups.g1 = { id: "g1", taskId: "Q13|VMS1", status: "correct", text: "", pinIds: [sg.id], createdAt: 1 };
+  s.grades.pinGroup[sg.id] = "g1";
+  const plan = planQuestionEdit(s, qs, first.r);
+  ok(plan.regraded === 1 && !plan.grades.pinGroup[sg.id] && plan.merged.pins.find((p) => p.id === sg.id)?.q === 3, "rules changed: the moved pin's grade is cleared, same pin id");
+  const plan2 = planQuestionEdit(s, qs, gone.r);
+  ok(plan2.retired === 3 && plan2.merged.retired.some((r) => r.pin.id === sg.id && r.grade?.status === "correct" && !r.review), "rules changed: left-out pins are set aside with their grades, not put up for review");
 }
 
 // ---- exam editor: check questions, describe changes, edit questions inside a session ----

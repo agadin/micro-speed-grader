@@ -2,7 +2,7 @@
  * Review helpers: one student's answers across the exam (for regrade requests and appeals),
  * and searching / filtering the ledger.
  */
-import type { Group, Pin, Session, Student, Task } from "./types";
+import { autoWrongDoubles, type Group, type Pin, type Session, type Student, type Task } from "./types";
 import { doublePinIds, effectiveQ, feedbackText, studentResults, taskId, type QuestionResult } from "./grading";
 import { awayPins, conflictPins, graderLabel, HOST } from "./handoff";
 import { parseStudentName } from "./exportCsv";
@@ -122,8 +122,9 @@ export function studentSummary(
         reason: latest.text,
         by: graderLabel(latest.by),
       };
-    if (labelled.length > 1)
+    if (labelled.length > 1 && autoWrongDoubles(session))
       return { ...base, kind: "double", label: `Marked wrong: ${labelled.length} pins`, reason: settings.doubleMessage, by: "AUTO" };
+    if (labelled.length > 1) return { ...base, kind: "ungraded", label: `${labelled.length} pins: grade one`, reason: "" };
     if (!pins.length) return { ...base, kind: "none", label: "No answer", reason: settings.noAnswerMessage };
     const out = pins.find((p) => p.away)?.away;
     if (out) return { ...base, kind: "away", label: `With ${out}`, reason: "" };
@@ -211,6 +212,8 @@ export function filterGroups(groups: Group[], f: LedgerFilter, nameOfPin: (pinId
 
 /** the AUTO rows: per image, ungraded pins of students with more than one pin for that question */
 export function autoRows(session: Session, tasks: Task[]): { task: Task; pins: Pin[] }[] {
+  // several pins left for the grader: nothing is marked wrong automatically
+  if (!autoWrongDoubles(session)) return [];
   const g = session.grades;
   const byQ = new Map<number, Set<string>>();
   const out: { task: Task; pins: Pin[] }[] = [];

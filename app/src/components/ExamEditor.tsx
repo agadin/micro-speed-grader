@@ -1,6 +1,6 @@
 import { useEffect, useMemo, useRef, useState } from "react";
 import { save } from "@tauri-apps/plugin-dialog";
-import type { Question, Session, SlideRef } from "../lib/types";
+import { sessionRules, type Question, type Session, type SlideRef } from "../lib/types";
 import { useStore } from "../lib/store";
 import { dirname, joinPath, openSlide, tileBase, withExt, writeText } from "../lib/backend";
 import { checkQuestions, examJson, nextNum, normSlide, planQuestionEdit, renumbered, type QuestionEditPlan } from "../lib/examEdit";
@@ -134,7 +134,7 @@ export function ExamEditor(p: {
     setStatus(null);
     try {
       const s = p.session;
-      const scan = await scanSubmissions(s.submissionsDir, draft, undefined, s.fileSlides ?? {});
+      const scan = await scanSubmissions(s.submissionsDir, draft, undefined, s.fileSlides ?? {}, sessionRules(s));
       setReview(planQuestionEdit(s, draft, scan));
     } catch (e) {
       setStatus({ ok: false, text: `Could not read the submissions folder: ${e}` });

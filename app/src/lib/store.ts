@@ -1,5 +1,5 @@
 import { create } from "zustand";
-import type { GradeState, GradeStatus, Group, Pin, RetiredPin, Session, Question } from "./types";
+import type { GradeState, GradeStatus, Group, Pin, RetiredPin, Session, Question, ReadingRules } from "./types";
 import { graderLabel, hostGraded, type Handoff } from "./handoff";
 import type { AnswerKey } from "./answerKey";
 import type { RescanResult, ReviewChange } from "./rescan";
@@ -90,6 +90,10 @@ interface Store {
   applyResult: (grades: GradeState, h: Handoff[], timeLog?: TimeEvent[], retired?: RetiredPin[]) => void;
   /** the exam's questions were edited inside the session (clears undo; a copy was saved at `backup`) */
   applyQuestionEdit: (questions: Question[], r: RescanResult, grades: GradeState, backup: string) => void;
+  /** the submissions read again with other pin-title rules (Preferences ▸ Reading submissions) */
+  applyReadingRules: (rules: ReadingRules, r: RescanResult, grades: GradeState, notice: string) => void;
+  /** reading rules that don't need the submissions read again (Several pins for one question) */
+  setReadingRules: (rules: ReadingRules, notice: string) => void;
   /** "Things to check" after a rescan: files whose slide was chosen, and acknowledged problems */
   setScanFixes: (fileSlides: Record<string, string>, scanAck: string[]) => void;
   /** save the answer key (marks aren't part of undo; applying them is) */
@@ -292,6 +296,26 @@ export const useStore = create<Store>((set, get) => {
         dirty: true,
         notice: { kind: "info", text: `Questions updated. A copy of the session from before was saved as “${backup.split(/[\\/]/).pop()}”.` },
       });
+      scheduleSave();
+    },
+    applyReadingRules: (readingRules, r, grades, text) => {
+      const s = get().session;
+      if (!s) return;
+      set({
+        session: { ...s, readingRules, students: r.students, pins: r.pins, retired: r.retired, grades },
+        past: [],
+        future: [],
+        selection: [],
+        menu: null,
+        dirty: true,
+        notice: { kind: "info", text },
+      });
+      scheduleSave();
+    },
+    setReadingRules: (readingRules, text) => {
+      const s = get().session;
+      if (!s) return;
+      set({ session: { ...s, readingRules }, dirty: true, notice: { kind: "info", text } });
       scheduleSave();
     },
     setScanFixes: (fileSlides, scanAck) => {

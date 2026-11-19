@@ -28,6 +28,8 @@ export interface ViewerProps {
   states: Map<string, PinState>;
   /** pins two graders disagreed on (drawn with a ! badge) */
   flagged?: Set<string>;
+  /** a student's several pins for one question (drawn with a 2 badge, graded or not) */
+  multi?: Set<string>;
   /** new pins from a changed submission, waiting in Changed submissions (drawn with a blue ↻ badge) */
   changed?: Set<string>;
   selection: Set<string>;
@@ -475,13 +477,14 @@ export function SlideViewer(props: ViewerProps) {
         ctx.lineTo(ax + 0.4, ay + 2.4);
         ctx.stroke();
       }
-      if (st === "double" || pin.q === null) {
-        const t = st === "double" ? "2" : "?";
+      const several = st === "double" || (st === "ungraded" && !!p.multi?.has(pin.id));
+      if (several || pin.q === null) {
+        const t = several ? "2" : "?";
         const hp = headPos(s.x, s.y);
         const bx = hp.x + pinSize * 0.5, by = hp.y - pinSize * 0.2;
         ctx.fillStyle = "rgba(15,15,15,0.9)";
         ctx.fillRect(bx - 1, by - 8, 10, 11);
-        ctx.fillStyle = st === "double" ? colors.double : "#f0f0f0";
+        ctx.fillStyle = several ? colors.double : "#f0f0f0";
         ctx.font = `600 9.5px ${MONO}`;
         ctx.fillText(t, bx + 1.5, by + 1);
         ctx.font = `11px ${MONO}`;

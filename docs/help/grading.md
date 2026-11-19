@@ -71,7 +71,7 @@ By default a reason is required. To allow blank reasons (students then read *Inc
 
 ### Double pins
 
-A student who placed more than one pin for the same question gets a **2** badge on their pins. They're counted as done and marked wrong with *Multiple pins submitted (only one allowed)*, shown in the ledger as an **AUTO** row. If you grade one of their pins yourself, your most recent grade counts instead.
+A student who placed more than one pin for the same question gets a **2** badge on their pins. They're counted as done and marked wrong with *Multiple pins submitted (only one allowed)*, shown in the ledger as an **AUTO** row. If you grade one of their pins yourself, your most recent grade counts instead. To grade them yourself instead, set **Several pins for one question** to **Leave them for me to grade** in [Preferences ▸ Reading submissions](preferences.md#reading-submissions): the pins keep their **2** badge but stay ungraded until you grade one.
 
 ### No answer
 

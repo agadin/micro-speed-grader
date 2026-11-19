@@ -68,13 +68,14 @@ export function slideIdFromFilename(name: string): string | null {
  * Read a question number out of a free-text pin title.
  * Returns the number if it is a valid question for this slide; otherwise null.
  */
-export function matchTitle(title: string, slideQuestions: number[]): { q: number | null; clean: boolean } {
+export function matchTitle(title: string, slideQuestions: number[], bareNumbers = true): { q: number | null; clean: boolean } {
   // titles are student-written: cap the length so matching stays cheap
   const t = title.trim().slice(0, MAX_TITLE);
   const strict = t.match(/^q\s*(\d+)$/i);
   if (strict && slideQuestions.includes(Number(strict[1]))) return { q: Number(strict[1]), clean: true };
   const qish = t.match(/\bq(?:uestion)?\s*(?:#\s*)?(\d+)/i) ?? t.match(/q(\d+)/i);
   if (qish && slideQuestions.includes(Number(qish[1]))) return { q: Number(qish[1]), clean: false };
+  if (!bareNumbers) return { q: null, clean: false };
   const nums = (t.match(/\d+/g) ?? []).map(Number).filter((n) => slideQuestions.includes(n));
   if (nums.length === 1) return { q: nums[0], clean: false };
   return { q: null, clean: false };

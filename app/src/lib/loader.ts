@@ -1,4 +1,4 @@
-import type { Pin, Question, SlideRef, Student } from "./types";
+import { DEFAULT_READING_RULES, type Pin, type Question, type SlideRef, type Student, type ReadingRules } from "./types";
 import { basename, listFiles, readText } from "./backend";
 import { matchTitle, namedQuestion, parseNdpa, slideIdFromFilename } from "./ndpa";
 
@@ -87,11 +87,22 @@ const firstFew = (xs: string[], n = 3) => xs.slice(0, n).join(", ") + (xs.length
  * `fileSlides` says which slide a file is for when its name doesn't (or names the wrong one):
  * path inside the folder → slide ID, as chosen in "Things to check".
  */
+/** NDP.view annotation types that mark an area (a pin's position is their centre) */
+const AREA_TYPES = new Set(["circle", "rectangle", "freehand", "polygon", "ellipse"]);
+/** does an annotation of this type count as an answer under Preferences ▸ Reading submissions? */
+export function countsAsAnswer(type: string, count: ReadingRules["count"]): boolean {
+  const t = (type || "pin").toLowerCase();
+  if (t === "pin") return true;
+  if (count === "all") return true;
+  return count === "shapes" && AREA_TYPES.has(t);
+}
+
 export async function scanSubmissions(
   dir: string,
   questions: Question[],
   io: ScanIO = { listFiles, readText },
   fileSlides: Record<string, string> = {},
+  rules: ReadingRules = DEFAULT_READING_RULES,
 ): Promise<ScanResult> {
   // every file, so a student folder holding only a PDF or a screenshot still shows up as "no submission"
   const all = await io.listFiles(dir, []);
@@ -156,6 +167,8 @@ export async function scanSubmissions(
       else problem("unreadable", "Not valid annotation data");
       continue;
     }
+    // Preferences ▸ Reading submissions: which kinds of annotation count as an answer
+    anns = anns.filter((a) => countsAsAnswer(a.type, rules.count));
     // one student can't flood a slide with pins (keeps clustering and grading responsive)
     const key = `${student.id}|${slide}`;
     const have = pinsPerStudentSlide.get(key) ?? 0;
@@ -167,14 +180,17 @@ export async function scanSubmissions(
     /** pins whose title names a question this slide isn't for */
     const misnamed: { title: string; q: number }[] = [];
     for (const a of anns) {
-      const m = matchTitle(a.title, slideQs);
+      const m = matchTitle(a.title, slideQs, rules.bareNumbers);
       const named = m.q === null ? namedQuestion(a.title) : null;
-      if (named !== null && !examSlides.get(slide)!.includes(named)) misnamed.push({ title: a.title, q: named });
+      const elsewhere = named !== null && !examSlides.get(slide)!.includes(named);
+      if (elsewhere) misnamed.push({ title: a.title, q: named });
       let q = m.q;
       let guessed = !m.clean;
       let candidates: number[] = [];
       if (q === null) {
+        if (elsewhere && rules.otherQuestion === "omit") continue;
         if (slideQs.length === 1) q = slideQs[0];
+        // unlabelled: decided after the leftover-question step below
         else candidates = [...slideQs];
         guessed = true;
       }
@@ -198,7 +214,8 @@ export async function scanSubmissions(
       problem(
         "unknown-question",
         `${one ? "Pin" : `${misnamed.length} pins`} titled ${firstFew(misnamed.map((x) => `“${x.title}”`))}, but ${slide} is for ${qList(slideQs)}` +
-          (one ? (where ? ` (Q${one.q} uses ${where.join(" or ")})` : ` (there is no Q${one.q})`) : ""),
+          (one ? (where ? ` (Q${one.q} uses ${where.join(" or ")})` : ` (there is no Q${one.q})`) : "") +
+          (rules.otherQuestion === "omit" ? `. ${one ? "It's" : "They're"} left out (Preferences ▸ Reading submissions).` : ""),
       );
     }
   }
@@ -237,22 +254,33 @@ export async function scanSubmissions(
   // Ambiguous pins: if the student already answered every other candidate
   // question on this slide, the leftover one is the obvious match.
   // (indexed once per student+slide: a per-pin scan of all pins is quadratic)
-  const answeredBy = new Map<string, Set<number>>();
-  for (const o of pins)
-    if (o.q !== null) {
-      const k = `${o.studentId}|${o.slide}`;
-      if (!answeredBy.has(k)) answeredBy.set(k, new Set());
-      answeredBy.get(k)!.add(o.q);
+  // (Preferences ▸ Reading submissions can turn this off)
+  if (rules.leftover) {
+    const answeredBy = new Map<string, Set<number>>();
+    for (const o of pins)
+      if (o.q !== null) {
+        const k = `${o.studentId}|${o.slide}`;
+        if (!answeredBy.has(k)) answeredBy.set(k, new Set());
+        answeredBy.get(k)!.add(o.q);
+      }
+    for (const p of pins) {
+      if (p.q !== null) continue;
+      const answered = answeredBy.get(`${p.studentId}|${p.slide}`) ?? new Set<number>();
+      const left = p.candidates.filter((c) => !answered.has(c));
+      if (left.length === 1) {
+        p.q = left[0];
+        p.candidates = [];
+      } else if (left.length > 1) p.candidates = left;
     }
-  for (const p of pins) {
-    if (p.q !== null) continue;
-    const answered = answeredBy.get(`${p.studentId}|${p.slide}`) ?? new Set<number>();
-    const left = p.candidates.filter((c) => !answered.has(c));
-    if (left.length === 1) {
-      p.q = left[0];
-      p.candidates = [];
-    } else if (left.length > 1) p.candidates = left;
   }
+  // Preferences ▸ Reading submissions: what's still unlabelled goes to the lowest-numbered question, or is left out
+  if (rules.unlabelled === "first")
+    for (const p of pins)
+      if (p.q === null && p.candidates.length) {
+        p.q = Math.min(...p.candidates);
+        p.candidates = [];
+      }
+  if (rules.unlabelled === "omit") for (let i = pins.length - 1; i >= 0; i--) if (pins[i].q === null) pins.splice(i, 1);
 
   const students = [...studentsByFolder.values()].sort((a, b) => a.name.localeCompare(b.name));
   const warnings = problems.map((p) => `${p.file ?? p.student ?? ""}: ${p.detail}`);

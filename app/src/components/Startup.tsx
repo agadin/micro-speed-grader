@@ -12,6 +12,7 @@ import { guestSession, parsePack } from "../lib/handoff";
 import { buildTasks, parseTaskId } from "../lib/grading";
 import { ExamEditor } from "./ExamEditor";
 import { applyPlan, emptyKey, parseKeyFile, planKey, type AnswerKey, type KeyMark } from "../lib/answerKey";
+import { readingRules, useSettings } from "../lib/settings";
 
 async function openSessionFile(path: string): Promise<Session> {
   try {
@@ -304,8 +305,11 @@ function NewSession({ onCancel }: { onCancel: () => void }) {
         return n;
       }),
   };
+  // Preferences ▸ Reading submissions: how pin titles are matched to questions (kept with the session)
+  const prefs = useSettings((x) => x.s);
+  const rules = useMemo(() => readingRules(prefs), [prefs.readCount, prefs.titleBareNumbers, prefs.titleOtherQuestion, prefs.readLeftover, prefs.titleUnlabelled, prefs.readMultiple]); // eslint-disable-line react-hooks/exhaustive-deps
   const scanKey =
-    subDir && included.length ? JSON.stringify([subDir, questions.map((q) => [q.num, q.slides, q.include]), fileSlides, recheck]) : "";
+    subDir && included.length ? JSON.stringify([subDir, questions.map((q) => [q.num, q.slides, q.include]), fileSlides, recheck, rules]) : "";
   useEffect(() => {
     if (!scanKey) {
       setProblems(null);
@@ -315,7 +319,7 @@ function NewSession({ onCancel }: { onCancel: () => void }) {
     setChecking(true);
     const t = window.setTimeout(async () => {
       try {
-        const r = await scanSubmissions(subDir, questions, undefined, fileSlides);
+        const r = await scanSubmissions(subDir, questions, undefined, fileSlides, rules);
         if (alive) setProblems(r.problems);
       } catch {
         // Start reads the folder again and reports the error
@@ -345,7 +349,7 @@ function NewSession({ onCancel }: { onCancel: () => void }) {
     setErr(null);
     setBusy("Reading student annotations…");
     try {
-      const scan = await scanSubmissions(subDir, questions, undefined, fileSlides);
+      const scan = await scanSubmissions(subDir, questions, undefined, fileSlides, rules);
       const now = Date.now();
       const session: Session = {
         version: 1,
@@ -363,6 +367,7 @@ function NewSession({ onCancel }: { onCancel: () => void }) {
         taskIndex: 0,
         ...(keyFile ? { key: { ...emptyKey(), mode: keyFile.mode, marks: keyFile.marks } } : {}),
         ...(Object.keys(fileSlides).length ? { fileSlides } : {}),
+        readingRules: rules,
         ...(acked.size ? { scanAck: [...acked] } : {}),
       };
       // an imported key grades the matching pins straight away (nothing else is graded yet)

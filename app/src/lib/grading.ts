@@ -1,4 +1,4 @@
-import type { GradeState, Pin, Question, Session, Student, Task } from "./types";
+import { autoWrongDoubles, type GradeState, type Pin, type Question, type Session, type Student, type Task } from "./types";
 import { defaultSettings, type Settings } from "./settings";
 
 export const taskId = (q: number, slide: string) => `Q${q}|${slide}`;
@@ -118,7 +118,9 @@ export function studentResults(session: Session, student: Student, settings: Set
         .filter(Boolean)
         .sort((a, b) => b.createdAt - a.createdAt)[0];
       if (latest) out.push({ q: q.num, status: latest.status, text: resultText(latest.status, latest.text, settings) });
-      else out.push({ q: q.num, status: "wrong", text: settings.doubleMessage });
+      else if (autoWrongDoubles(session)) out.push({ q: q.num, status: "wrong", text: settings.doubleMessage });
+      // Preferences ▸ Reading submissions: several pins are left for the grader
+      else out.push({ q: q.num, status: "ungraded", text: settings.fbUngraded });
       continue;
     }
     const grp = graded.length ? g.groups[g.pinGroup[qp[0].id]] : undefined;
