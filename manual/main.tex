@@ -50,12 +50,12 @@
 \SetWatermarkColor[gray]{0.94}
 \usepackage[hidelinks]{hyperref}
 \hypersetup{colorlinks=true, linkcolor=accent, urlcolor=accent, pdftitle={Micro Speed Grader: User Manual (Draft, version \appversion)}}
-\setcounter{tocdepth}{2}
+\setcounter{tocdepth}{1}
 \makeatletter\renewcommand*\l@subsection{\@dottedtocline{2}{1.5em}{2.6em}}\makeatother
 \titleformat{\section}{\Large\bfseries\color{accent}}{\thesection}{0.6em}{}
 \titleformat{\subsection}{\large\bfseries}{\thesubsection}{0.6em}{}
 \titleformat{\subsubsection}{\normalsize\bfseries}{\thesubsubsection}{0.6em}{}
-\titlespacing*{\section}{0pt}{0pt}{6pt}
+\titlespacing*{\section}{0pt}{18pt}{6pt}
 \titlespacing*{\subsection}{0pt}{12pt}{3pt}
 
 % key caps: one rounded box per key
@@ -81,11 +81,14 @@
   arc=2pt, left=8pt, right=8pt, top=5pt, bottom=5pt, before skip=8pt, after skip=8pt}
 \newtcolorbox{codebox}{enhanced, breakable, colback=black!3, colframe=black!12, boxrule=0.4pt, arc=3pt, left=8pt, right=8pt, top=4pt, bottom=4pt,
   fontupper=\small, before skip=8pt, after skip=8pt}
+\newtcolorbox{pagecard}{enhanced, sidebyside, sidebyside align=center, lefthand ratio=0.8, segmentation hidden, colback=white,
+  colframe=black!14, boxrule=0.5pt, arc=4pt, left=9pt, right=9pt, top=7pt, bottom=7pt, before skip=6pt, after skip=6pt, breakable=false}
+\newcommand{\onlinemark}{\raisebox{0.1ex}{\scalebox{0.7}{\ensuremath{\nearrow}}}}
 % figures: the screenshot with rounded corners, the caption under it
 \newcommand{\shot}[3]{% width, file, caption
   \par\begin{center}
   \tcbox[enhanced, boxsep=0pt, left=0pt, right=0pt, top=0pt, bottom=0pt, arc=5pt, boxrule=0.5pt, colframe=black!22, colback=white, clip upper]%
-    {\includegraphics[width=#1, height=0.40\textheight, keepaspectratio]{#2}}\par\vspace{2pt}
+    {\includegraphics[width=#1, height=0.27\textheight, keepaspectratio]{#2}}\par\vspace{2pt}
   {\footnotesize\color{black!60}#3}
   \end{center}\par}
 
@@ -136,7 +139,7 @@ Students drop a pin on a structure in a whole-slide image. Micro Speed Grader ga
 \tableofcontents
 \vspace{10pt}
 \begin{note}
-\textbf{About this manual.} Each section matches a page of the app's built-in Help, in the same order. Links between sections are clickable in the PDF. Animations in the online help appear here as a still picture. On Windows, use \keycap{Ctrl} where this manual shows \keycap{\cmdsym}, and \keycap{Alt} for \keycap{\optsym}.
+\textbf{About this manual.} The first sections cover everyday grading in full: setting up, grading, selecting pins, the answer key and exporting. \hyperref[sec:more]{More in the online help} summarises the rest (working with other graders, editing exam questions, the ledger, preferences, troubleshooting and more), each with a QR code to its full page. Links marked \onlinemark{} open the online help. On Windows, use \keycap{Ctrl} where this manual shows \keycap{\cmdsym}, and \keycap{Alt} for \keycap{\optsym}.
 \end{note}
 \clearpage
 

@@ -80,10 +80,24 @@ let FILE = "";
 const label = (file: string, anchor = "") => `sec:${file}${anchor ? ":" + anchor : ""}`;
 const labels = new Set<string>();
 const refs: string[] = [];
-function link(text: string, href: string) {
-  if (/^https?:/.test(href)) return `\\href{${href.replace(/[%#]/g, "\\$&")}}{${inline(text)}}`;
-  const [file, anchor = ""] = href.split("#");
+/** the pages printed in full; the rest get a summary card pointing at the full page online */
+const FULL = new Set(["index", "getting-started", "grading", "selecting", "answer-key", "export", "shortcuts"]);
+/** sections of the full pages left to the online help (by heading id) */
+const ONLINE_ONLY: Record<string, string[]> = {
+  "getting-started": ["new-and-changed-submissions", "review-changed-submissions", "updates"],
+  grading: ["showing-the-pins-differently"],
+  selecting: ["paint-with-pins-hidden", "pin-by-pin", "spotlight-and-small-pins", "moving-the-cluster-ring"],
+  "answer-key": ["reuse-a-key", "with-other-graders", "new-submissions"],
+  export: ["time-spent"],
+};
+const printed = (f: string, anchor: string) => FULL.has(f) && !(anchor && (ONLINE_ONLY[f] ?? []).includes(anchor));
+const online = (f: string, anchor = "") => `${REPO}/blob/main/docs/help/${f}.md${anchor ? "#" + anchor : ""}`;
+const href = (url: string, text: string) => `\\href{${url.replace(/[%#]/g, "\\$&")}}{${text}}`;
+function link(text: string, href_: string) {
+  if (/^https?:/.test(href_)) return href(href_, inline(text));
+  const [file, anchor = ""] = href_.split("#");
   const f = file ? file.replace(/\.md$/, "").replace(/^\.\//, "") : FILE;
+  if (!printed(f, anchor)) return `${href(online(f, anchor), inline(text))}\\,\\onlinemark{}`;
   refs.push(label(f, anchor));
   return `\\hyperref[${label(f, anchor)}]{${inline(text)}}`;
 }
@@ -128,7 +142,7 @@ function image(src: string, alt: string) {
   } else fs.copyFileSync(from, to);
   // screenshots are 2× (retina): a 1600 px wide one fills the text width, smaller ones stay smaller
   const { w } = probe(to);
-  const frac = Math.min(1, w / 1600);
+  const frac = Math.min(0.72, w / 2000);
   const cap = inline(alt) + (anim ? ` \\textcolor{black!45}{(animated in the online help)}` : "");
   return `\\shot{${frac.toFixed(2)}\\linewidth}{img/${base}}{${cap}}`;
 }
@@ -173,10 +187,19 @@ function chapter(file: string, doc: Doc) {
   FILE = file;
   const out: string[] = [];
   const title = file === "index" ? "Introduction" : doc.meta.title;
-  out.push(`\\clearpage\n\\section{${inline(title)}}\\label{${label(file)}}`);
+  out.push(`\\section{${inline(title)}}\\label{${label(file)}}`);
   labels.add(label(file));
   if (doc.meta.blurb && file !== "index") out.push(`{\\color{black!55}\\itshape ${inline(doc.meta.blurb)}}\\par\\medskip`);
+  const skipped: string[] = [];
+  let skipping = false;
   for (const b of doc.blocks) {
+    // the introduction's topic list is the table of contents here
+    if (file === "index" && b.t === "h" && b.depth === 2) break;
+    if (b.t === "h" && b.depth <= 2) {
+      skipping = (ONLINE_ONLY[file] ?? []).includes(b.id);
+      if (skipping) skipped.push(href(online(file, b.id), inline(b.text)) + "\\,\\onlinemark{}");
+    }
+    if (skipping) continue;
     if (b.t === "h") {
       labels.add(label(file, b.id));
       if (b.depth === 1) {
@@ -191,7 +214,27 @@ function chapter(file: string, doc: Doc) {
     else if (b.t === "code") out.push(code(b.text));
     else if (b.t === "img") out.push(image(b.src, b.alt));
   }
+  if (skipped.length) out.push(`{\\small\\color{black!65}\\textbf{Also in the online help:} ${skipped.join(" \\textperiodcentered{} ")}}`);
   return out.join("\n\n") + "\n";
+}
+
+/** a page not printed in full: what it's for, what it covers, and where to read it */
+function card(file: string, doc: Doc) {
+  FILE = file;
+  const first = doc.blocks.find((b) => b.t === "p") as { text: string } | undefined;
+  const topics = doc.blocks.filter((b) => b.t === "h" && b.depth === 2).map((b) => inline((b as { text: string }).text));
+  const url = online(file);
+  labels.add(label(file));
+  return [
+    `\\begin{pagecard}\\phantomsection\\addcontentsline{toc}{subsection}{${inline(doc.meta.title)}}\\label{${label(file)}}`,
+    `{\\large\\bfseries\\color{accent}${inline(doc.meta.title)}}\\par\\smallskip`,
+    first ? inline(first.text) + "\\par" : "",
+    topics.length ? `{\\small\\color{black!60}Covers: ${topics.join(" \\textperiodcentered{} ")}}` : "",
+    "\\tcblower",
+    `\\centering${href(url, "\\qrcode[height=1.75cm, nolink]{" + url + "}")}\\\\[3pt]{\\scriptsize ${href(url, "Full page online")}}`,
+    "\\end{pagecard}",
+    "",
+  ].join("\n");
 }
 
 // ---------------- build ----------------
@@ -232,14 +275,22 @@ const pages = fs
   .map((f) => ({ id: f.replace(/\.md$/, ""), doc: parseMarkdown(fs.readFileSync(path.join(HELP, f), "utf8")) }))
   .sort((a, b) => Number(a.doc.meta.order ?? 99) - Number(b.doc.meta.order ?? 99));
 const all: string[] = [];
-for (const p of pages) {
+for (const p of pages.filter((p) => FULL.has(p.id))) {
   fs.writeFileSync(path.join(OUT, "chapters", `${p.id}.tex`), chapter(p.id, p.doc));
   all.push(`\\input{chapters/${p.id}}`);
 }
+const rest = pages.filter((p) => !FULL.has(p.id));
+fs.writeFileSync(
+  path.join(OUT, "chapters", "more.tex"),
+  `\\bigskip\n\\section{More in the online help}\\label{sec:more}\n` +
+    `These pages of the Help are summarised here. Scan a code, or click a title's link, to read the full page; it's also in the app under \\textbf{Help}.\\par\\medskip\n\n` +
+    rest.map((p) => card(p.id, p.doc)).join("\n"),
+);
+all.push("\\input{chapters/more}");
 fs.writeFileSync(path.join(OUT, "chapters", "all.tex"), all.join("\n") + "\n");
 
 const broken = [...new Set(refs)].filter((r) => !labels.has(r));
-console.log(`${pages.length} chapters, ${fs.readdirSync(imgDir).length} images, version ${version} (${commit}${ahead ? `, ${ahead} commits after v${version}` : ""})`);
+console.log(`${pages.length - rest.length} pages in full, ${rest.length} summarised, ${fs.readdirSync(imgDir).length} images, version ${version} (${commit}${ahead ? `, ${ahead} commits after v${version}` : ""})`);
 if (unknown.size) console.log(`characters with no LaTeX mapping: ${[...unknown].join(" ")}`);
 if (broken.length) console.log(`links to missing sections: ${broken.join(", ")}`);
 
