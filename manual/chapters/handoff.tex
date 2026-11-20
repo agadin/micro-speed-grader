@@ -7,8 +7,7 @@ Split a grading session with one or more other graders. You (the \textbf{host}) 
 There is no server and no account. The files travel however you like: email, Google Drive, a shared folder or a USB stick.
 
 \begin{codebox}\begin{alltt}
- host -- Exam - Jamie.msgpack --\ensuremath{\blacktriangleright} guest grades only that work
- host \ensuremath{\blacktriangleleft}-- Exam - Jamie.msgresult -- guest
+ host -- Exam - Jamie.msgpack --\ensuremath{\blacktriangleright} guest grades only that work host \ensuremath{\blacktriangleright}-- Exam - Jamie.msgresult -- guest
 \end{alltt}\end{codebox}
 
 \shot{0.38\linewidth}{img/handoff.png}{Splitting the work between three people}
@@ -77,7 +76,7 @@ With several graders, import each person's results file as it arrives, in any or
 
 Merging is a single step you can undo with \keycap{\cmdsym{}}\keyplus{}\keycap{Z}.
 
-Only pins that were in that pack are taken from the file. If you already graded one of those pins yourself (for example after a recall), \textbf{your grade is kept} and the guest's is skipped. The confirmation message says how many were skipped.
+Only pins in that pack are taken from the file. If you already graded one of those pins yourself (for example after a recall), \textbf{your grade is kept} and the guest's is skipped. The confirmation message says how many were skipped.
 
 \subsubsection{Sending results again}\label{sec:handoff:sending-results-again}
 
@@ -132,8 +131,6 @@ To check that everyone is marking the same way, give some pins to two people. Ea
 \item Each person's column shows how many extra pins they grade second (\textbf{+N twice}), and the bar at the top shows them as a striped end on that person's colour. Click \textbf{Create packs} as usual.
 \end{enumerate}
 
-Grading twice needs at least two people taking part.
-
 When both grades for a pin are in:
 
 \begin{itemize}[topsep=2pt, itemsep=2pt]
@@ -145,7 +142,7 @@ If you're one of the graders, you grade your overlap pins in your own session as
 
 \subsection{Settle disagreements}\label{sec:handoff:settle-disagreements}
 
-When there are disagreements, a red \textbf{Disagreements} button with a count appears (Figure~\ref{fig:disagreements}) in the top bar, and those pins get a red \textbf{!} dot on the slide. Click the button to see them, grouped by image and by what each person said, for example \emph{Q2 \textperiodcentered{} VMS109 --- Jamie: \checksym{} Correct, Sam: \crosssym{} Neutrophil --- 12 pins}.
+When there are disagreements, a red \textbf{Disagreements} button with a count appears (Figure~\ref{fig:disagreements}) in the top bar, and those pins get a red \textbf{!} dot on the slide. Click the button to see them, grouped by image and by what each person said, for example \emph{Q2 \textperiodcentered{} VMS109; Jamie: \checksym{} Correct, Sam: \crosssym{} Neutrophil 12 pins}.
 
 For each group:
 
@@ -158,7 +155,7 @@ Settling is a normal step you can undo with \keycap{\cmdsym{}}\keyplus{}\keycap{
 
 \subsubsection{How often graders agree}\label{sec:handoff:how-often-graders-agree}
 
-The Disagreements window also shows, for each pair of graders, how many pins they both graded, how often they agreed, and \textbf{\ensuremath{\kappa}} (Cohen's kappa on correct / wrong: how much more they agree than chance would). Above 0.8 is very good. Below 0.6, shown in red, suggests the two read the question differently and are worth a quick calibration chat. \ensuremath{\kappa} shows \textbf{---} when one of them gave every shared pin the same grade, because there's then nothing to measure beyond the agreement percentage.
+The Disagreements window also shows, for each pair of graders, how many pins they both graded, how often they agreed, and \textbf{\ensuremath{\kappa}} (Cohen's kappa on correct / wrong: how much more they agree than chance would). Above 0.8 is very good. Below 0.6, shown in red, suggests the two read the question differently and are worth a quick calibration chat. \ensuremath{\kappa} shows when one of them gave every shared pin the same grade, because there's then nothing to measure beyond the agreement percentage.
 
 \subsection{Taking work back (recall)}\label{sec:handoff:taking-work-back-recall}
 

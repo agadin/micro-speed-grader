@@ -59,16 +59,19 @@ The \textbf{Statistics} tab shows how the exam performed:
 
 \begin{itemize}[topsep=2pt, itemsep=2pt]
 \item \textbf{KR-20}: the test's reliability (0--1), with a reading from \emph{very low} to \emph{good}.
-\item \textbf{Mean} and \textbf{SD} of the scores.
+\item \textbf{Mean} and \textbf{SD} of the scores, and the \textbf{SEM} (standard error of measurement, $\mathrm{SD}\sqrt{1-\mathrm{KR20}}$): roughly how many points a student's score could move on a retest.
 \item For each question:
 \begin{itemize}[topsep=1pt]
 \item \textbf{Difficulty (p)}: the share of students who got it right.
-\item \textbf{Point-biserial (corrected)}: how well the question separates strong from weak students. Below 0.2 is shown in red.
+\item \textbf{Discrimination (D)}: p among the top 27\% of scorers minus p among the bottom 27\%. Hover it for the two values. Below 0.2 is shown in red, 0.3 and up in green.
+\item \textbf{Point-biserial (corrected)}: how well the question separates strong from weak students.
 \item \textbf{KR-20 if deleted}: reliability without that question. Red when leaving it out would make the test more reliable.
 \end{itemize}
 \end{itemize}
 
-If some answers are ungraded, choose \textbf{Leave those students out} or \textbf{Count ungraded as wrong}. At least two fully graded students are needed. \textbf{Save item-stats.csv} writes the table to the export folder.
+\textbf{Answers and feedback by question} lists, for every student (graded or not), how many got each question right and wrong, how many had no pin, how many had several pins, and how many are still ungraded, with the three most common pieces of feedback. Feedback that differs only in capitals counts as one.
+
+If some answers are ungraded, choose \textbf{Leave those students out} or \textbf{Count ungraded as wrong}. At least two fully graded students are needed. \textbf{Save item-stats.csv} writes the summary, the per-question statistics, the answer counts and every piece of feedback with its count to the export folder.
 
 {\small\textbf{Also in the online help:} \href{https://github.com/agadin/micro-speed-grader/blob/main/docs/help/export.md\#time-spent}{Time spent}\,\onlinemark{}}
 \tocon
