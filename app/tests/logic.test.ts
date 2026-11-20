@@ -10,7 +10,7 @@ import { computeClusters } from "../src/lib/cluster";
 import { buildTasks, pinsForTask, doublePinIds, studentResults, feedbackText } from "../src/lib/grading";
 import { defaultSettings } from "../src/lib/settings";
 import { isPainted, pinsInPaint, type PaintOp } from "../src/lib/paint";
-import { exportTable, kr20, parseStudentName, EXPORT_PRESETS, testStats, safeFileName, uniqueFileNames, textCell, toCsv, type ExportRow } from "../src/lib/exportCsv";
+import { exportTable, kr20, parseStudentName, EXPORT_PRESETS, testStats, questionSummaries, statsTable, safeFileName, uniqueFileNames, textCell, toCsv, type ExportRow } from "../src/lib/exportCsv";
 import { MAX_ANNOTATIONS } from "../src/lib/ndpa";
 import { parseMarkdown, slug } from "../src/lib/markdown";
 import { applyPlan, emptyKey, makeKeyFile, matchPin, newMark, parseKeyFile, planKey, type AnswerKey } from "../src/lib/answerKey";
@@ -135,6 +135,22 @@ ok(!!dbl && studentResults(session, dbl, defaultSettings)[0].text === defaultSet
   const st = testStats(rows, [1, 2, 3]);
   ok(st.n === 4 && st.excluded === 1 && Math.abs((st.kr20 ?? 0) - 0.75) < 1e-9, `stats: n=${st.n} kr20=${st.kr20}`);
   ok(Math.abs(st.items[0].p - 0.75) < 1e-9, "item difficulty");
+  // 4 complete students → groups of round(4 × 0.27) = 1: top scorer (3/3) vs bottom (0/3)
+  ok(st.groupSize === 1 && st.items.every((it) => it.d === 1 && it.pUpper === 1 && it.pLower === 0), `D: ${st.items.map((i) => i.d)}`);
+  ok(Math.abs((st.sem ?? 0) - Math.sqrt(1.25) * 0.5) < 1e-9, `SEM ${st.sem}`);
+  // answers and feedback: kinds and notes come from studentResults
+  const r2: ExportRow[] = [
+    { ...rows[0], res: [{ q: 1, status: "wrong", text: "Incorrect: duct", kind: "answer", note: "duct" }] },
+    { ...rows[1], res: [{ q: 1, status: "wrong", text: "Incorrect: Duct", kind: "answer", note: "Duct" }] },
+    { ...rows[2], res: [{ q: 1, status: "wrong", text: "No answer", kind: "none" }] },
+    { ...rows[3], res: [{ q: 1, status: "wrong", text: "Multiple pins", kind: "double" }] },
+    { ...rows[4], res: [{ q: 1, status: "correct", text: "Correct", kind: "answer", note: "" }] },
+  ];
+  const [qs1] = questionSummaries(r2, [1]);
+  ok(qs1.correct === 1 && qs1.wrong === 4 && qs1.noAnswer === 1 && qs1.several === 1 && qs1.ungraded === 0, `summary ${JSON.stringify(qs1)}`);
+  ok(qs1.feedback[0].note === "duct" && qs1.feedback[0].n === 2 && qs1.feedback.length === 4, `feedback ${JSON.stringify(qs1.feedback)}`);
+  const csv = statsTable(st, [qs1]);
+  ok(csv.some((r) => r[0] === "Q1" && r[2] === "duct" && r[3] === "2") && csv.some((r) => r[0] === "SEM (points)"), "item-stats.csv has D, SEM and feedback");
 }
 
 

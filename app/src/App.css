@@ -2122,7 +2122,7 @@ button.preview-strip:hover .pl {
 }
 .ex-stats .kr-cards {
   display: grid;
-  grid-template-columns: 1.4fr 1fr 1fr 1fr;
+  grid-template-columns: 1.4fr 1fr 1fr 1fr 1fr;
   gap: 10px;
   margin-bottom: 14px;
 }
@@ -2156,6 +2156,21 @@ button.preview-strip:hover .pl {
   color: #ee6a5c;
 }
 .csv-table.items td.good {
+  color: #86c46d;
+}
+.ex-h {
+  margin: 18px 0 8px;
+  font-size: 13px;
+}
+.csv-table.qsum td.fb-list {
+  white-space: normal;
+  min-width: 260px;
+  line-height: 1.45;
+}
+.fb-list .fb-wrong b {
+  color: #ee6a5c;
+}
+.fb-list .fb-right b {
   color: #86c46d;
 }
 .pbar {

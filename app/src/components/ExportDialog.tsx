@@ -7,7 +7,7 @@ import type { Session } from "../lib/types";
 import { useSettings } from "../lib/settings";
 import { feedbackText, studentResults } from "../lib/grading";
 import { dirname, joinPath, writeText } from "../lib/backend";
-import { exportTable, statsTable, testStats, toCsv, uniqueFileNames, type ExportRow } from "../lib/exportCsv";
+import { exportTable, questionSummaries, statsTable, testStats, toCsv, uniqueFileNames, type ExportRow } from "../lib/exportCsv";
 import { CsvPreviewTable, ExportLayoutEditor } from "./ExportLayout";
 import { conflictPins } from "../lib/handoff";
 
@@ -51,6 +51,7 @@ export function ExportDialog({ session, onClose }: { session: Session; onClose: 
   const opts = { columns: cols, uidFrom: settings.exportUid, ungradedItem: settings.exportUngraded };
   const table = useMemo(() => exportTable(rows, qs, opts), [rows, qs, cols, settings.exportUid, settings.exportUngraded]);
   const stats = useMemo(() => testStats(rows, qs, ungradedAsWrong), [rows, qs, ungradedAsWrong]);
+  const sums = useMemo(() => questionSummaries(rows, qs), [rows, qs]);
   const exportCsv = async () => {
     try {
       await writeText(joinPath(dir, "grades.csv"), toCsv(table));
@@ -83,7 +84,7 @@ export function ExportDialog({ session, onClose }: { session: Session; onClose: 
   };
   const exportStats = async () => {
     try {
-      await writeText(joinPath(dir, "item-stats.csv"), toCsv(statsTable(stats)));
+      await writeText(joinPath(dir, "item-stats.csv"), toCsv(statsTable(stats, sums)));
       setStatus(`Wrote item-stats.csv to ${dir}`);
     } catch (e) {
       setStatus(`Export failed: ${e}`);
@@ -209,6 +210,11 @@ export function ExportDialog({ session, onClose }: { session: Session; onClose: 
                   <b>{fmt(stats.sd)}</b>
                   <span className="kn">population</span>
                 </div>
+                <div className="kr" title="Standard error of measurement: SD × √(1 − KR-20)">
+                  <span className="kl">SEM</span>
+                  <b>{fmt(stats.sem)}</b>
+                  <span className="kn">points</span>
+                </div>
               </div>
               {stats.n < 2 ? (
                 <div className="ex-empty">
@@ -222,6 +228,9 @@ export function ExportDialog({ session, onClose }: { session: Session; onClose: 
                     <tr>
                       <th>Question</th>
                       <th title="Proportion of students who got it right">Difficulty (p)</th>
+                      <th title="Upper–lower discrimination index: p in the top 27% of scorers minus p in the bottom 27%">
+                        Discrimination (D)
+                      </th>
                       <th title="Correlation of the item with the total score without that item">Point-biserial</th>
                       <th title="KR-20 of the test with this question left out">KR-20 if deleted</th>
                       <th>Correct</th>
@@ -237,6 +246,12 @@ export function ExportDialog({ session, onClose }: { session: Session; onClose: 
                             <span style={{ width: `${it.p * 100}%` }} />
                           </span>
                           {fmt(it.p)}
+                        </td>
+                        <td
+                          className={it.d === null ? "" : it.d < 0.2 ? "bad" : it.d >= 0.3 ? "good" : ""}
+                          title={it.d === null ? undefined : `top 27%: ${fmt(it.pUpper)} · bottom 27%: ${fmt(it.pLower)}`}
+                        >
+                          {fmt(it.d)}
                         </td>
                         <td className={it.rpb === null ? "" : it.rpb < 0.2 ? "bad" : it.rpb >= 0.3 ? "good" : ""}>{fmt(it.rpb)}</td>
                         <td
@@ -255,9 +270,46 @@ export function ExportDialog({ session, onClose }: { session: Session; onClose: 
               </div>
               )}
               <p className="muted small">
-                Red: point-biserial below 0.2 (weak discrimination), or KR-20 would rise without the question. Students with
+                Red: D or point-biserial below 0.2 (weak discrimination), or KR-20 would rise without the question. D compares
+                the top and bottom 27% of scorers{stats.groupSize ? ` (${stats.groupSize} students each)` : ""}. Students with
                 any ungraded answer are left out unless you count those answers as wrong.
               </p>
+              <h4 className="ex-h">Answers and feedback by question</h4>
+              <div className="tbl-wrap">
+                <table className="csv-table items qsum">
+                  <thead>
+                    <tr>
+                      <th>Question</th>
+                      <th>Correct</th>
+                      <th title="Includes students with no pin">Wrong</th>
+                      <th>No answer</th>
+                      <th title="Students with more than one pin for the question">Several pins</th>
+                      <th>Ungraded</th>
+                      <th>Most common feedback</th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    {sums.map((q) => (
+                      <tr key={q.q}>
+                        <td>Q{q.q}</td>
+                        <td>{q.correct}</td>
+                        <td>{q.wrong}</td>
+                        <td>{q.noAnswer || ""}</td>
+                        <td>{q.several || ""}</td>
+                        <td>{q.ungraded || ""}</td>
+                        <td className="fb-list">
+                          {q.feedback.slice(0, 3).map((e, i) => (
+                            <div key={i} className={e.status === "wrong" ? "fb-wrong" : "fb-right"}>
+                              <b>{e.n}</b> {e.status === "correct" ? "✓" : "✗"} {e.note || <i>no note</i>}
+                            </div>
+                          ))}
+                          {q.feedback.length > 3 && <div className="muted small">+{q.feedback.length - 3} more in item-stats.csv</div>}
+                        </td>
+                      </tr>
+                    ))}
+                  </tbody>
+                </table>
+              </div>
             </div>
           ) : (
             <TimeTab report={timeRep} />

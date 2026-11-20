@@ -52,13 +52,16 @@ The CSV is UTF-8 and opens directly in Excel. Text that a spreadsheet could mist
 The **Statistics** tab shows how the exam performed:
 
 - **KR-20**: the test's reliability (0–1), with a reading from *very low* to *good*.
-- **Mean** and **SD** of the scores.
+- **Mean** and **SD** of the scores, and the **SEM** (standard error of measurement, SD × √(1 − KR-20)): roughly how many points a student's score could move on a retest.
 - For each question:
   - **Difficulty (p)**: the share of students who got it right.
-  - **Point-biserial (corrected)**: how well the question separates strong from weak students. Below 0.2 is shown in red.
+  - **Discrimination (D)**: p among the top 27% of scorers minus p among the bottom 27%. Hover it for the two values. Below 0.2 is shown in red, 0.3 and up in green.
+  - **Point-biserial (corrected)**: the correlation between the question and the rest of the test. Below 0.2 is shown in red.
   - **KR-20 if deleted**: reliability without that question. Red when leaving it out would make the test more reliable.
 
-If some answers are ungraded, choose **Leave those students out** or **Count ungraded as wrong**. At least two fully graded students are needed. **Save item-stats.csv** writes the table to the export folder.
+**Answers and feedback by question** lists, for every student (graded or not), how many got each question right and wrong, how many had no pin, how many had several pins, and how many are still ungraded, with the three most common pieces of feedback. Feedback that differs only in capitals counts as one.
+
+If some answers are ungraded, choose **Leave those students out** or **Count ungraded as wrong**. At least two fully graded students are needed. **Save item-stats.csv** writes the summary, the per-question statistics, the answer counts and every piece of feedback with its count to the export folder.
 
 ## Time spent
 

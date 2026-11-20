@@ -191,8 +191,26 @@ export interface ItemStat {
   rpb: number | null;
   /** KR-20 of the test with this item left out */
   kr20IfDeleted: number | null;
+  /** upper–lower discrimination index: p in the top 27% of scorers minus p in the bottom 27% */
+  d: number | null;
+  pUpper: number | null;
+  pLower: number | null;
   correct: number;
   incorrect: number;
+}
+
+/** what every student handed in for one question, and the feedback they got (all students, graded or not) */
+export interface QuestionSummary {
+  q: number;
+  correct: number;
+  wrong: number;
+  /** of the wrong: no pin at all */
+  noAnswer: number;
+  /** students with several pins for this question (whatever their grade) */
+  several: number;
+  ungraded: number;
+  /** distinct feedback notes given, most common first ("" = no note) */
+  feedback: { status: "correct" | "wrong"; note: string; n: number }[];
 }
 
 export interface TestStats {
@@ -203,6 +221,10 @@ export interface TestStats {
   mean: number;
   sd: number;
   kr20: number | null;
+  /** standard error of measurement: SD × √(1 − KR-20), in points */
+  sem: number | null;
+  /** students in each of the upper and lower groups used for D */
+  groupSize: number;
   items: ItemStat[];
 }
 
@@ -246,8 +268,14 @@ export function testStats(rows: ExportRow[], qs: number[], ungradedAsWrong = fal
   const totals = m.map((r) => r.reduce((a, b) => a + b, 0));
   const mean = n ? totals.reduce((a, b) => a + b, 0) / n : 0;
   const sd = n ? Math.sqrt(totals.reduce((a, t) => a + (t - mean) ** 2, 0) / n) : 0;
+  // upper and lower 27% by total score (Kelley); ties at the cut are broken by order, as is usual
+  const g = n >= 4 ? Math.max(1, Math.round(n * 0.27)) : 0;
+  const order = totals.map((t, i) => [t, i]).sort((a, b) => b[0] - a[0]).map((x) => x[1]);
+  const upper = order.slice(0, g), lower = order.slice(n - g);
   const items = qs.map((q, j) => {
     const col = m.map((r) => r[j]);
+    const pUpper = g ? upper.reduce((a, i) => a + m[i][j], 0) / g : null;
+    const pLower = g ? lower.reduce((a, i) => a + m[i][j], 0) / g : null;
     const correct = col.reduce((a, b) => a + b, 0);
     const rest = m.map((r, i) => totals[i] - r[j]);
     return {
@@ -255,18 +283,51 @@ export function testStats(rows: ExportRow[], qs: number[], ungradedAsWrong = fal
       p: n ? correct / n : 0,
       rpb: pearson(col, rest),
       kr20IfDeleted: qs.length > 2 ? kr20(m.map((r) => r.filter((_, jj) => jj !== j))) : null,
+      d: pUpper !== null && pLower !== null ? pUpper - pLower : null,
+      pUpper,
+      pLower,
       correct,
       incorrect: n - correct,
     };
   });
-  return { n, excluded: rows.length - n, k: qs.length, mean, sd, kr20: kr20(m), items };
+  const k20 = kr20(m);
+  const sem = k20 === null ? null : sd * Math.sqrt(Math.max(0, 1 - k20));
+  return { n, excluded: rows.length - n, k: qs.length, mean, sd, kr20: k20, sem, groupSize: g, items };
+}
+
+/** per question: correct / wrong / no answer / several pins / ungraded, and the feedback notes given */
+export function questionSummaries(rows: ExportRow[], qs: number[]): QuestionSummary[] {
+  return qs.map((q) => {
+    const s: QuestionSummary = { q, correct: 0, wrong: 0, noAnswer: 0, several: 0, ungraded: 0, feedback: [] };
+    const fb = new Map<string, QuestionSummary["feedback"][number]>();
+    for (const r of rows) {
+      const x = r.res.find((y) => y.q === q);
+      if (!x) continue;
+      if (x.kind === "double") s.several++;
+      if (x.status === "ungraded") {
+        s.ungraded++;
+        continue;
+      }
+      if (x.status === "correct") s.correct++;
+      else s.wrong++;
+      if (x.kind === "none") s.noAnswer++;
+      // no pin and automatic double-pin grades have no note of their own: show the wording they get
+      const note = x.kind === "none" || (x.kind === "double" && x.note === undefined) ? x.text : (x.note ?? "");
+      const key = `${x.status}|${note.toLowerCase()}`;
+      const e = fb.get(key);
+      if (e) e.n++;
+      else fb.set(key, { status: x.status, note, n: 1 });
+    }
+    s.feedback = [...fb.values()].sort((a, b) => b.n - a.n || (a.status === "wrong" ? -1 : 1));
+    return s;
+  });
 }
 
 const f = (x: number | null, d = 3) => (x === null || !Number.isFinite(x) ? "" : x.toFixed(d).replace(/^-(0\.0*)$/, "$1"));
 
 /** item-stats.csv: a summary block, then one row per question */
-export function statsTable(s: TestStats): string[][] {
-  return [
+export function statsTable(s: TestStats, sums: QuestionSummary[] = []): string[][] {
+  const out: string[][] = [
     ["Statistic", "Value"],
     ["Students", String(s.n)],
     ["Students left out (ungraded answers)", String(s.excluded)],
@@ -274,10 +335,53 @@ export function statsTable(s: TestStats): string[][] {
     ["Mean score", f(s.mean, 2)],
     ["SD (population)", f(s.sd, 2)],
     ["KR-20", f(s.kr20)],
+    ["SEM (points)", f(s.sem, 2)],
+    ["Upper / lower group size (27%)", s.groupSize ? String(s.groupSize) : ""],
     [],
-    ["Question", "Difficulty (p)", "Point-biserial (corrected)", "KR-20 if deleted", "Correct", "Incorrect"],
-    ...s.items.map((it) => [`Q${it.q}`, f(it.p), f(it.rpb), f(it.kr20IfDeleted), String(it.correct), String(it.incorrect)]),
+    [
+      "Question",
+      "Difficulty (p)",
+      "Discrimination (D)",
+      "p upper 27%",
+      "p lower 27%",
+      "Point-biserial (corrected)",
+      "KR-20 if deleted",
+      "Correct",
+      "Incorrect",
+    ],
+    ...s.items.map((it) => [
+      `Q${it.q}`,
+      f(it.p),
+      f(it.d),
+      f(it.pUpper),
+      f(it.pLower),
+      f(it.rpb),
+      f(it.kr20IfDeleted),
+      String(it.correct),
+      String(it.incorrect),
+    ]),
   ];
+  if (sums.length) {
+    out.push(
+      [],
+      ["Question", "Correct", "Wrong", "of which no answer", "Several pins", "Ungraded", "Distinct feedback"],
+      ...sums.map((q) => [
+        `Q${q.q}`,
+        String(q.correct),
+        String(q.wrong),
+        String(q.noAnswer),
+        String(q.several),
+        String(q.ungraded),
+        String(q.feedback.length),
+      ]),
+      [],
+      ["Question", "Grade", "Feedback", "Students"],
+      ...sums.flatMap((q) =>
+        q.feedback.map((e) => [`Q${q.q}`, e.status === "correct" ? "Correct" : "Wrong", textCell(e.note || "(no note)"), String(e.n)]),
+      ),
+    );
+  }
+  return out;
 }
 
 // ---------- feedback file names ----------

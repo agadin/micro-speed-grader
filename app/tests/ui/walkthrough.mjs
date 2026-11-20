@@ -513,6 +513,8 @@ await step("export grades.csv (item columns) + feedback; statistics tab saves it
   await page.waitForTimeout(500);
   const statsCsv = fs.readFileSync(path.join(exp, "item-stats.csv"), "utf8");
   expect(/KR-20,/.test(statsCsv) && /^Q1,/m.test(statsCsv), "item-stats.csv has KR-20 and per-question rows");
+  expect(/Discrimination \(D\)/.test(statsCsv) && /SEM \(points\)/.test(statsCsv) && /^Question,Grade,Feedback,Students/m.test(statsCsv), "item-stats.csv has D, SEM and feedback");
+  expect((await page.locator(".qsum tbody tr").count()) > 0, "answers and feedback table shown");
   expect(/^-?\d\.\d\d$/.test(kr), `provisional KR-20 shown: ${kr}`);
   const csv = fs.readFileSync(path.join(exp, "grades.csv"), "utf8");
   const fb = fs.readdirSync(path.join(exp, "feedback"));

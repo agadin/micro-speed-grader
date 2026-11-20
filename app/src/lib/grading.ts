@@ -93,6 +93,10 @@ export interface QuestionResult {
   q: number;
   status: "correct" | "wrong" | "ungraded";
   text: string;
+  /** what the student handed in: no pin, several pins, or one answer (statistics only) */
+  kind?: "none" | "double" | "answer";
+  /** the grader's own note, before the feedback wording is applied (statistics only) */
+  note?: string;
 }
 
 export function studentResults(session: Session, student: Student, settings: Settings): QuestionResult[] {
@@ -107,7 +111,7 @@ export function studentResults(session: Session, student: Student, settings: Set
       out.push(
         pending
           ? { q: q.num, status: "ungraded", text: `${settings.fbUngraded} (unlabelled pin)` }
-          : { q: q.num, status: "wrong", text: settings.noAnswerMessage },
+          : { q: q.num, status: "wrong", text: settings.noAnswerMessage, kind: "none" },
       );
       continue;
     }
@@ -117,15 +121,16 @@ export function studentResults(session: Session, student: Student, settings: Set
         .map((p) => g.groups[g.pinGroup[p.id]])
         .filter(Boolean)
         .sort((a, b) => b.createdAt - a.createdAt)[0];
-      if (latest) out.push({ q: q.num, status: latest.status, text: resultText(latest.status, latest.text, settings) });
-      else if (autoWrongDoubles(session)) out.push({ q: q.num, status: "wrong", text: settings.doubleMessage });
+      if (latest)
+        out.push({ q: q.num, status: latest.status, text: resultText(latest.status, latest.text, settings), kind: "double", note: latest.text.trim() });
+      else if (autoWrongDoubles(session)) out.push({ q: q.num, status: "wrong", text: settings.doubleMessage, kind: "double" });
       // Preferences ▸ Reading submissions: several pins are left for the grader
-      else out.push({ q: q.num, status: "ungraded", text: settings.fbUngraded });
+      else out.push({ q: q.num, status: "ungraded", text: settings.fbUngraded, kind: "double" });
       continue;
     }
     const grp = graded.length ? g.groups[g.pinGroup[qp[0].id]] : undefined;
-    if (!grp) out.push({ q: q.num, status: "ungraded", text: settings.fbUngraded });
-    else out.push({ q: q.num, status: grp.status, text: resultText(grp.status, grp.text, settings) });
+    if (!grp) out.push({ q: q.num, status: "ungraded", text: settings.fbUngraded, kind: "answer" });
+    else out.push({ q: q.num, status: grp.status, text: resultText(grp.status, grp.text, settings), kind: "answer", note: grp.text.trim() });
   }
   return out;
 }
