@@ -37,6 +37,9 @@ function shortPath(p: string): string {
 let resizeQueue: Promise<void> = Promise.resolve();
 
 /** Size the (title-bar-less) window snugly around the start-up card. */
+/** the start-up window may be made shorter than its card down to this (it scrolls), never narrower */
+const MIN_H = 420;
+
 function useFitWindow() {
   const ref = useRef<HTMLDivElement>(null);
   useEffect(() => {
@@ -63,7 +66,8 @@ function useFitWindow() {
       resizeQueue = resizeQueue
         .then(async () => {
           if (!alive) return;
-          await w.setMinSize(new LogicalSize(320, 200));
+          // the window can't be dragged smaller than the card (a tall card may still scroll)
+          await w.setMinSize(new LogicalSize(W, Math.min(H, MIN_H)));
           await w.setSize(new LogicalSize(W, H));
           await w.center();
         })

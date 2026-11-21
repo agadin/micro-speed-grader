@@ -100,3 +100,7 @@ ASSETS+=("$OUT/latest.json")
 cd "$ROOT"
 gh release create "v$VER" "${ASSETS[@]}" --target "$SHA" --title "Micro Speed Grader $VER" --notes "${NOTES:-Release $VER}"
 echo "released v$VER (files in $OUT)"
+
+# check the update as installed apps will see it (download, signature, signed version)
+sleep 5
+node "$ROOT/tools/check-update.mjs" "$VER" ${SKIP_WINDOWS:+--mac-only} || { echo "the release is up, but installed copies can't update to it: fix and re-sign its assets" >&2; exit 1; }

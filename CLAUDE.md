@@ -17,7 +17,7 @@ The GitHub releases page is the record of versions. It must go up one step at a 
 2. Bump all five files to the new version, run `cd app/src-tauri && cargo check`, and commit as `v<version>` (e.g. `v0.3.4`). Push to `main`.
 3. `tools/release.sh <version> "<notes for users>"`. It refuses to run unless HEAD is `origin/main` and the version files say `<version>`. It starts the Windows build on GitHub Actions (Build workflow), builds, signs and notarizes the universal macOS app and DMG, waits for the Windows installer and signs it for the updater locally (the updater key never goes to GitHub), writes `latest.json` (Apple silicon, Intel, Windows) and creates the GitHub release on that commit. It takes 10–15 minutes; run it in the background. If only the Windows build fails, fix it and rerun; `SKIP_WINDOWS=1` releases macOS only (say so in the notes).
 4. Nothing to revert: the script no longer rewrites version files. `git status` should be clean.
-5. Check: `gh release view v<version>` lists `Micro-Speed-Grader_<version>_macOS.dmg`, `Micro-Speed-Grader.app.tar.gz` and its `.sig`, `Micro-Speed-Grader_<version>_Windows-x64-setup.exe` and its `.sig`, and `latest.json`, and the release is marked Latest.
+5. Check: the script ends by running `node tools/check-update.mjs <version>`, which downloads the published update and verifies it exactly as installed apps do; it must print "Installed copies will accept this update." Also `gh release view v<version>` lists `Micro-Speed-Grader_<version>_macOS.dmg`, `Micro-Speed-Grader.app.tar.gz` and its `.sig`, `Micro-Speed-Grader_<version>_Windows-x64-setup.exe` and its `.sig`, and `latest.json`, and the release is marked Latest.
 
 Notes:
 

@@ -1014,4 +1014,15 @@ ok(!!dbl && studentResults(session, dbl, defaultSettings)[0].text === defaultSet
   ok(depth === 0 && !bad, `App.css braces balance${bad ? ` (unclosed rule before line ${bad})` : ""}`);
 }
 
+// ---- updates: what installed apps require, the release must provide ----
+// (0.3.2–0.3.8 shipped with requireSignedVersion on but releases signed without a version, so no copy could update)
+{
+  const conf = JSON.parse(fs.readFileSync(path.resolve("src-tauri/tauri.conf.json"), "utf8"));
+  const rel = fs.readFileSync(path.resolve("../tools/release.sh"), "utf8");
+  const signs = rel.split("\n").filter((l) => /tauri signer sign\b/.test(l) && !l.trim().startsWith("#"));
+  ok(signs.length > 0 && (!conf.plugins.updater.requireSignedVersion || signs.every((l) => /--app-version "\$VER"/.test(l))), `release.sh signs updates with the version (${signs.length} signer call${signs.length === 1 ? "" : "s"})`);
+  ok(/tools\/check-update\.mjs" "\$VER"/.test(rel), "release.sh checks the published update as installed apps see it (tools/check-update.mjs)");
+  ok(conf.plugins.updater.endpoints?.[0]?.endsWith("/releases/latest/download/latest.json"), "updater reads latest.json from the latest release");
+}
+
 process.exit(fails ? 1 : 0);
