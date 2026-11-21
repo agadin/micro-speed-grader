@@ -554,7 +554,7 @@ function MarkerPreview({ settings: s }: { settings: Settings }) {
   );
 }
 
-type MethodId = "lasso" | "brush" | "polygon" | "hidden-paint" | "pin-by-pin" | "spotlight" | "shrink" | "click-toggle";
+type MethodId = "lasso" | "brush" | "polygon" | "hidden-paint" | "pin-by-pin" | "spotlight" | "shrink" | "click-toggle" | "not-sure";
 interface MethodDef {
   id: MethodId;
   group: string;
@@ -724,6 +724,39 @@ function SelectionPane({ s, set }: { s: Settings; set: (patch: Partial<Settings>
           A plain click on a pin adds it to the selection or removes it, which is handy for fixing a few stragglers after
           a lasso. {kbd("⌘")}-click then opens the grade menu instead.
         </>
+      ),
+    },
+    {
+      id: "not-sure",
+      group: "Unsure pins",
+      title: "Not sure button",
+      sub: "skip pins, come back later",
+      key: "L",
+      on: s.notSure,
+      toggle: (v) => set({ notSure: v }),
+      desc: (
+        <>
+          Adds a <b>Not sure</b> button between Correct and Wrong. It sets the selected pins aside, marked with an amber
+          ?, and they come back to grade at the end. {kbd("L")} does the same. Other graders grading a hand-off pack
+          always have it: for them it leaves the pins for you.
+        </>
+      ),
+      extra: (
+        <div className="mextra">
+          <span className="ml">Come back</span>
+          <div className="seg">
+            {(
+              [
+                ["image", "End of the image"],
+                ["exam", "End of the exam"],
+              ] as const
+            ).map(([v, l]) => (
+              <button key={v} className={s.notSureBack === v ? "on" : ""} onClick={() => set({ notSureBack: v })}>
+                {l}
+              </button>
+            ))}
+          </div>
+        </div>
       ),
     },
   ];

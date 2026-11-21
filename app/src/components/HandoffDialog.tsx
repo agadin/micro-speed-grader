@@ -224,6 +224,9 @@ export function HandoffDialog({ session, tasks, onClose }: { session: Session; t
         m.updated ? `${m.updated} of their earlier grades were updated.` : "",
         m.skipped ? `${m.skipped} pin${m.skipped === 1 ? "" : "s"} you had graded yourself kept your grade.` : "",
         m.waiting ? `${m.waiting} pin${m.waiting === 1 ? " is" : "s are"} graded twice and waiting for the other grader.` : "",
+        m.left
+          ? `${r.guest} wasn't sure about ${m.left} pin${m.left === 1 ? "" : "s"} and left ${m.left === 1 ? "it" : "them"} for you: ${m.left === 1 ? "it's" : "they're"} ungraded and marked with an amber ? on the slide.`
+          : "",
         m.conflicts ? `${m.conflicts} disagreement${m.conflicts === 1 ? "" : "s"} to resolve: see Disagreements in the top bar.` : "",
         m.changed
           ? `${m.changed} of their grade${m.changed === 1 ? " was for a pin" : "s were for pins"} the student changed or removed since the pack was sent. ${m.changed === 1 ? "It doesn't" : "They don't"} count, and ${m.changed === 1 ? "is" : "are"} kept with the old pin${m.changed === 1 ? "" : "s"} in Changed submissions.`
@@ -461,6 +464,12 @@ export function HandoffDialog({ session, tasks, onClose }: { session: Session; t
                 <span className="muted small">
                   {h.pinIds.length} pins{h.checkPins?.length ? ` (${h.checkPins.length} twice)` : ""} · {h.taskIds.length} images ·{" "}
                   {new Date(h.createdAt).toLocaleDateString()}
+                  {h.status === "returned" && h.leftForHost?.length ? (
+                    <span className="warn-text" title="Pins the grader wasn't sure about. They're ungraded here, marked with an amber ? on the slide.">
+                      {" "}
+                      · {h.leftForHost.length} left for you
+                    </span>
+                  ) : null}
                   {changedOut.get(h.id) ? (
                     <span className="warn-text" title="A rescan found students changed or removed these pins after the pack was sent. The guest's grades for them won't count; they'll be listed in Changed submissions.">
                       {" "}

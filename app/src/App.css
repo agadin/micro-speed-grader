@@ -1712,6 +1712,13 @@ button.big {
   }
 }
 
+/* a third grade button (Not sure): drop the grade keys sooner to make room */
+@container (max-width: 1250px) {
+  .vtool.three .vgrade .kbd {
+    display: none;
+  }
+}
+
 /* cluster nav | selection + Correct / Wrong (centred) | view + shortcuts */
 .vtool {
   display: grid;

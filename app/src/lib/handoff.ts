@@ -34,6 +34,8 @@ export interface Handoff {
   returnedAt?: number;
   /** pins graded by the guest that were merged in */
   mergedCount?: number;
+  /** pins the guest wasn't sure about and left for the host (from their latest results) */
+  leftForHost?: string[];
 }
 
 /** Present in a guest's session: what they were given. */
@@ -44,6 +46,8 @@ export interface GuestPack {
   taskIds: string[];
   pinIds: string[];
   createdAt: number;
+  /** pins the guest isn't sure about: left ungraded for the host to grade */
+  left?: string[];
 }
 
 /** one grader's grade for a pin that is graded twice */
@@ -91,6 +95,8 @@ export interface ResultFile {
   assign: Record<string, number>;
   /** the guest's grading time on the pack's pins (shown on the host's export) */
   timeLog?: TimeEvent[];
+  /** pins the guest wasn't sure about: the host grades them */
+  leftForHost?: string[];
 }
 
 /** Pins the host can't grade right now because they are out with a guest (and the host isn't one of their graders). */
@@ -309,7 +315,34 @@ export function makeResult(s: Session): ResultFile {
     .map((e) => ({ ...e, pinIds: e.pinIds.filter((id) => mine.has(id)) }))
     .filter((e) => e.pinIds.length)
     .map(({ at, taskId, pinIds, secs }) => ({ at, taskId, pinIds, secs }));
-  return { kind: "msg-handoff-result", version: 1, packId: gp.id, guest: gp.guest, sentAt: Date.now(), groups, assign, ...(timeLog.length ? { timeLog } : {}) };
+  const left = (gp.left ?? []).filter((id) => mine.has(id) && !s.grades.pinGroup[id]);
+  return {
+    kind: "msg-handoff-result",
+    version: 1,
+    packId: gp.id,
+    guest: gp.guest,
+    sentAt: Date.now(),
+    groups,
+    assign,
+    ...(timeLog.length ? { timeLog } : {}),
+    ...(left.length ? { leftForHost: left } : {}),
+  };
+}
+
+/** Guest: pins they left for the host (not graded, so they don't count as theirs). */
+export const guestLeft = (s: Session): Set<string> => new Set(s.guestPack?.left ?? []);
+
+/**
+ * Host: pins a guest left for the host that are still ungraded, pin id → the guest's name.
+ * Only from packs that have come back (an out pack's pins are still the guest's).
+ */
+export function leftForHost(s: Session): Map<string, string> {
+  const m = new Map<string, string>();
+  const g = s.grades;
+  for (const h of s.handoffs ?? [])
+    if (h.status === "returned")
+      for (const id of h.leftForHost ?? []) if (!g.pinGroup[id] && g.checks?.[id]?.state !== "conflict") m.set(id, h.guest);
+  return m;
 }
 
 export function parseResult(raw: string): ResultFile {
@@ -320,11 +353,13 @@ export function parseResult(raw: string): ResultFile {
   return r;
 }
 
-/** How many of the pack's pins the guest has graded (for the guest's "send back" button). */
-export function guestProgress(s: Session): { done: number; total: number } {
+/** How many of the pack's pins the guest has dealt with: graded, or left for the host (for the "send back" button). */
+export function guestProgress(s: Session): { done: number; total: number; left: number } {
   const gp = s.guestPack;
-  if (!gp) return { done: 0, total: 0 };
-  return { done: gp.pinIds.filter((id) => s.grades.pinGroup[id]).length, total: gp.pinIds.length };
+  if (!gp) return { done: 0, total: 0, left: 0 };
+  const left = guestLeft(s);
+  const n = gp.pinIds.filter((id) => !s.grades.pinGroup[id] && left.has(id)).length;
+  return { done: gp.pinIds.filter((id) => s.grades.pinGroup[id]).length + n, total: gp.pinIds.length, left: n };
 }
 
 // ---------------------------------------------------------------- comparing two graders
@@ -507,6 +542,8 @@ export function mergeResult(
   changed: number;
   /** set when `changed`: the session's retired pins with those grades kept aside */
   retired?: RetiredPin[];
+  /** pins the guest left for the host */
+  left: number;
 } {
   const hs = s.handoffs ?? [];
   const h = hs.find((x) => x.id === r.packId);
@@ -520,11 +557,27 @@ export function mergeResult(
   const now = Date.now();
   const retiredAt = new Map((s.retired ?? []).map((x, i) => [x.pin.id, i]));
   let retired: RetiredPin[] | undefined;
+  // pins the guest wasn't sure about: they come back to the host ungraded
+  const left = new Set((Array.isArray(r.leftForHost) ? r.leftForHost : []).map(String).filter((id) => allowed.has(id) && pinById.has(id)));
+  for (const id of left) {
+    const c = g.checks![id];
+    if (c && c.graders.includes(r.guest) && c.state !== "resolved") {
+      // graded twice: the other grader's verdict stands alone (as after a recall)
+      const graders = c.graders.filter((x) => x !== r.guest);
+      if (!graders.length) delete g.checks![id];
+      else {
+        g.checks![id] = { ...c, graders, verdicts: c.verdicts.filter((v) => v.by !== r.guest) };
+        touched.add(id);
+      }
+    }
+    // an earlier results file graded it: the guest has taken that grade back
+    if (g.groups[g.pinGroup[id]]?.by === r.guest) detach(g, [id]);
+  }
   for (const grp of r.groups) {
     if (grp.status !== "correct" && grp.status !== "wrong") continue;
     const v: Verdict = { by: r.guest, status: grp.status, text: String(grp.text ?? "").slice(0, 2000), at: Number(grp.createdAt) || now };
     for (const id of grp.pinIds) {
-      if (!allowed.has(id)) continue;
+      if (!allowed.has(id) || left.has(id)) continue;
       if (!pinById.has(id)) {
         // the student changed or removed this pin after the pack went out
         const i = retiredAt.get(id);
@@ -569,9 +622,12 @@ export function mergeResult(
   applyVerdicts(g, fresh);
   const conflicts = reconcile(g, touched, pinById);
   const waiting = [...touched].filter((id) => g.checks![id]?.state === "waiting").length;
-  const handoffs = hs.map((x) =>
-    x.id === h.id ? { ...x, status: "returned" as const, returnedAt: now, mergedCount: (x.mergedCount ?? 0) + merged } : x,
-  );
+  const handoffs = hs.map((x) => {
+    if (x.id !== h.id) return x;
+    // the latest file says which pins are left for the host
+    const { leftForHost: _was, ...rest } = x;
+    return { ...rest, status: "returned" as const, returnedAt: now, mergedCount: (x.mergedCount ?? 0) + merged, ...(left.size ? { leftForHost: [...left] } : {}) };
+  });
   // the guest's grading time: a re-sent results file replaces what this pack sent before
   const theirs: TimeEvent[] = (Array.isArray(r.timeLog) ? r.timeLog : [])
     .slice(0, MAX_EVENTS)
@@ -585,7 +641,7 @@ export function mergeResult(
     }))
     .filter((e) => e.pinIds.length);
   const timeLog = [...(s.timeLog ?? []).filter((e) => e.pack !== h.id), ...theirs];
-  return { grades: g, handoffs, merged, updated, skipped, conflicts, waiting, timeLog, changed, ...(retired ? { retired } : {}) };
+  return { grades: g, handoffs, merged, updated, skipped, conflicts, waiting, timeLog, changed, left: left.size, ...(retired ? { retired } : {}) };
 }
 
 // ---------------------------------------------------------------- how well graders agree

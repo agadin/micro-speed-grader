@@ -18,6 +18,7 @@ Press **?** while grading to show the shortcuts sheet over the slide. On Windows
 | ⇧C | Correct with a note |
 | W | Wrong, with a reason |
 | ↵ | Open the grade menu |
+| L | Not sure: skip the selection for now ([when turned on](grading.md#not-sure)), or leave it for the host when grading a [hand-off pack](handoff.md#not-sure-leave-it-for-the-host) |
 | X | Invert the selection |
 | ⌘Z | Undo |
 | ⇧⌘Z or ⌘Y | Redo |
@@ -75,6 +76,7 @@ Press **?** while grading to show the shortcuts sheet over the slide. On Windows
 | W | Mark wrong |
 | O | Only these correct (painted pins) |
 | X / I / U | Invert / isolate / remove grade |
+| L | Not sure (come back later, or leave for the host) |
 | 1–9 | Pick a suggested reason (⌘1–9 while typing) |
 | ↑ ↓ then ⇥ | Choose and complete a suggestion |
 | Esc | Back / close |

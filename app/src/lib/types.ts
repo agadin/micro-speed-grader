@@ -75,6 +75,8 @@ export interface GradeState {
   assign: Record<string, number>;
   /** pins graded twice (hand-off overlap): each grader's verdict and whether they agree */
   checks?: Record<string, Check>;
+  /** pins the host wasn't sure about (Not sure): left out of the clusters until the end of the image or exam */
+  later?: string[];
 }
 
 export interface SlideRef {

@@ -54,6 +54,10 @@ export interface Settings {
   hiddenPaint: boolean;
   /** offer the pin-by-pin mode (O): step through a cluster showing one pin at a time */
   pinByPin: boolean;
+  /** the host's Not sure button (L): skip pins and come back to them later (guests always have it) */
+  notSure: boolean;
+  /** when the host's skipped pins come back: once the rest of that image is graded, or the rest of the exam */
+  notSureBack: "image" | "exam";
   /** hovering a pin hides every other pin */
   spotlight: boolean;
   /** draw pins as small dots once zoomed in past shrinkUmPerPx */
@@ -150,6 +154,8 @@ export const defaultSettings: Settings = {
   clickToggle: false,
   hiddenPaint: true,
   pinByPin: true,
+  notSure: false,
+  notSureBack: "image",
   spotlight: false,
   shrinkPins: false,
   shrinkUmPerPx: 0.5,

@@ -18,7 +18,7 @@ import { activeSecs, fmtDuration, IDLE_CAP, timeCsv, timeReport } from "../src/l
 import { checkQuestions, examJson, nextNum, normSlide, planQuestionEdit, questionChanges, renumbered } from "../src/lib/examEdit";
 import { area, dist, fmtArea, fmtLength, measureLabel, perimeter } from "../src/lib/measure";
 import { canCarry, carryOver, dismissRows, mergeRescan, rescanMessage, restorePins, reviewPinIds, reviewRows } from "../src/lib/rescan";
-import { KEY, HOST, agreement, changedSinceSent, conflictPins, hostGraded, planOverlap, recallChecks, resolveWith, sameReason, seeded, awayPins, splitWeighted, guestSession, makePack, makeResult, mergeResult, parsePack, parseResult, remainingByTask } from "../src/lib/handoff";
+import { KEY, HOST, agreement, changedSinceSent, conflictPins, hostGraded, planOverlap, recallChecks, resolveWith, sameReason, seeded, awayPins, splitWeighted, guestSession, guestProgress, leftForHost, makePack, makeResult, mergeResult, parsePack, parseResult, remainingByTask } from "../src/lib/handoff";
 import { AUTO, autoRows, filterGroups, findStudents, graderOptions, isFiltered, noFilter, rowPasses, studentLabel, studentSummary, type LedgerFilter } from "../src/lib/review";
 import type { GradeState, Pin, Question, Session } from "../src/lib/types";
 import { DEFAULT_READING_RULES, emptyGrades, sessionRules, type ReadingRules } from "../src/lib/types";
@@ -410,6 +410,42 @@ ok(!!dbl && studentResults(session, dbl, defaultSettings)[0].text === defaultSet
     ok(c.grades.groups[c.grades.pinGroup[np]]?.by === "Ana" && c.grades.groups[c.grades.pinGroup[np]].text === "Mast cell", "carry over gives the new pin the guest's grade");
     ok(changedSinceSent(s2).size === 0, "a returned pack no longer shows changes");
     ok(mergeResult(s, result("pk", "Ana", [{ ids: ["p0"], status: "correct", text: "" }])).retired === undefined, "nothing changed: retired pins untouched");
+  }
+
+  // a guest isn't sure about some pins and leaves them for the host
+  {
+    const s = base();
+    s.grades.checks = { p2: { taskId: T, graders: ["Ana", "Ben"], verdicts: [], state: "waiting" } };
+    s.handoffs = [{ id: "pk", guest: "Ana", createdAt: 0, taskIds: [T], pinIds: ["p0", "p1", "p2", "p3"], checkPins: ["p2"], status: "out" }];
+    // guest side: leave p1 and p2, grade p0; p1 is in the file as left, not graded
+    const pack = makePack(s, "Ana", [T], ["p0", "p1", "p2", "p3"]);
+    s.handoffs[0].id = pack.id;
+    const gs = guestSession(pack, [{ id: "A", path: "/g/A.ndpi" }], "/g/a.msgrade", "/g");
+    gs.guestPack = { ...gs.guestPack!, left: ["p1", "p2"] };
+    gs.grades.groups.z = { id: "z", taskId: T, status: "correct", text: "", pinIds: ["p0"], createdAt: 1 };
+    gs.grades.pinGroup.p0 = "z";
+    const prog = guestProgress(gs);
+    ok(prog.done === 3 && prog.left === 2 && prog.total === 4, `guest progress counts left pins as dealt with (${prog.done}/${prog.total}, ${prog.left} left)`);
+    const res = parseResult(JSON.stringify(makeResult(gs)));
+    ok(res.leftForHost?.sort().join() === "p1,p2" && res.groups.every((x) => !x.pinIds.includes("p1")), "results file lists the left pins");
+    const m = mergeResult(s, res);
+    ok(m.left === 2 && !m.grades.pinGroup.p1 && m.merged === 1, `host: ${m.left} left, ungraded; ${m.merged} merged`);
+    ok(m.grades.checks!.p2.graders.join() === "Ben", "a left pin graded twice: the other grader's verdict will stand alone");
+    const s1: Session = { ...s, grades: m.grades, handoffs: m.handoffs };
+    ok([...leftForHost(s1).keys()].sort().join() === "p1,p2" && leftForHost(s1).get("p1") === "Ana", "host sees the left pins and who left them");
+    ok(!awayPins(s1).has("p1"), "left pins are unlocked for the host");
+    // the host grades p1: no longer flagged
+    hostGrade(s1.grades, ["p1"], "correct", "");
+    ok(!leftForHost(s1).has("p1"), "graded by the host: no longer flagged");
+    // a re-sent file: Ana took p2 back and graded it, then left p0 (which she'd graded before)
+    gs.guestPack = { ...gs.guestPack!, left: ["p1", "p0"] };
+    delete gs.grades.pinGroup.p0;
+    delete gs.grades.groups.z;
+    gs.grades.groups.y = { id: "y", taskId: T, status: "wrong", text: "Mast cell", pinIds: ["p2"], createdAt: 2 };
+    gs.grades.pinGroup.p2 = "y";
+    const m2 = mergeResult(s1, parseResult(JSON.stringify(makeResult(gs))));
+    const s2: Session = { ...s1, grades: m2.grades, handoffs: m2.handoffs };
+    ok(!m2.grades.pinGroup.p0 && leftForHost(s2).has("p0") && !!m2.grades.pinGroup.p1 && !leftForHost(s2).has("p2"), "re-sent: the earlier grade on a now-left pin is withdrawn; the host's grade stays");
   }
 
   // a file from a newer version says so

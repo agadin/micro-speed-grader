@@ -13,7 +13,7 @@ import {
 } from "../lib/grading";
 import { computeClusters, type Cluster } from "../lib/cluster";
 import { openSlide, dirname, hasTauri, isMac, joinPath, showHelp, withExt, writeText } from "../lib/backend";
-import { awayPins, awayTasks, changedSinceSent, conflictPins, guestProgress, makeResult } from "../lib/handoff";
+import { awayPins, awayTasks, changedSinceSent, conflictPins, graderLabel, guestLeft, guestProgress, leftForHost, makeResult, remainingByTask } from "../lib/handoff";
 import { safeFileName } from "../lib/exportCsv";
 import { save } from "@tauri-apps/plugin-dialog";
 import { HandoffDialog } from "./HandoffDialog";
@@ -61,7 +61,7 @@ const GAP = 10;
 const TOOL_H = 40;
 
 type KeyRow = [string[], string];
-function KeySheet({ tool, swap, pinByPin, onClose }: { tool: SelectTool; swap: boolean; pinByPin: boolean; onClose: () => void }) {
+function KeySheet({ tool, swap, pinByPin, guest, notSure, onClose }: { tool: SelectTool; swap: boolean; pinByPin: boolean; guest: boolean; notSure: boolean; onClose: () => void }) {
   const drag = swap ? "L-drag" : "R-drag";
   const click = swap ? "L-click" : "R-click";
   const cols: [string, KeyRow[]][] = [
@@ -118,6 +118,7 @@ function KeySheet({ tool, swap, pinByPin, onClose }: { tool: SelectTool; swap: b
         [["⇧", "C"], "correct + note"],
         [["W"], "wrong + reason"],
         [["↵"], "grade menu"],
+        ...(notSure ? ([[["L"], guest ? "not sure: leave for the host" : "not sure: come back later"]] as KeyRow[]) : []),
         [["⌘", "Z"], "undo"],
       ],
     ],
@@ -189,9 +190,13 @@ export function Grader({ session }: { session: Session }) {
   // pins this grader can't touch: (host) out with someone else; (guest) not in their pack
   const locked = useMemo(() => {
     if (!guestPack) return awayPins(session);
-    const mine = new Set(guestPack.pinIds);
+    // a guest's pins left for the host are out of their hands too (until taken back)
+    const left = guestLeft(session);
+    const mine = new Set(guestPack.pinIds.filter((id) => !left.has(id)));
     return new Set(session.pins.filter((p) => !mine.has(p.id)).map((p) => p.id));
   }, [session, guestPack]);
+  /** host: pins a guest left for you (still ungraded), pin → guest */
+  const leftToMe = useMemo(() => (guestPack ? new Map<string, string>() : leftForHost(session)), [session, guestPack]);
   const away = useMemo(() => awayTasks(session), [session]);
   const taskIndex = Math.min(session.taskIndex, Math.max(0, tasks.length - 1));
   const task = tasks[taskIndex];
@@ -332,6 +337,25 @@ export function Grader({ session }: { session: Session }) {
     const t = setTimeout(() => useStore.getState().set({ notice: null }), 9000);
     return () => clearTimeout(t);
   }, [st.notice]);
+  /** pins on this image left for the host: (guest) the ones you left; (host) the ones left for you */
+  const leftHere = useMemo(() => {
+    if (!task) return [];
+    const ids = guestPack ? guestLeft(session) : leftToMe;
+    return pinsForTask(session.pins, task, g)
+      .filter((p) => ids.has(p.id) && !g.pinGroup[p.id])
+      .map((p) => p.id);
+  }, [session, task, g, guestPack, leftToMe]);
+  // ---- Not sure (host): pins set aside come back at the end of the image, or of the exam ----
+  const later = useMemo(() => new Set(guestPack ? [] : (g.later ?? []).filter((id) => !g.pinGroup[id])), [g.later, g.pinGroup, guestPack]);
+  /** exam mode: everything else in the exam is graded, so the set-aside pins are back everywhere */
+  const examBack = useMemo(() => {
+    if (!later.size || settings.notSureBack !== "exam") return false;
+    return remainingByTask(session, tasks).every((r) => r.pinIds.every((id) => later.has(id)));
+  }, [later, settings.notSureBack, session, tasks]);
+  const unsure = useMemo(
+    () => (guestPack ? undefined : new Set([...leftToMe.keys(), ...later])),
+    [guestPack, leftToMe, later],
+  );
   const lockedHere = useMemo(
     () => (task && !guestPack ? pinsForTask(session.pins, task, g).filter((p) => locked.has(p.id)).length : 0),
     [session.pins, task, g, locked, guestPack],
@@ -357,9 +381,16 @@ export function Grader({ session }: { session: Session }) {
     for (const p of taskPins) m.set(p.id, pinState(p, g, auto));
     return m;
   }, [taskPins, g, doubles, autoDoubles]);
+  /** this image's pins set aside with Not sure, and whether they're back (the rest of the image / exam is graded) */
+  const laterHere = useMemo(() => taskPins.filter((p) => later.has(p.id) && states.get(p.id) === "ungraded").map((p) => p.id), [taskPins, later, states]);
+  const laterBack =
+    !laterHere.length ||
+    (settings.notSureBack === "exam"
+      ? examBack
+      : taskPins.every((p) => states.get(p.id) !== "ungraded" || later.has(p.id)));
   const ungraded = useMemo(
-    () => taskPins.filter((p) => states.get(p.id) === "ungraded"),
-    [taskPins, states],
+    () => taskPins.filter((p) => states.get(p.id) === "ungraded" && (laterBack || !later.has(p.id))),
+    [taskPins, states, laterBack, later],
   );
   const clusters = useMemo(
     () =>
@@ -446,7 +477,8 @@ export function Grader({ session }: { session: Session }) {
         doublePinIds(session.pins, q.num, g).forEach((id) =>
           allDoubles.add(id),
         );
-    const done = (id: string) => !!g.pinGroup[id] || allDoubles.has(id);
+    const left = guestLeft(session);
+    const done = (id: string) => !!g.pinGroup[id] || allDoubles.has(id) || left.has(id);
     const pinsTotal = session.pins.length;
     const pinsDone = session.pins.filter((p) => done(p.id)).length;
     let tasksDone = 0;
@@ -463,7 +495,7 @@ export function Grader({ session }: { session: Session }) {
       pinsDone,
       pinsTotal,
     };
-  }, [session.pins, session.questions, g, tasks, taskPins, states]);
+  }, [session, g, tasks, taskPins, states]);
 
   // ---------- slide loading ----------
   const [info, setInfo] = useState<SlideInfo | null>(null);
@@ -671,6 +703,32 @@ export function Grader({ session }: { session: Session }) {
     st.grade(st.menu.pinIds, status, text, task.id, task.q);
   };
 
+  /** Not sure: a guest leaves the pins for the host; the host sets them aside to come back to */
+  const notSure = (ids: string[]) => {
+    if (guestPack) return leaveSelection(ids);
+    const n = ids.filter((id) => !g.pinGroup[id]).length;
+    if (!n) return;
+    st.setAside(ids, true);
+    st.set({
+      notice: {
+        kind: "info",
+        undo: true,
+        text: `${n} pin${n === 1 ? "" : "s"} set aside. ${n === 1 ? "It comes" : "They come"} back once the rest of ${settings.notSureBack === "exam" ? "the exam" : "this image"} is graded.`,
+      },
+    });
+  };
+  /** guest: not sure about these pins, so the host grades them */
+  const leaveSelection = (ids: string[]) => {
+    st.leaveForHost(ids, true);
+    st.set({
+      notice: {
+        kind: "info",
+        undo: true,
+        text: `${ids.length} pin${ids.length === 1 ? "" : "s"} left for the host. They go back ungraded with your results.`,
+      },
+    });
+  };
+
   // clusters are sorted largest-first, single pins come after the real clusters
   const onSingles = !!cluster?.single;
   /** Correct grades straight away (⇧ = add a note); Wrong asks for a reason */
@@ -804,6 +862,7 @@ export function Grader({ session }: { session: Session }) {
     if (k === "k" && keyHint) return acceptKey();
     const c = menuAnchor(st.selection);
     if (k === "Enter") return openMenu(st.selection, c.x, c.y);
+    if (k === "l" && st.selection.length && (guestPack || settings.notSure)) return notSure(st.selection);
     if (k === "c" && paintSplit && (paintSplit.ok.length || paintSplit.rest.length) && task) {
       e.preventDefault(); // the reason box takes focus: keep the "c" out of it
       flashBtn("correct");
@@ -852,7 +911,10 @@ export function Grader({ session }: { session: Session }) {
     if (!path) return;
     try {
       await writeText(withExt(path, "msgresult"), JSON.stringify(makeResult(session)));
-      alert(`Results saved (${gp.done} of ${gp.total} pins graded). Send the file to ${guestPack!.host}'s grader.`);
+      const graded = gp.done - gp.left;
+      alert(
+        `Results saved (${graded} of ${gp.total} pins graded${gp.left ? `, ${gp.left} left for the host` : ""}). Send the file to ${guestPack!.host}'s grader.`,
+      );
     } catch (e) {
       alert(`Could not save results: ${e}`);
     }
@@ -1017,6 +1079,7 @@ export function Grader({ session }: { session: Session }) {
               flagged={flagged}
               multi={doubles}
               changed={changedPins}
+              unsure={unsure}
               selection={selection}
               cluster={cluster}
               isolate={st.isolate}
@@ -1084,6 +1147,8 @@ export function Grader({ session }: { session: Session }) {
               <KeySheet
                 tool={activeTool(settings)}
                 pinByPin={settings.pinByPin}
+                guest={!!guestPack}
+                notSure={!!guestPack || settings.notSure}
                 swap={settings.swapMouse}
                 onClose={() => setSettings({ showKeyHints: false })}
               />
@@ -1137,6 +1202,16 @@ export function Grader({ session }: { session: Session }) {
                       Don't warn again
                     </button>
                   </>
+                ) : st.notice.undo ? (
+                  <button
+                    className="btn ghost small"
+                    onClick={() => {
+                      st.undo();
+                      st.set({ notice: null });
+                    }}
+                  >
+                    Undo
+                  </button>
                 ) : null}
                 <button className="notice-x" onClick={() => st.set({ notice: null })} aria-label="Dismiss" title="Dismiss">
                   ×
@@ -1163,7 +1238,7 @@ export function Grader({ session }: { session: Session }) {
                 Editing the answer key: paint where an answer is, then save it in the panel on the right.
               </div>
             )}
-            {lockedHere > 0 && (
+            {lockedHere > 0 ? (
               <div className="handoff-banner">
                 {lockedHere} pin{lockedHere > 1 ? "s" : ""} on this image {lockedHere > 1 ? "are" : "is"} with{" "}
                 <b>{away.get(task.id) ?? "another grader"}</b>
@@ -1171,10 +1246,53 @@ export function Grader({ session }: { session: Session }) {
                   Manage
                 </button>
               </div>
-            )}
+            ) : leftHere.length > 0 && guestPack ? (
+              <div className="handoff-banner" data-help="handoff/not-sure-leave-it-for-the-host">
+                {leftHere.length} pin{leftHere.length > 1 ? "s" : ""} on this image left for the host
+                <button className="btn ghost small" onClick={() => st.leaveForHost(leftHere, false)} title="Grade them yourself after all">
+                  Take back
+                </button>
+              </div>
+            ) : laterHere.length > 0 && !laterBack ? (
+              <div className="handoff-banner" data-help="grading/not-sure">
+                {laterHere.length} pin{laterHere.length > 1 ? "s" : ""} set aside: back once the rest of{" "}
+                {settings.notSureBack === "exam" ? "the exam" : "this image"} is graded
+                <button className="btn ghost small" onClick={() => st.setAside(laterHere, false)} title="Put them back in the clusters now">
+                  Bring back now
+                </button>
+              </div>
+            ) : laterHere.length > 0 && !leftHere.length ? (
+              <div className="handoff-banner" data-help="grading/not-sure">
+                {laterHere.length} pin{laterHere.length > 1 ? "s" : ""} you weren't sure about {laterHere.length > 1 ? "are" : "is"} back
+                <button className="btn ghost small" onClick={() => st.showPins(taskIndex, laterHere)}>
+                  Select
+                </button>
+              </div>
+            ) : examBack && !leftHere.length ? (
+              <div className="handoff-banner" data-help="grading/not-sure">
+                The rest of the exam is graded: {later.size} pin{later.size > 1 ? "s" : ""} you set aside {later.size > 1 ? "are" : "is"} back
+                <button
+                  className="btn ghost small"
+                  onClick={() => {
+                    const i = tasks.findIndex((t) => pinsForTask(session.pins, t, g).some((p) => later.has(p.id)));
+                    if (i >= 0) st.showPins(i, pinsForTask(session.pins, tasks[i], g).filter((p) => later.has(p.id)).map((p) => p.id));
+                  }}
+                >
+                  Go to them
+                </button>
+              </div>
+            ) : leftHere.length > 0 ? (
+              <div className="handoff-banner" data-help="handoff/pins-left-for-you">
+                {leftHere.length} pin{leftHere.length > 1 ? "s" : ""} on this image left for you by{" "}
+                <b>{[...new Set(leftHere.map((id) => graderLabel(leftToMe.get(id))))].join(", ")}</b>
+                <button className="btn ghost small" onClick={() => st.showPins(taskIndex, leftHere)}>
+                  Select
+                </button>
+              </div>
+            ) : null}
             {allDone && (
               <div className="done-banner">
-                {guestPack ? "All your pins are graded." : "All pins graded."}
+                {guestPack ? (gp.left ? `All your pins are done (${gp.left} left for the host).` : "All your pins are graded.") : "All pins graded."}
                 <button
                   className="btn light"
                   onClick={() => (guestPack ? sendResults() : st.set({ exportOpen: true }))}
@@ -1184,7 +1302,7 @@ export function Grader({ session }: { session: Session }) {
               </div>
             )}
           </div>
-          <div className="vtool" data-help="grading/grade-a-cluster">
+          <div className={`vtool ${guestPack || settings.notSure ? "three" : ""}`} data-help="grading/grade-a-cluster">
             <div className="vside">
               <div className="cnav" data-help="clusters/moving-around">
                 <button
@@ -1251,6 +1369,24 @@ export function Grader({ session }: { session: Session }) {
                 </span>
                 <span className="kbd">C</span>
               </button>
+              {(guestPack || settings.notSure) && (
+                <button
+                  className="btn"
+                  disabled={!st.selection.length}
+                  title={
+                    guestPack
+                      ? "Not sure about these pins: leave them ungraded for the host to grade"
+                      : `Not sure: skip these pins for now and come back to them at the end of ${settings.notSureBack === "exam" ? "the exam" : "this image"}`
+                  }
+                  onClick={() => notSure(st.selection)}
+                  data-help="handoff/not-sure-leave-it-for-the-host"
+                >
+                  <span className="l">
+                    <IconHandoff /> Not sure
+                  </span>
+                  <span className="kbd">L</span>
+                </button>
+              )}
               <button
                 key={flash?.kind === "wrong" ? `w${flash.n}` : "w"}
                 className={`btn bad ${flash?.kind === "wrong" ? "flash" : ""}`}
@@ -1259,7 +1395,7 @@ export function Grader({ session }: { session: Session }) {
                 onClick={() => gradeSelectionFromButton("wrong")}
               >
                 <span className="l">
-                  <IconCross /> Wrong…
+                  <IconCross /> Wrong
                 </span>
                 <span className="kbd">W</span>
               </button>
@@ -1375,6 +1511,8 @@ export function Grader({ session }: { session: Session }) {
             st.ungrade(st.menu!.pinIds);
             st.set({ menu: null });
           }}
+          onLeave={(guestPack || settings.notSure) && !st.menu.paintOk ? () => notSure(st.menu!.pinIds) : undefined}
+          leaveLabel={guestPack ? "Not sure: leave for host" : "Not sure: come back later"}
           onMode={(mode) => st.set({ menu: { ...st.menu!, mode } })}
           onClose={() => st.set({ menu: null })}
           paintRest={paintSplit?.rest.length ?? 0}

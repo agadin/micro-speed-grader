@@ -19,7 +19,7 @@ How student pins are drawn.
 
 ## Selection
 
-Which selection tools are on. Each has a short demo. At least one of **Lasso**, **Paint brush** and **Polygon** stays on. Under **Crowded clusters**: **Paint with pins hidden**, **Pin by pin**, **Spotlight on hover**, **Small pins when zoomed** and **Click to add / remove**. See [Selecting pins](selecting.md).
+Which selection tools are on. Each has a short demo. At least one of **Lasso**, **Paint brush** and **Polygon** stays on. Under **Crowded clusters**: **Paint with pins hidden**, **Pin by pin**, **Spotlight on hover**, **Small pins when zoomed** and **Click to add / remove**. See [Selecting pins](selecting.md). Under **Unsure pins**: **Not sure button**, and whether skipped pins come back at the end of the image or the exam. See [Not sure](grading.md#not-sure).
 
 ## Mouse & keys
 

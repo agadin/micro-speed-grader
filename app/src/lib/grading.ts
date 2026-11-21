@@ -24,6 +24,7 @@ export const cloneGrades = (g: GradeState): GradeState => ({
   pinGroup: { ...g.pinGroup },
   assign: { ...g.assign },
   ...(g.checks ? { checks: { ...g.checks } } : {}),
+  ...(g.later ? { later: [...g.later] } : {}),
 });
 
 /** Remove pins from whatever group they're in, deleting groups left empty. Changes `g`. */

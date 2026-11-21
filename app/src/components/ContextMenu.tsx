@@ -1,6 +1,6 @@
 import { isMac } from "../lib/backend";
 import { useLayoutEffect, useMemo, useRef, useState, type ReactNode } from "react";
-import { IconCheck, IconCross, IconEraser, IconHalf, IconTarget } from "./icons";
+import { IconCheck, IconCross, IconEraser, IconHalf, IconHandoff, IconTarget } from "./icons";
 import type { MenuState } from "../lib/store";
 import type { GradeState } from "../lib/types";
 import { reasonSuggestions } from "../lib/grading";
@@ -16,6 +16,9 @@ interface Props {
   onInvert: () => void;
   onIsolate: () => void;
   onUngrade: () => void;
+  /** guest: not sure, leave these pins for the host to grade */
+  onLeave?: () => void;
+  leaveLabel?: string;
   onMode: (mode: MenuState["mode"]) => void;
   onClose: () => void;
   /** painted area active: how many other ungraded pins in the cluster C would mark wrong */
@@ -26,7 +29,7 @@ interface Props {
 
 const mod = isMac ? "⌘" : "Ctrl+";
 
-export function ContextMenu({ menu, grades, q, settings, anyGraded, onGrade, onInvert, onIsolate, onUngrade, onMode, onClose, paintRest = 0, onPaintGrade }: Props) {
+export function ContextMenu({ menu, grades, q, settings, anyGraded, onGrade, onInvert, onIsolate, onUngrade, onLeave, leaveLabel = "Not sure", onMode, onClose, paintRest = 0, onPaintGrade }: Props) {
   const painted = paintRest > 0 && !!onPaintGrade;
   const ref = useRef<HTMLDivElement>(null);
   const inputRef = useRef<HTMLInputElement>(null);
@@ -92,6 +95,7 @@ export function ContextMenu({ menu, grades, q, settings, anyGraded, onGrade, onI
     if (k === "x") return onInvert();
     if (k === "i") return onIsolate();
     if (k === "u" && anyGraded) return onUngrade();
+    if (k === "l" && onLeave) return onLeave();
   };
 
   const onInputKey = (e: React.KeyboardEvent) => {
@@ -158,6 +162,7 @@ export function ContextMenu({ menu, grades, q, settings, anyGraded, onGrade, onI
             )}
             <Item k={["⇧", "C"]} icon={<IconCheck />} label="Correct with note…" cls="ok" onClick={() => onMode("correct")} />
             <Item k={["W"]} icon={<IconCross />} label="Mark wrong…" cls="bad" onClick={() => onMode("wrong")} />
+            {onLeave && <Item k={["L"]} icon={<IconHandoff />} label={leaveLabel} onClick={onLeave} />}
             <div className="ctx-sep" />
             <Item k={["X"]} icon={<IconHalf />} label="Invert selection" onClick={onInvert} />
             <Item k={["I"]} icon={<IconTarget />} label="Isolate" onClick={onIsolate} />

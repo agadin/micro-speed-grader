@@ -1,6 +1,6 @@
 import { create } from "zustand";
 import type { GradeState, GradeStatus, Group, Pin, RetiredPin, Session, Question, ReadingRules } from "./types";
-import { graderLabel, hostGraded, type Handoff } from "./handoff";
+import { graderLabel, hostGraded, type GuestPack, type Handoff } from "./handoff";
 import type { AnswerKey } from "./answerKey";
 import type { RescanResult, ReviewChange } from "./rescan";
 import { activeSecs, MAX_EVENTS, type TimeEvent } from "./timing";
@@ -19,13 +19,14 @@ export interface MenuState {
   paintOk?: string[];
 }
 
-/** what one undo step puts back: the grades, and the pins (Changed submissions can restore pins) */
+/** what one undo step puts back: the grades, the pins (Changed submissions can restore pins), and a guest's pins left for the host */
 interface Snap {
   grades: GradeState;
   pins: Pin[];
   retired?: RetiredPin[];
+  guestPack?: GuestPack;
 }
-const snap = (s: Session): Snap => ({ grades: s.grades, pins: s.pins, retired: s.retired });
+const snap = (s: Session): Snap => ({ grades: s.grades, pins: s.pins, retired: s.retired, guestPack: s.guestPack });
 
 interface Store {
   session: Session | null;
@@ -76,6 +77,10 @@ interface Store {
   /** several grades as one undo step (e.g. painted pins correct + the rest wrong); a batch may name its own image */
   gradeMany: (batches: { pinIds: string[]; status: GradeStatus; text: string; taskId?: string }[], taskId: string, assignQ: number) => void;
   ungrade: (pinIds: string[]) => void;
+  /** host: Not sure — skip pins for now (they come back later), or bring them back (`on` false) */
+  setAside: (pinIds: string[], on: boolean) => void;
+  /** guest: leave pins for the host to grade (any grade on them is removed), or take them back (`on` false) */
+  leaveForHost: (pinIds: string[], on: boolean) => void;
   editGroup: (groupId: string, patch: Partial<Pick<Group, "status" | "text">>) => void;
   undo: () => void;
   redo: () => void;
@@ -126,7 +131,7 @@ let saveTimer: ReturnType<typeof setTimeout> | null = null;
 let lastActivity = Date.now();
 
 export const useStore = create<Store>((set, get) => {
-  const commit = (next: GradeState, more?: Omit<Snap, "grades">) => {
+  const commit = (next: GradeState, more?: Partial<Omit<Snap, "grades">>) => {
     const s = get().session;
     if (!s) return;
     set({
@@ -196,6 +201,12 @@ export const useStore = create<Store>((set, get) => {
       const g = cloneGrades(s.grades);
       const all = batches.flatMap((b) => b.pinIds);
       const others = othersOn(g, all);
+      // graded now: no longer set aside
+      if (g.later) {
+        const done = new Set(batches.flatMap((b) => b.pinIds));
+        g.later = g.later.filter((id) => !done.has(id));
+        if (!g.later.length) delete g.later;
+      }
       for (const { pinIds, status, text, taskId } of batches) {
         detach(g, pinIds);
         const id = uid();
@@ -233,6 +244,36 @@ export const useStore = create<Store>((set, get) => {
       commit(g);
       if (others.size && !get().overrideQuiet)
         set({ notice: { kind: "override", text: overrideText(others).replace("Your grade replaced theirs.", "You removed their grade."), undo: true } });
+    },
+
+    setAside: (pinIds, on) => {
+      const s = get().session;
+      if (!s || !pinIds.length) return;
+      const ids = new Set(pinIds);
+      const g = cloneGrades(s.grades);
+      // only ungraded pins are set aside
+      const later = on
+        ? [...new Set([...(g.later ?? []), ...pinIds.filter((id) => !g.pinGroup[id])])]
+        : (g.later ?? []).filter((id) => !ids.has(id));
+      if (later.length) g.later = later;
+      else delete g.later;
+      commit(g);
+      set({ selection: [], menu: null, isolate: false });
+    },
+
+    leaveForHost: (pinIds, on) => {
+      const s = get().session;
+      const gp = s?.guestPack;
+      if (!s || !gp || !pinIds.length) return;
+      const ids = new Set(pinIds);
+      const left = on ? [...new Set([...(gp.left ?? []), ...pinIds])] : (gp.left ?? []).filter((id) => !ids.has(id));
+      const g = cloneGrades(s.grades);
+      if (on) {
+        detach(g, pinIds);
+        for (const p of pinIds) delete g.assign[p];
+      }
+      commit(g, { guestPack: { ...gp, left } });
+      set({ selection: [], menu: null, isolate: false });
     },
 
     editGroup: (groupId, patch) => {

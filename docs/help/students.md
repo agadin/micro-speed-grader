@@ -40,7 +40,7 @@ At the bottom is the **Feedback** the student will get, worded as in [Preference
 Under each answer:
 
 - **Correct**: mark the student's pin correct.
-- **Wrong…**: type a reason (earlier reasons are suggested) and press **↵**.
+- **Wrong**: type a reason (earlier reasons are suggested) and press **↵**.
 - **Remove**: make the answer ungraded again.
 
 The change applies to this student's pin only: it's taken out of the group it was graded with, and the rest of that group keeps its grade. Each change is one step for **⌘Z**. When you replace another grader's grade, the usual [notice](handoff.md#replacing-another-graders-grade) appears.

@@ -32,6 +32,8 @@ export interface ViewerProps {
   multi?: Set<string>;
   /** new pins from a changed submission, waiting in Changed submissions (drawn with a blue ↻ badge) */
   changed?: Set<string>;
+  /** pins another grader wasn't sure about and left for you (drawn with an amber ? badge) */
+  unsure?: Set<string>;
   selection: Set<string>;
   cluster: Cluster | null;
   isolate: boolean;
@@ -476,6 +478,25 @@ export function SlideViewer(props: ViewerProps) {
         ctx.lineTo(ax, ay);
         ctx.lineTo(ax + 0.4, ay + 2.4);
         ctx.stroke();
+      }
+      if (p.unsure?.has(pin.id) && st === "ungraded") {
+        // a guest left this pin for you: an amber dot with "?" beside its head (below any ! / ↻)
+        const hp = headPos(s.x, s.y);
+        const cx = hp.x - pinSize * 0.55 - 5;
+        const cy = hp.y - pinSize * 0.25 + (p.flagged?.has(pin.id) ? 14 : 0) + (p.changed?.has(pin.id) ? 14 : 0);
+        ctx.beginPath();
+        ctx.arc(cx, cy, 6, 0, Math.PI * 2);
+        ctx.fillStyle = "#f5a524";
+        ctx.fill();
+        ctx.lineWidth = 1.5;
+        ctx.strokeStyle = "rgba(0,0,0,0.75)";
+        ctx.stroke();
+        ctx.fillStyle = "#1a1a1a";
+        ctx.font = `800 9px ${SANS}`;
+        ctx.textAlign = "center";
+        ctx.fillText("?", cx, cy + 3.2);
+        ctx.textAlign = "start";
+        ctx.font = `11px ${MONO}`;
       }
       const several = st === "double" || (st === "ungraded" && !!p.multi?.has(pin.id));
       if (several || pin.q === null) {

@@ -58,6 +58,15 @@ You can keep grading everything else, and you can hand off more later. Each pack
 
 You can send results more than once. Each file holds everything you've graded in the pack so far, and importing a newer file updates your earlier grades.
 
+### Not sure? Leave it for the host
+
+If you aren't sure how to grade some pins, don't guess: leave them for the host.
+
+1. Select the pins.
+2. Click **Not sure** (between **Correct** and **Wrong** in the toolbar under the slide; guests always have it), press **L**, or choose **Not sure: leave for host** in the grade menu (**↵** or right-click).
+
+The pins fade like the host's and count as done in **Send results**. They go back in your results file ungraded, and the host grades them. If you change your mind, click **Take back** in the banner on that image (or **⌘Z** straight away), then grade them yourself.
+
 Some of your pins may also be graded by someone else (see [Grade some pins twice](#grade-some-pins-twice)). You aren't told which, and you never see the other person's grade: grade every pin as you normally would.
 
 ## Host: merge the results
@@ -71,9 +80,19 @@ Merging is a single step you can undo with **⌘Z**.
 
 Only pins that were in that pack are taken from the file. If you already graded one of those pins yourself (for example after a recall), **your grade is kept** and the guest's is skipped. The confirmation message says how many were skipped.
 
+### Pins left for you
+
+When a guest wasn't sure about some pins, the import message says how many they left for you. Those pins are ungraded in your session:
+
+- They have an amber **?** dot on the slide.
+- A banner on the image says how many were left for you and by whom. **Select** selects them, ready to grade.
+- Under **Packs**, the pack shows **N left for you**.
+
+Grade them as usual; the **?** goes once a pin is graded. If a left pin was also to be graded twice, the other grader's grade stands on its own.
+
 ### Sending results again
 
-If a grader sends a second results file (say a partial one first, then the finished one), import the new file too. Their earlier grades are updated to match; anything you graded yourself in the meantime still keeps your grade.
+If a grader sends a second results file (say a partial one first, then the finished one), import the new file too. Their earlier grades are updated to match; anything you graded yourself in the meantime still keeps your grade. If they've since left a pin for you that they had graded before, their earlier grade is removed.
 
 ### Submissions that change while a pack is out
 
@@ -149,7 +168,7 @@ Recalling a pack with pins that were to be graded twice leaves those pins to the
 | File | Made by | Contains |
 | --- | --- | --- |
 | `.msgpack` | host | Session name, questions, students and their pins and answers, grades so far, and slide file names. No slide images. |
-| `.msgresult` | guest | The guest's grades and feedback text, for pins in that pack only. |
+| `.msgresult` | guest | The guest's grades and feedback text, for pins in that pack only, and which pins they left for the host. |
 
 Both files contain student answers, so share them the way you'd share any other grading material.
 

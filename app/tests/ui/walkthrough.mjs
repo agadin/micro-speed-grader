@@ -426,9 +426,39 @@ await step("Preferences → Selection: list switches toggle tools", async () => 
   await page.getByRole("button", { name: "Selection" }).click();
   await page.locator(".sel-row", { hasText: "Polygon" }).locator("input.switch").check();
   await page.getByRole("button", { name: "Done" }).click();
-  expect(cards === 8, `${cards} method rows`);
+  expect(cards === 9, `${cards} method rows`);
   expect(hasPoly === 0, "disabled Polygon still in the tool switcher");
   return `${cards} rows; polygon toggled off and on`;
+});
+
+await step("Not sure (host): off by default; turned on, it sets pins aside until the end of the image", async () => {
+  const notSure = page.locator(".vgrade").getByRole("button", { name: /Not sure/ });
+  expect((await notSure.count()) === 0, "Not sure button shows for the host by default");
+  expect((await page.locator(".vgrade .btn.bad").innerText()).trim().startsWith("Wrong") && !(await page.locator(".vgrade .btn.bad").innerText()).includes("…"), "Wrong button still has dots");
+  await emit("menu", "preferences");
+  await page.getByRole("button", { name: "Selection" }).click();
+  await page.locator(".sel-row", { hasText: "Not sure button" }).click();
+  await page.locator(".sel-row", { hasText: "Not sure button" }).locator("input.switch").check();
+  await page.waitForTimeout(200);
+  await snap("prefs-not-sure");
+  await page.getByRole("button", { name: "Done" }).click();
+  const before = await page.locator(".cnav .cur").innerText();
+  const n = Number(await page.locator(".selcount b").innerText());
+  await notSure.click();
+  await page.waitForTimeout(400);
+  const banner = await page.locator(".handoff-banner").innerText();
+  const after = await page.locator(".cnav .cur").innerText();
+  await snap("not-sure-host");
+  expect(/set aside/.test(banner) && banner.includes(String(n)), `banner: ${banner}`);
+  expect(after !== before, `the set-aside cluster is still current: ${before} → ${after}`);
+  await page.getByRole("button", { name: "Bring back now" }).click();
+  await page.waitForTimeout(300);
+  expect((await page.locator(".handoff-banner").count()) === 0, "Bring back now left the banner");
+  await emit("menu", "preferences");
+  await page.getByRole("button", { name: "Selection" }).click();
+  await page.locator(".sel-row", { hasText: "Not sure button" }).locator("input.switch").uncheck();
+  await page.getByRole("button", { name: "Done" }).click();
+  return `${n} pins set aside (${before.replace(/\n/g, " ")} → ${after.replace(/\n/g, " ")}), brought back`;
 });
 
 await step("key hints collapsed by default; ? expands", async () => {
@@ -617,6 +647,30 @@ await step("hand off: host splits work, guest grades the pack, host merges resul
   expect(gopts.length === 1 && cardLabel.startsWith(gopts[0].split(" (")[0].trim()), `guest sees ${gopts.join(" | ")} (expected ${cardLabel})`);
   const sendBtn = page.getByRole("button", { name: /Send results/ }).first();
   expect((await sendBtn.innerText()).includes(`0/${n}`), `guest progress: ${await sendBtn.innerText()}`);
+  // not sure: leave the cluster for the host from the grade menu, then take it back
+  await page.keyboard.press("Enter");
+  await page.locator(".ctx-menu").waitFor();
+  await page.waitForTimeout(200);
+  await snap("handoff-guest-leave-menu");
+  const leaveItem = page.locator(".ctx-menu").getByText("Not sure: leave for host");
+  expect((await leaveItem.count()) === 1, "no 'Not sure: leave for host' in the guest's grade menu");
+  await leaveItem.click();
+  await page.waitForTimeout(300);
+  const leftN = parseInt((await sendBtn.innerText()).match(/(\d+)\//)[1]);
+  await snap("handoff-guest-left");
+  expect(leftN > 0 && (await page.locator(".handoff-banner").innerText()).includes("left for the host"), `leaving pins for the host: ${await sendBtn.innerText()}`);
+  await page.getByRole("button", { name: "Take back" }).click();
+  await page.waitForTimeout(300);
+  expect((await sendBtn.innerText()).includes(`0/${n}`), `take back: ${await sendBtn.innerText()}`);
+  // the same from the toolbar button between Correct and Wrong, undone with ⌘Z
+  const notSure = page.locator(".vgrade").getByRole("button", { name: /Not sure/ });
+  await notSure.click();
+  await page.waitForTimeout(300);
+  await snap("handoff-guest-not-sure-button");
+  expect(!(await sendBtn.innerText()).includes(`0/${n}`), `toolbar Not sure did nothing: ${await sendBtn.innerText()}`);
+  await page.keyboard.press(process.platform === "darwin" ? "Meta+z" : "Control+z");
+  await page.waitForTimeout(300);
+  expect((await sendBtn.innerText()).includes(`0/${n}`), `undo after Not sure: ${await sendBtn.innerText()}`);
   for (let i = 0; i < 400 && !(await sendBtn.innerText()).includes(`${n}/${n}`); i++) {
     await page.keyboard.press("c");
     await page.waitForTimeout(120);

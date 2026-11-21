@@ -319,7 +319,7 @@ function Answer({
               <IconCheck /> Correct
             </button>
             <button className="btn small sv-bad" onClick={() => setWrong(a.kind === "wrong" ? a.reason : "")} title="Mark this answer wrong and give a reason">
-              <IconCross /> Wrong…
+              <IconCross /> Wrong
             </button>
             {graded.length > 0 && (
               <button className="btn ghost small" onClick={() => ungrade(graded.map((p) => p.pin.id))} title="Remove grade: make this answer ungraded again">
