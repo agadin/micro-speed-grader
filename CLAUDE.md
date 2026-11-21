@@ -23,6 +23,7 @@ Notes:
 
 - Release notes are read by graders in the update banner: describe what changed for them in plain words, not commit messages.
 - If notarization fails with "A required agreement is missing or has expired", the user has to accept the agreement at developer.apple.com. Then rerun step 3 with the same version.
+- Updater signatures must name the version (`tauri signer sign --app-version`): installed apps since 0.3.2 have `requireSignedVersion` on and refuse anything else with "The update signature does not specify the version it was signed for". `release.sh` does this and refuses to publish a signature without it; releases 0.3.2–0.3.8 lacked it, so their update button never worked.
 - Signing details (Developer ID, the `notary` keychain profile, the updater key at `~/.tauri/micro-speed-grader.key`) are in `tools/release.sh`. OpenSlide comes from `tools/fetch-openslide.sh` (pinned openslide-bin, checksummed); run `tools/fetch-openslide.sh mac` once on a new machine before `tauri dev`/`cargo check`. Losing the updater key breaks updates for every installed copy.
 
 ## Before committing

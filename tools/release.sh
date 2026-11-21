@@ -52,7 +52,8 @@ ditto -c -k --keepParent "Micro Speed Grader.app" "$OUT/app.zip"
 xcrun notarytool submit "$OUT/app.zip" --keychain-profile notary --wait
 xcrun stapler staple "Micro Speed Grader.app"
 COPYFILE_DISABLE=1 tar -czf "$OUT/Micro-Speed-Grader.app.tar.gz" "Micro Speed Grader.app"
-sign() { (cd "$APP" && TAURI_SIGNING_PRIVATE_KEY_PASSWORD="" npx tauri signer sign -f "$KEY" "$1" >/dev/null); }
+# --app-version binds the signature to this version: installed apps (requireSignedVersion) reject updates without it
+sign() { (cd "$APP" && TAURI_SIGNING_PRIVATE_KEY_PASSWORD="" npx tauri signer sign -f "$KEY" --app-version "$VER" "$1" >/dev/null); }
 sign "$OUT/Micro-Speed-Grader.app.tar.gz"
 
 DMG="$OUT/Micro-Speed-Grader_${VER}_macOS.dmg"
@@ -78,10 +79,18 @@ fi
 python3 - "$OUT" "$VER" "$NOTES" "$DL" "$WIN" <<'PY'
 import json, sys, datetime, os
 out, ver, notes, dl, win = sys.argv[1:6]
-mac = {"signature": open(f"{out}/Micro-Speed-Grader.app.tar.gz.sig").read().strip(), "url": f"{dl}/Micro-Speed-Grader.app.tar.gz"}
+import base64
+def sig(path):
+    s = open(path).read().strip()
+    # the updater (requireSignedVersion) refuses a signature that doesn't name this version
+    trusted = base64.b64decode(s).decode().splitlines()[2]
+    if f"\tversion:{ver}" not in trusted:
+        sys.exit(f"{path} isn't signed for version {ver} ({trusted}): installed apps would refuse the update")
+    return s
+mac = {"signature": sig(f"{out}/Micro-Speed-Grader.app.tar.gz.sig"), "url": f"{dl}/Micro-Speed-Grader.app.tar.gz"}
 plat = {"darwin-aarch64": mac, "darwin-x86_64": mac}
 if win:
-    plat["windows-x86_64"] = {"signature": open(win + ".sig").read().strip(), "url": f"{dl}/{os.path.basename(win)}"}
+    plat["windows-x86_64"] = {"signature": sig(win + ".sig"), "url": f"{dl}/{os.path.basename(win)}"}
 json.dump({"version": ver, "notes": notes,
            "pub_date": datetime.datetime.now(datetime.timezone.utc).strftime("%Y-%m-%dT%H:%M:%SZ"),
            "platforms": plat}, open(f"{out}/latest.json", "w"), indent=2)
