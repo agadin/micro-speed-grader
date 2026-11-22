@@ -8,6 +8,8 @@ import { webkit, chromium } from "playwright";
 
 export const APP = path.resolve(import.meta.dirname, "../..");
 export const ROOT = path.resolve(APP, "..");
+/** the slides folder (MSG_SLIDES for the synthetic test slides: cargo run --example make_test_slides) */
+export const SLIDES = process.env.MSG_SLIDES ? path.resolve(process.env.MSG_SLIDES) : path.join(ROOT, "images");
 /** the app's dev server (MSG_APP_URL to test a second checkout on another port) */
 export const APP_URL = process.env.MSG_APP_URL ?? "http://localhost:1420/";
 const TILE_PORT = Number(process.env.MSG_TILE_PORT ?? 8787);
@@ -192,7 +194,7 @@ export async function launch({
  * Fresh start, then the New grading session wizard on the demo class, and Start grading.
  * `beforeStart(page)` runs with the wizard filled in (e.g. to screenshot it).
  */
-export async function newDemoSession(page, dialog, { save, slides = path.join(ROOT, "images"), beforeStart } = {}) {
+export async function newDemoSession(page, dialog, { save, slides = SLIDES, beforeStart } = {}) {
   await page.goto(APP_URL);
   await page.evaluate(() => localStorage.clear());
   await page.reload();

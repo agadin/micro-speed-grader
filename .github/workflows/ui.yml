@@ -1,0 +1,66 @@
+# The UI walkthrough (app/tests/ui/walkthrough.mjs): the real front end in headless Chromium, with
+# slides served by the app's own Rust tile server through OpenSlide. The course slides aren't in the
+# repo, so it uses synthetic stand-ins with the same geometry (app/src-tauri/examples/make_test_slides.rs)
+# and the simulated demo class.
+name: UI
+on:
+  push:
+    branches: [main]
+    paths: ["app/**", "docs/help/**", "demo-key/**", "tools/simulate.mjs", "tools/fetch-openslide.sh", ".github/workflows/ui.yml"]
+  pull_request:
+    paths: ["app/**", "docs/help/**", "demo-key/**", "tools/simulate.mjs", "tools/fetch-openslide.sh", ".github/workflows/ui.yml"]
+  workflow_dispatch:
+concurrency:
+  group: ui-${{ github.ref }}
+  cancel-in-progress: true
+permissions:
+  contents: read
+jobs:
+  walkthrough:
+    runs-on: macos-latest
+    timeout-minutes: 45
+    env:
+      OPENSLIDE_LIB: ${{ github.workspace }}/app/src-tauri/frameworks/libopenslide.1.dylib
+      MSG_SLIDES: ${{ github.workspace }}/test-slides
+      UI_BROWSER: chromium
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+          cache-dependency-path: app/package-lock.json
+      - uses: dtolnay/rust-toolchain@stable
+      - uses: Swatinem/rust-cache@v2
+        with:
+          workspaces: app/src-tauri
+          key: ui
+      - run: tools/fetch-openslide.sh mac
+      - working-directory: app
+        run: |
+          npm ci
+          npx playwright install chromium
+      - name: Demo class (simulated students and pins)
+        run: node tools/simulate.mjs --key demo-key --spec demo-key/demo.json --out demo
+      - name: Synthetic slides and the tile server
+        working-directory: app/src-tauri
+        run: |
+          cargo build --release --example tileserver --example make_test_slides
+          target/release/examples/make_test_slides "$MSG_SLIDES"
+      - name: Start the app's dev server
+        working-directory: app
+        run: |
+          npx vite --port 1420 --strictPort > "$RUNNER_TEMP/vite.log" 2>&1 &
+          for i in $(seq 1 60); do curl -fsS -o /dev/null http://localhost:1420/ && exit 0; sleep 1; done
+          cat "$RUNNER_TEMP/vite.log"; exit 1
+      - name: Walkthrough
+        working-directory: app
+        run: npm run test:ui
+      - name: Screenshots
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: ui-screenshots
+          path: app/tests/.out/ui
+          if-no-files-found: ignore
+          retention-days: 7

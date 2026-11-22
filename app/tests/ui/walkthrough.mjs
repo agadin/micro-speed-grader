@@ -5,7 +5,7 @@
 //   node tests/ui/walkthrough.mjs
 import fs from "node:fs";
 import path from "node:path";
-import { launch, startTileServer, closeSession, openSession, pickTool, ringOf, APP, APP_URL, ROOT } from "./harness.mjs";
+import { launch, startTileServer, closeSession, openSession, pickTool, ringOf, APP, APP_URL, ROOT, SLIDES } from "./harness.mjs";
 
 const OUT = path.join(APP, "tests/.out/ui");
 const WORK = path.join(APP, "tests/.out/ui-work");
@@ -90,7 +90,7 @@ await step("wizard: exam, folders, save path", async () => {
   await dialog(path.join(ROOT, "demo/submissions"));
   await page.locator(".step").nth(1).getByRole("button").click();
   await page.waitForTimeout(800);
-  await dialog(path.join(ROOT, "images"));
+  await dialog(SLIDES);
   await page.locator(".step").nth(2).getByRole("button").click();
   await page.waitForTimeout(800);
   await dialog(SESSION);
@@ -326,7 +326,7 @@ const ring = () => ringOf(page);
 const tool = (name) => pickTool(page, name);
 /** a second grader: open a hand-off pack from the start screen with the demo slides */
 async function openPack(pack, saveAs) {
-  await dialog(pack, path.join(ROOT, "images"), saveAs);
+  await dialog(pack, SLIDES, saveAs);
   await page.getByRole("button", { name: "Got work from another grader?" }).click();
   await page.locator(".topbar").waitFor({ timeout: 30000 });
 }
@@ -1230,7 +1230,7 @@ await step("exam editor: fix and add questions before starting; add a forgotten 
   await dialog(path.join(ROOT, "demo/exam.json"));
   await page.getByText("Choose exam PDF / JSON…").click();
   await page.waitForTimeout(400);
-  await dialog(path.join(ROOT, "images"));
+  await dialog(SLIDES);
   await page.locator(".step").nth(2).getByRole("button").click();
   await page.waitForTimeout(800);
   await page.getByRole("button", { name: "Edit questions…" }).click();
@@ -1351,7 +1351,7 @@ await step("wizard: drag a question to renumber, mark its answer, start → answ
     await dialog(path.join(ROOT, "demo/submissions"));
     await page.locator(".step").nth(1).getByRole("button", { name: "Choose folder…" }).click();
     await page.waitForTimeout(800);
-    await dialog(path.join(ROOT, "images"));
+    await dialog(SLIDES);
     await page.locator(".step").nth(2).getByRole("button", { name: "Choose folder…" }).click();
     await page.waitForTimeout(800);
     await dialog(path.join(WORK, "renumbered.msgrade"));

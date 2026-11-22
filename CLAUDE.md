@@ -30,6 +30,6 @@ Notes:
 
 - `cd app && npx tsc --noEmit && npm run test:logic` (CI runs these too, on every push and PR touching `app/`, `docs/help/` or `tools/`; the Update check workflow verifies the published update daily and after each release)
 - For changes under `app/src-tauri/`, also `cd app/src-tauri && cargo fmt && cargo clippy --release --lib --examples -- -D warnings` (the Build workflow fails on either)
-- For UI changes, also run `UI_BROWSER=chromium npm run test:ui` (dev server running). WebKit's headless clicks are unreliable on this machine.
+- For UI changes, also run `UI_BROWSER=chromium npm run test:ui` (dev server running). WebKit's headless clicks are unreliable on this machine. It reads slides from `images/`; set `MSG_SLIDES` to use the synthetic stand-ins instead (`cd app/src-tauri && cargo run --release --example make_test_slides -- <dir>`), as the UI workflow on GitHub does.
 - `demo.zip` at the repo root is the user's own file: never commit it.
 - Help pages live in `docs/help/*.md` (shown in the app and on GitHub). When a feature changes, update its page. `test:logic` checks that every link, image and in-app help reference resolves.
