@@ -1441,7 +1441,14 @@ await step("in-session edit: graded pins that now answer another question are un
     await snap("exam-editor-review-moves");
     const regraded = Number(impact.match(/(\d+)\s+graded pins? now answer a different question/)?.[1]);
     expect(/Q1 adds VMS133, drops VMS109/.test(changes) && /Q6 Removed/.test(changes), `changes: ${changes.replace(/\n/g, " | ")}`);
-    expect(regraded > 0, `impact: ${impact.replace(/\n/g, " | ")}`);
+    if (!(regraded > 0)) {
+      // keep what the editor saw, to find out why nothing moved
+      fs.copyFileSync(SESSION, path.join(OUT, "in-session-edit-session.msgrade"));
+      const q1 = Object.values(before.grades.groups).filter((g) => g.taskId.startsWith("Q1|")).flatMap((g) => g.pinIds);
+      const pins = new Map(before.pins.map((p) => [p.id, p]));
+      const sample = q1.slice(0, 4).map((id) => `${JSON.stringify(pins.get(id)?.rawTitle)} q=${pins.get(id)?.q} assign=${before.grades.assign[id]}`);
+      throw new Error(`impact: ${impact.replace(/\n/g, " | ")} · rules ${JSON.stringify(before.readingRules)} · ${q1.length} Q1 grades, e.g. ${sample.join("; ")}`);
+    }
     await ed.getByRole("button", { name: "Apply changes" }).click();
     await page.waitForTimeout(1500);
     const after = session();
