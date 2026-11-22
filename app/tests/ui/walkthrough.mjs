@@ -1422,6 +1422,10 @@ await step("in-session edit: graded pins that now answer another question are un
     await closeSession(page);
     await openSession(page, dialog, SESSION);
     await waitTiles();
+    // an earlier step asked for a rescan: opening a session must not start another one by itself
+    await page.waitForTimeout(1500);
+    const notice = (await page.locator(".notice-banner").allInnerTexts()).join(" ");
+    expect(!/Rescan|Reading the submissions folder/.test(notice), `opening the session started a rescan nobody asked for: ${notice}`);
     const before = session();
     await page.locator(".right .ee-open").click();
     const ed = page.locator(".exam-editor");

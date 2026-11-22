@@ -327,8 +327,13 @@ export function Grader({ session }: { session: Session }) {
     }
   };
   const rescanAsk = st.rescanAsk;
+  // only a request made while this session is open: an earlier one (e.g. in another session) stays in
+  // the store, and acting on it when the grading screen opens rescanned sessions nobody asked to rescan
+  const rescanSeen = useRef(rescanAsk);
   useEffect(() => {
-    if (rescanAsk) void rescan();
+    if (!rescanAsk || rescanAsk === rescanSeen.current) return;
+    rescanSeen.current = rescanAsk;
+    void rescan();
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [rescanAsk]);
   // notices (replaced someone's grade / new disagreements) fade on their own
