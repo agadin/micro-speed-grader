@@ -28,12 +28,14 @@ SHA=$(git -C "$ROOT" rev-parse HEAD)
 
 # Windows: start it now so it builds while macOS notarizes
 if [ -z "${SKIP_WINDOWS:-}" ]; then
+  # runs that already exist (e.g. from an earlier attempt at this release: the new one cancels them)
+  OLD_RUNS=$(gh run list -R "$REPO" --workflow build.yml --event workflow_dispatch --limit 20 --json databaseId -q '[.[].databaseId]')
   gh workflow run build.yml -R "$REPO" --ref main -f version="$VER"
   RUN=""
   for _ in $(seq 1 30); do
     sleep 4
-    RUN=$(gh run list -R "$REPO" --workflow build.yml --event workflow_dispatch --limit 5 --json databaseId,headSha \
-      -q "map(select(.headSha == \"$SHA\"))[0].databaseId // empty")
+    RUN=$(gh run list -R "$REPO" --workflow build.yml --event workflow_dispatch --limit 20 --json databaseId,headSha \
+      -q "map(select(.headSha == \"$SHA\" and ([.databaseId] | inside($OLD_RUNS) | not)))[0].databaseId // empty")
     [ -n "$RUN" ] && break
   done
   [ -n "$RUN" ] || { echo "couldn't find the Windows build run" >&2; exit 1; }
