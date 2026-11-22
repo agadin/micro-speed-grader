@@ -2,12 +2,12 @@
 //! macOS and Windows) plus a Deep-Zoom style tile renderer.
 
 use std::collections::HashMap;
-use std::ffi::{c_char, CStr, CString};
+use std::ffi::{CStr, CString, c_char};
 use std::io::Cursor;
 use std::path::{Path, PathBuf};
 use std::sync::{Arc, Mutex, OnceLock};
 
-use image::{codecs::jpeg::JpegEncoder, imageops::FilterType, RgbImage};
+use image::{RgbImage, codecs::jpeg::JpegEncoder, imageops::FilterType};
 use libloading::Library;
 use serde::Serialize;
 
@@ -45,14 +45,14 @@ fn candidate_lib_paths() -> Vec<PathBuf> {
         &["libopenslide.so.1", "libopenslide.so"]
     };
     // 1. next to the executable / in the app bundle's Frameworks + Resources
-    if let Ok(exe) = std::env::current_exe() {
-        if let Some(dir) = exe.parent() {
-            for n in names {
-                v.push(dir.join(n));
-                v.push(dir.join("../Frameworks").join(n));
-                v.push(dir.join("../Resources/lib").join(n));
-                v.push(dir.join("lib").join(n));
-            }
+    if let Ok(exe) = std::env::current_exe()
+        && let Some(dir) = exe.parent()
+    {
+        for n in names {
+            v.push(dir.join(n));
+            v.push(dir.join("../Frameworks").join(n));
+            v.push(dir.join("../Resources/lib").join(n));
+            v.push(dir.join("lib").join(n));
         }
     }
     // 2. explicit override
@@ -76,7 +76,10 @@ fn candidate_lib_paths() -> Vec<PathBuf> {
 unsafe fn load_api(lib: Library) -> Result<Api, String> {
     macro_rules! sym {
         ($n:literal) => {
-            unsafe { *lib.get(concat!($n, "\0").as_bytes()).map_err(|e| format!("{}: {e}", $n))? }
+            unsafe {
+                *lib.get(concat!($n, "\0").as_bytes())
+                    .map_err(|e| format!("{}: {e}", $n))?
+            }
         };
     }
     let open = sym!("openslide_open");
@@ -230,7 +233,13 @@ impl Slide {
 
     /// Render a Deep-Zoom tile. `level` follows OpenSeadragon conventions:
     /// `max_level` is full resolution, each lower level halves the size.
-    pub fn render_tile(&self, level: u32, tx: u32, ty: u32, quality: u8) -> Result<Vec<u8>, String> {
+    pub fn render_tile(
+        &self,
+        level: u32,
+        tx: u32,
+        ty: u32,
+        quality: u8,
+    ) -> Result<Vec<u8>, String> {
         let a = api()?;
         if level > self.info.max_level {
             return Err("bad level".into());
@@ -297,10 +306,10 @@ pub struct SlideRegistry {
 
 impl SlideRegistry {
     pub fn open(&self, path: &str) -> Result<SlideInfo, String> {
-        if let Some(id) = self.by_path.lock().unwrap().get(path).copied() {
-            if let Some(s) = self.by_id.lock().unwrap().get(&id) {
-                return Ok(s.info.clone());
-            }
+        if let Some(id) = self.by_path.lock().unwrap().get(path).copied()
+            && let Some(s) = self.by_id.lock().unwrap().get(&id)
+        {
+            return Ok(s.info.clone());
         }
         let id = {
             let mut n = self.next.lock().unwrap();
@@ -345,6 +354,9 @@ mod tests {
         let s = reg.get(info.id).unwrap();
         let full = s.render_tile(info.max_level, 10, 10, 85).unwrap();
         let thumb = s.render_tile(8, 0, 0, 85).unwrap();
-        assert!(full.starts_with(&[0xFF, 0xD8]) && thumb.starts_with(&[0xFF, 0xD8]), "not JPEG");
+        assert!(
+            full.starts_with(&[0xFF, 0xD8]) && thumb.starts_with(&[0xFF, 0xD8]),
+            "not JPEG"
+        );
     }
 }

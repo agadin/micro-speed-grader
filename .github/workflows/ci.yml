@@ -1,11 +1,12 @@
-# Type check, logic tests and web build on every change to the app or its help pages.
+# Type check, logic tests and web build on every change to the app, its help pages or the release tools
+# (the logic tests check tools/release.sh signs updates the way installed apps require).
 name: CI
 on:
   push:
     branches: [main]
-    paths: ["app/**", "docs/help/**", "demo-key/**", "tools/simulate.mjs", ".github/workflows/ci.yml"]
+    paths: ["app/**", "docs/help/**", "demo-key/**", "tools/**", "CLAUDE.md", ".github/workflows/ci.yml"]
   pull_request:
-    paths: ["app/**", "docs/help/**", "demo-key/**", "tools/simulate.mjs", ".github/workflows/ci.yml"]
+    paths: ["app/**", "docs/help/**", "demo-key/**", "tools/**", "CLAUDE.md", ".github/workflows/ci.yml"]
 concurrency:
   group: ci-${{ github.ref }}
   cancel-in-progress: true
@@ -31,7 +32,7 @@ jobs:
         run: node tools/simulate.mjs --key demo-key --spec demo-key/demo.json --out demo
       - name: Type check
         run: npx tsc --noEmit
-      - name: Logic tests (grading, hand-off, answer key, rescan, timing, help links)
+      - name: Logic tests (grading, hand-off, answer key, rescan, timing, help links, release and version files)
         run: npm run test:logic
       - name: Web build
         run: npm run build

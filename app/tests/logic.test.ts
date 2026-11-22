@@ -1025,4 +1025,22 @@ ok(!!dbl && studentResults(session, dbl, defaultSettings)[0].text === defaultSet
   ok(conf.plugins.updater.endpoints?.[0]?.endsWith("/releases/latest/download/latest.json"), "updater reads latest.json from the latest release");
 }
 
+// ---- the version lives in five files, which must match (CLAUDE.md; release.sh checks only tauri.conf.json) ----
+{
+  const read = (f: string) => fs.readFileSync(path.resolve(f), "utf8");
+  const lock = JSON.parse(read("package-lock.json"));
+  const cargoToml = read("src-tauri/Cargo.toml").match(/\[package\][^\[]*?\nversion\s*=\s*"([^"]+)"/)?.[1];
+  const cargoLock = read("src-tauri/Cargo.lock").match(/\[\[package\]\]\nname = "app"\nversion = "([^"]+)"/)?.[1];
+  const versions: Record<string, string | undefined> = {
+    "package.json": JSON.parse(read("package.json")).version,
+    "package-lock.json": lock.version,
+    "package-lock.json (packages)": lock.packages?.[""]?.version,
+    "tauri.conf.json": JSON.parse(read("src-tauri/tauri.conf.json")).version,
+    "Cargo.toml": cargoToml,
+    "Cargo.lock": cargoLock,
+  };
+  const vs = new Set(Object.values(versions));
+  ok(vs.size === 1 && !vs.has(undefined), `version files match (${vs.size === 1 ? [...vs][0] : Object.entries(versions).map(([f, v]) => `${f} ${v}`).join(", ")})`);
+}
+
 process.exit(fails ? 1 : 0);

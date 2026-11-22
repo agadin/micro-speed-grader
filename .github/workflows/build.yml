@@ -28,7 +28,7 @@ jobs:
       fail-fast: false
       matrix:
         include:
-          - { name: macOS Apple silicon, os: macos-latest, lib: mac }
+          - { name: macOS Apple silicon, os: macos-latest, lib: mac, lint: true }
           - { name: macOS Intel, os: macos-15-intel, lib: mac }
           - { name: Windows, os: windows-latest, lib: windows }
     runs-on: ${{ matrix.os }}
@@ -39,11 +39,19 @@ jobs:
     steps:
       - uses: actions/checkout@v4
       - uses: dtolnay/rust-toolchain@stable
+        with:
+          components: rustfmt, clippy
       - uses: Swatinem/rust-cache@v2
         with:
           workspaces: app/src-tauri
           key: ${{ matrix.os }}
       - run: tools/fetch-openslide.sh ${{ matrix.lib }}
+      - name: Rust formatting and lints (once, on Apple silicon)
+        if: matrix.lint
+        working-directory: app/src-tauri
+        run: |
+          cargo fmt --check
+          cargo clippy --release --lib --examples -- -D warnings
       - name: Rust tests
         working-directory: app/src-tauri
         run: cargo test --release --lib

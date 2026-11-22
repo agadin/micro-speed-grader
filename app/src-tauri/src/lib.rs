@@ -9,7 +9,10 @@ use tauri::menu::{Menu, MenuItem, PredefinedMenuItem, Submenu};
 use tauri::{Emitter, Manager};
 
 #[tauri::command]
-async fn open_slide(state: tauri::State<'_, Arc<SlideRegistry>>, path: String) -> Result<SlideInfo, String> {
+async fn open_slide(
+    state: tauri::State<'_, Arc<SlideRegistry>>,
+    path: String,
+) -> Result<SlideInfo, String> {
     // Slide paths can come from a shared .msgrade file: never let one reach out to a
     // network share (on Windows a UNC path makes the OS send the grader's credentials).
     if is_remote_path(&path) {
@@ -42,7 +45,9 @@ fn list_files(dir: String, suffixes: Vec<String>) -> Result<Vec<String>, String>
                 walk(&path, suffixes, out)?;
             } else {
                 let lower = name.to_lowercase();
-                if suffixes.is_empty() || suffixes.iter().any(|s| lower.ends_with(&s.to_lowercase())) {
+                if suffixes.is_empty()
+                    || suffixes.iter().any(|s| lower.ends_with(&s.to_lowercase()))
+                {
                     out.push(path.to_string_lossy().to_string());
                 }
             }
@@ -58,7 +63,9 @@ fn list_files(dir: String, suffixes: Vec<String>) -> Result<Vec<String>, String>
 #[tauri::command]
 fn read_text(path: String, max_bytes: Option<u64>) -> Result<String, String> {
     if let Some(max) = max_bytes {
-        let len = std::fs::metadata(&path).map_err(|e| format!("{path}: {e}"))?.len();
+        let len = std::fs::metadata(&path)
+            .map_err(|e| format!("{path}: {e}"))?
+            .len();
         if len > max {
             return Err(format!("{path}: file is larger than {max} bytes"));
         }
@@ -98,9 +105,17 @@ fn write_text(path: String, contents: String, keep_backup: Option<bool>) -> Resu
 /// shared with the main window through localStorage.
 #[tauri::command]
 fn open_preferences<R: tauri::Runtime>(app: tauri::AppHandle<R>) -> Result<(), String> {
-    show_window(&app, "preferences", "index.html?window=preferences", false, |b| {
-        b.title("Preferences").inner_size(900.0, 680.0).min_inner_size(760.0, 480.0)
-    })
+    show_window(
+        &app,
+        "preferences",
+        "index.html?window=preferences",
+        false,
+        |b| {
+            b.title("Preferences")
+                .inner_size(900.0, 680.0)
+                .min_inner_size(760.0, 480.0)
+        },
+    )
 }
 
 /// Bring a secondary window to the front, or create it. When it's already open and `reload`
@@ -110,20 +125,26 @@ fn show_window<R: tauri::Runtime>(
     label: &str,
     url: &str,
     reload: bool,
-    build: impl FnOnce(tauri::WebviewWindowBuilder<'_, R, tauri::AppHandle<R>>) -> tauri::WebviewWindowBuilder<'_, R, tauri::AppHandle<R>>,
+    build: impl FnOnce(
+        tauri::WebviewWindowBuilder<'_, R, tauri::AppHandle<R>>,
+    ) -> tauri::WebviewWindowBuilder<'_, R, tauri::AppHandle<R>>,
 ) -> Result<(), String> {
     if let Some(w) = app.get_webview_window(label) {
         if reload {
-            let _ = w.eval(&format!("location.replace({url:?})"));
+            let _ = w.eval(format!("location.replace({url:?})"));
         }
         let _ = w.unminimize();
         let _ = w.show();
         return w.set_focus().map_err(|e| e.to_string());
     }
-    build(tauri::WebviewWindowBuilder::new(app, label, tauri::WebviewUrl::App(url.into())))
-        .build()
-        .map(|_| ())
-        .map_err(|e| e.to_string())
+    build(tauri::WebviewWindowBuilder::new(
+        app,
+        label,
+        tauri::WebviewUrl::App(url.into()),
+    ))
+    .build()
+    .map(|_| ())
+    .map_err(|e| e.to_string())
 }
 
 /// Help viewer: its own narrow window, like macOS Help. `topic` is a help topic id ("" = topic list).
@@ -131,17 +152,27 @@ fn show_window<R: tauri::Runtime>(
 #[tauri::command]
 fn open_help<R: tauri::Runtime>(app: tauri::AppHandle<R>, topic: String) -> Result<(), String> {
     // "article" or "article/section": short slugs only; anything else opens the help home page
-    let ok = topic.len() <= 80 && topic.chars().all(|c| c.is_ascii_lowercase() || c.is_ascii_digit() || c == '-' || c == '/');
+    let ok = topic.len() <= 80
+        && topic
+            .chars()
+            .all(|c| c.is_ascii_lowercase() || c.is_ascii_digit() || c == '-' || c == '/');
     let topic = if ok { topic } else { String::new() };
     let url = format!("index.html?window=help&topic={topic}");
     // open beside the main window when there's room
     let beside = app.get_webview_window("main").and_then(|m| {
-        let (pos, size, scale) = (m.outer_position().ok()?, m.outer_size().ok()?, m.scale_factor().ok()?);
+        let (pos, size, scale) = (
+            m.outer_position().ok()?,
+            m.outer_size().ok()?,
+            m.scale_factor().ok()?,
+        );
         let (p, s) = (pos.to_logical::<f64>(scale), size.to_logical::<f64>(scale));
         Some(((p.x + s.width - 400.0).max(0.0), p.y + 60.0))
     });
     show_window(&app, "help", &url, true, |b| {
-        let b = b.title("Micro Speed Grader Help").inner_size(420.0, 680.0).min_inner_size(320.0, 360.0);
+        let b = b
+            .title("Micro Speed Grader Help")
+            .inner_size(420.0, 680.0)
+            .min_inner_size(320.0, 360.0);
         match beside {
             Some((x, y)) => b.position(x, y),
             None => b,
@@ -183,15 +214,57 @@ fn tile_response(reg: &SlideRegistry, uri_path: &str) -> Response<Vec<u8>> {
 /// Native menu bar. On macOS the first submenu is the app menu
 /// ("Micro Speed Grader ▸ Preferences… ⌘,"); on Windows it shows as a File menu.
 fn build_menu<R: tauri::Runtime>(app: &tauri::AppHandle<R>) -> tauri::Result<Menu<R>> {
-    let prefs = MenuItem::with_id(app, "preferences", "Preferences…", true, Some("CmdOrCtrl+,"))?;
-    let new_s = MenuItem::with_id(app, "new_session", "New Grading Session…", true, Some("CmdOrCtrl+N"))?;
-    let open_s = MenuItem::with_id(app, "open_session", "Open Session…", true, Some("CmdOrCtrl+O"))?;
+    let prefs = MenuItem::with_id(
+        app,
+        "preferences",
+        "Preferences…",
+        true,
+        Some("CmdOrCtrl+,"),
+    )?;
+    let new_s = MenuItem::with_id(
+        app,
+        "new_session",
+        "New Grading Session…",
+        true,
+        Some("CmdOrCtrl+N"),
+    )?;
+    let open_s = MenuItem::with_id(
+        app,
+        "open_session",
+        "Open Session…",
+        true,
+        Some("CmdOrCtrl+O"),
+    )?;
     let export = MenuItem::with_id(app, "export", "Export Grades…", true, Some("CmdOrCtrl+E"))?;
-    let rescan = MenuItem::with_id(app, "rescan_submissions", "Rescan Submissions", true, None::<&str>)?;
+    let rescan = MenuItem::with_id(
+        app,
+        "rescan_submissions",
+        "Rescan Submissions",
+        true,
+        None::<&str>,
+    )?;
     let edit_q = MenuItem::with_id(app, "edit_questions", "Edit Questions…", true, None::<&str>)?;
-    let close_s = MenuItem::with_id(app, "close_session", "Close Session", true, Some("CmdOrCtrl+W"))?;
-    let updates = MenuItem::with_id(app, "check_updates", "Check for Updates…", true, None::<&str>)?;
-    let help = MenuItem::with_id(app, "help", "Micro Speed Grader Help", true, Some("CmdOrCtrl+Shift+/"))?;
+    let close_s = MenuItem::with_id(
+        app,
+        "close_session",
+        "Close Session",
+        true,
+        Some("CmdOrCtrl+W"),
+    )?;
+    let updates = MenuItem::with_id(
+        app,
+        "check_updates",
+        "Check for Updates…",
+        true,
+        None::<&str>,
+    )?;
+    let help = MenuItem::with_id(
+        app,
+        "help",
+        "Micro Speed Grader Help",
+        true,
+        Some("CmdOrCtrl+Shift+/"),
+    )?;
     let help_menu = Submenu::with_items(app, "Help", true, &[&help])?;
 
     #[cfg(target_os = "macos")]
@@ -218,7 +291,21 @@ fn build_menu<R: tauri::Runtime>(app: &tauri::AppHandle<R>) -> tauri::Result<Men
     let file_menu = {
         #[cfg(target_os = "macos")]
         {
-            Submenu::with_items(app, "File", true, &[&new_s, &open_s, &PredefinedMenuItem::separator(app)?, &edit_q, &rescan, &export, &PredefinedMenuItem::separator(app)?, &close_s])?
+            Submenu::with_items(
+                app,
+                "File",
+                true,
+                &[
+                    &new_s,
+                    &open_s,
+                    &PredefinedMenuItem::separator(app)?,
+                    &edit_q,
+                    &rescan,
+                    &export,
+                    &PredefinedMenuItem::separator(app)?,
+                    &close_s,
+                ],
+            )?
         }
         #[cfg(not(target_os = "macos"))]
         {
@@ -226,7 +313,19 @@ fn build_menu<R: tauri::Runtime>(app: &tauri::AppHandle<R>) -> tauri::Result<Men
                 app,
                 "File",
                 true,
-                &[&new_s, &open_s, &PredefinedMenuItem::separator(app)?, &edit_q, &rescan, &export, &prefs, &updates, &PredefinedMenuItem::separator(app)?, &close_s, &PredefinedMenuItem::quit(app, None)?],
+                &[
+                    &new_s,
+                    &open_s,
+                    &PredefinedMenuItem::separator(app)?,
+                    &edit_q,
+                    &rescan,
+                    &export,
+                    &prefs,
+                    &updates,
+                    &PredefinedMenuItem::separator(app)?,
+                    &close_s,
+                    &PredefinedMenuItem::quit(app, None)?,
+                ],
             )?
         }
     };
@@ -247,11 +346,17 @@ fn build_menu<R: tauri::Runtime>(app: &tauri::AppHandle<R>) -> tauri::Result<Men
         app,
         "Window",
         true,
-        &[&PredefinedMenuItem::minimize(app, None)?, &PredefinedMenuItem::fullscreen(app, None)?],
+        &[
+            &PredefinedMenuItem::minimize(app, None)?,
+            &PredefinedMenuItem::fullscreen(app, None)?,
+        ],
     )?;
 
     #[cfg(target_os = "macos")]
-    return Menu::with_items(app, &[&app_menu, &file_menu, &edit_menu, &window_menu, &help_menu]);
+    return Menu::with_items(
+        app,
+        &[&app_menu, &file_menu, &edit_menu, &window_menu, &help_menu],
+    );
     #[cfg(not(target_os = "macos"))]
     return Menu::with_items(app, &[&file_menu, &edit_menu, &window_menu, &help_menu]);
 }
@@ -287,17 +392,26 @@ pub fn run() {
                 .into_iter()
                 .filter_map(|l| app.get_webview_window(l))
                 .find(|w| w.is_focused().unwrap_or(false));
-            if id == "close_session" {
-                if let Some(w) = side {
-                    let _ = w.close();
-                    return;
-                }
+            if id == "close_session"
+                && let Some(w) = side
+            {
+                let _ = w.close();
+                return;
             }
             if id == "preferences" {
                 let _ = open_preferences(app.clone());
             } else if id == "help" {
                 let _ = open_help(app.clone(), String::new());
-            } else if matches!(id, "new_session" | "open_session" | "export" | "close_session" | "check_updates" | "rescan_submissions" | "edit_questions") {
+            } else if matches!(
+                id,
+                "new_session"
+                    | "open_session"
+                    | "export"
+                    | "close_session"
+                    | "check_updates"
+                    | "rescan_submissions"
+                    | "edit_questions"
+            ) {
                 let _ = app.emit("menu", id);
             }
         })

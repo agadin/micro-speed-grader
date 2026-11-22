@@ -9,7 +9,7 @@ use std::io::{BufRead, BufReader, Write};
 use std::net::{TcpListener, TcpStream};
 use std::sync::Arc;
 
-use app_lib::slide::{parse_tile_path, SlideRegistry};
+use app_lib::slide::{SlideRegistry, parse_tile_path};
 
 fn unescape(s: &str) -> String {
     let b = s.as_bytes();
@@ -18,7 +18,10 @@ fn unescape(s: &str) -> String {
     while i < b.len() {
         match b[i] {
             b'%' if i + 2 < b.len() => {
-                out.push(u8::from_str_radix(std::str::from_utf8(&b[i + 1..i + 3]).unwrap_or("00"), 16).unwrap_or(b'?'));
+                out.push(
+                    u8::from_str_radix(std::str::from_utf8(&b[i + 1..i + 3]).unwrap_or("00"), 16)
+                        .unwrap_or(b'?'),
+                );
                 i += 3;
             }
             b'+' => {
@@ -61,10 +64,10 @@ fn handle(reg: &SlideRegistry, s: TcpStream) {
         if r.read_line(&mut h).is_err() || h == "\r\n" || h.is_empty() {
             break;
         }
-        if let Some((k, v)) = h.split_once(':') {
-            if k.eq_ignore_ascii_case("host") {
-                host = v.trim().to_ascii_lowercase();
-            }
+        if let Some((k, v)) = h.split_once(':')
+            && k.eq_ignore_ascii_case("host")
+        {
+            host = v.trim().to_ascii_lowercase();
         }
     }
     // reject DNS-rebinding requests: the Host must be the loopback address we bound
@@ -75,7 +78,12 @@ fn handle(reg: &SlideRegistry, s: TcpStream) {
     let target = line.split_whitespace().nth(1).unwrap_or("/").to_string();
     if let Some(q) = target.strip_prefix("/open?path=") {
         match reg.open(&unescape(q)) {
-            Ok(info) => reply(s, "200 OK", "application/json", serde_json::to_string(&info).unwrap().as_bytes()),
+            Ok(info) => reply(
+                s,
+                "200 OK",
+                "application/json",
+                serde_json::to_string(&info).unwrap().as_bytes(),
+            ),
             Err(e) => reply(s, "500 Error", "text/plain", e.as_bytes()),
         }
     } else if let Some(p) = target.strip_prefix("/tile/") {

@@ -1,0 +1,31 @@
+# Checks the published update the way installed copies of the app see it: downloads latest.json and
+# every update file, and verifies each signature and the version it was signed for
+# (requireSignedVersion). Runs daily, after each release, and on demand. A failure means graders'
+# Check for Updates is broken (0.3.2–0.3.8 shipped like that unnoticed).
+name: Update check
+on:
+  schedule:
+    - cron: "17 13 * * *" # daily
+  release:
+    types: [published]
+  workflow_dispatch:
+permissions:
+  contents: read
+jobs:
+  check:
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+      - name: Check the published update
+        run: |
+          # just after a release the files may still be uploading: try a few times
+          for i in 1 2 3 4 5; do
+            node tools/check-update.mjs && exit 0
+            echo "attempt $i failed; retrying in a minute"
+            sleep 60
+          done
+          exit 1
