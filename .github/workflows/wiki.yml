@@ -1,0 +1,37 @@
+# The GitHub wiki is written from the help pages in docs/help (tools/sync-wiki.mjs), so the app's Help
+# window, the pages on GitHub and the wiki always say the same thing. Don't edit the wiki by hand:
+# this replaces its pages on every push to main that touches the help.
+name: Wiki
+on:
+  push:
+    branches: [main]
+    paths: ["docs/help/**", "tools/sync-wiki.mjs", ".github/workflows/wiki.yml"]
+  workflow_dispatch:
+concurrency:
+  group: wiki
+  cancel-in-progress: false
+permissions:
+  contents: write
+jobs:
+  sync:
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+      - name: Write the wiki pages from docs/help
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          git clone "https://x-access-token:${GH_TOKEN}@github.com/${GITHUB_REPOSITORY}.wiki.git" wiki
+          node tools/sync-wiki.mjs wiki
+      - name: Publish what changed
+        working-directory: wiki
+        run: |
+          git add -A
+          if git diff --cached --quiet; then echo "The wiki is already up to date."; exit 0; fi
+          git -c user.name="github-actions[bot]" -c user.email="41898282+github-actions[bot]@users.noreply.github.com" \
+            commit -m "Help pages from docs/help at ${GITHUB_SHA::7}"
+          git push

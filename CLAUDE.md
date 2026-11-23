@@ -33,3 +33,4 @@ Notes:
 - For UI changes, also run `UI_BROWSER=chromium npm run test:ui` (dev server running). WebKit's headless clicks are unreliable on this machine. It reads slides from `images/`; set `MSG_SLIDES` to use the synthetic stand-ins instead (`cd app/src-tauri && cargo run --release --example make_test_slides -- <dir>`), as the UI workflow on GitHub does.
 - `demo.zip` at the repo root is the user's own file: never commit it.
 - Help pages live in `docs/help/*.md` (shown in the app and on GitHub). When a feature changes, update its page. `test:logic` checks that every link, image and in-app help reference resolves.
+- The GitHub wiki is written from `docs/help` by `tools/sync-wiki.mjs` (the Wiki workflow runs it on every push to `main` that touches the help). Never edit the wiki itself: the next sync overwrites it. To look at the result first: `node tools/sync-wiki.mjs <dir>`.

@@ -34,5 +34,8 @@ jobs:
         run: npx tsc --noEmit
       - name: Logic tests (grading, hand-off, answer key, rescan, timing, help links, release and version files)
         run: npm run test:logic
+      - name: The wiki can be written from the help pages (every link and image resolves)
+        working-directory: .
+        run: node tools/sync-wiki.mjs "$RUNNER_TEMP/wiki"
       - name: Web build
         run: npm run build

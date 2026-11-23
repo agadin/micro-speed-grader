@@ -23,7 +23,7 @@ updates itself from new releases (**Check for Updates…** in the app menu).
 
 ## Features
 
-The full user guide is in [docs/help](docs/help/index.md); the same pages are built into the app (Help ▸ Micro Speed Grader Help, ⌘?).
+The full user guide is on the [wiki](https://github.com/agadin/micro-speed-grader/wiki); the same pages are built into the app (Help ▸ Micro Speed Grader Help, ⌘?). They are written in [docs/help](docs/help/index.md).
 
 - Opens NDP.view slides (`.ndpi`, plus other OpenSlide formats) and student `.ndpa` annotations
 - Clusters answers by distance (µm), largest first; jump between clusters and single pins
