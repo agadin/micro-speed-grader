@@ -78,3 +78,16 @@ The app quietly keeps track of how long grading takes. You never see it while gr
 Pins the [answer key](answer-key.md) graded take no time and are counted separately. **Save time-stats.csv** writes all of these tables to the export folder.
 
 An action's time is shared equally by the pins it graded, so a cluster of 30 graded with one key press gives each pin a thirtieth of that time. Undoing a grade doesn't remove its time, and sessions created before version 0.3.6 have no time recorded for earlier grading.
+
+## Picture reports
+
+Off unless you turn on **Picture reports** in [Preferences ▸ Export](preferences.md#export). The Export window then has a **Pictures** tab with two buttons. Both need the slide files, and both write to the export folder.
+
+- **Save picture feedback** writes `picture-feedback/<student>.html`, one page per student: their score, the feedback for each question and, where they placed a pin, a picture of the slide with their pin marked. The right answer is shown as the [answer key](answer-key.md)'s correct area when there is one, otherwise as green dots where classmates placed correct pins. Choose **Pictures for mistakes only** (the default) or **Every answer**. Each page is a single file with its pictures inside, so it can be emailed or uploaded as it is.
+
+  ![A picture from a student's feedback page: their pin, and green dots where classmates placed correct pins](img/picture-feedback.jpg)
+- **Save wrong-answer maps** writes `wrong-answer-maps.html`: for each question on each slide, every graded pin on a picture of the slide. Correct pins are green; wrong ones are coloured by the reason you gave (the six most common reasons, then grey for the rest), with a legend and counts. Useful for a review session: right-click a picture to save it for a slide.
+
+  ![A wrong-answer map: wrong pins in orange in two other structures, correct pins in green](img/wrong-answer-map.jpg)
+
+Making the pages takes a while for a large class; **Stop** ends it early.

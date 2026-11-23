@@ -10,6 +10,7 @@ import { dirname, joinPath, writeText } from "../lib/backend";
 import { exportTable, questionSummaries, statsTable, testStats, toCsv, uniqueFileNames, type ExportRow } from "../lib/exportCsv";
 import { CsvPreviewTable, ExportLayoutEditor } from "./ExportLayout";
 import { conflictPins } from "../lib/handoff";
+import { PicturesTab } from "./PicturesTab";
 
 const fmt = (x: number | null, d = 2) => (x === null || !Number.isFinite(x) ? "—" : (x + 0).toFixed(d).replace(/^-(0\.0*)$/, "$1"));
 
@@ -24,7 +25,7 @@ function kr20Note(k: number | null) {
 
 export function ExportDialog({ session, onClose }: { session: Session; onClose: () => void }) {
   const settings = useSettings((s) => s.s);
-  const [tab, setTab] = useState<"csv" | "stats" | "time">("csv");
+  const [tab, setTab] = useState<"csv" | "stats" | "time" | "pictures">("csv");
   const hasTime = !!session.timeLog?.length;
   const [dir, setDir] = useState(joinPath(dirname(session.sessionPath), "export"));
   const [status, setStatus] = useState<string | null>(null);
@@ -108,6 +109,11 @@ export function ExportDialog({ session, onClose }: { session: Session; onClose: 
             {hasTime && (
               <button className={tab === "time" ? "on" : ""} onClick={() => setTab("time")} title="How long grading took: per question, grader and student">
                 Time
+              </button>
+            )}
+            {settings.exportPictures && (
+              <button className={tab === "pictures" ? "on" : ""} onClick={() => setTab("pictures")} title="Picture feedback and wrong-answer maps">
+                Pictures
               </button>
             )}
           </div>
@@ -311,6 +317,8 @@ export function ExportDialog({ session, onClose }: { session: Session; onClose: 
                 </table>
               </div>
             </div>
+          ) : tab === "pictures" ? (
+            <PicturesTab session={session} rows={rows} dir={dir} />
           ) : (
             <TimeTab report={timeRep} />
           )}
@@ -340,7 +348,7 @@ export function ExportDialog({ session, onClose }: { session: Session; onClose: 
             <button className="primary" onClick={exportStats}>
               Save item-stats.csv
             </button>
-          ) : (
+          ) : tab === "pictures" ? null : (
             <button className="primary" onClick={exportTime}>
               Save time-stats.csv
             </button>

@@ -55,6 +55,8 @@ The feedback students read, edited in place. See [What students see](feedback.md
 
 The column layout of `grades.csv`, shared with the Export window. See [Exporting grades](export.md#choosing-columns).
 
+**Picture reports** (off by default) adds a **Pictures** tab to the Export window, for feedback pages with each student's pin on the slide and maps of where the class went wrong. See [Picture reports](export.md#picture-reports).
+
 ## About
 
 The version you're running, links to this help and the project page, and **Check for Updates…**.

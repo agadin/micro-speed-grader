@@ -22,6 +22,7 @@ import { KEY, HOST, agreement, changedSinceSent, conflictPins, hostGraded, planO
 import { AUTO, autoRows, filterGroups, findStudents, graderOptions, isFiltered, noFilter, rowPasses, studentLabel, studentSummary, type LedgerFilter } from "../src/lib/review";
 import type { GradeState, Pin, Question, Session } from "../src/lib/types";
 import { DEFAULT_READING_RULES, emptyGrades, sessionRules, type ReadingRules } from "../src/lib/types";
+import { answerCrop, correctRef, escapeHtml, mapCrop, mapLegend, OTHER_COLOR, CORRECT_COLOR, REASON_COLORS } from "../src/lib/pictures";
 
 (globalThis as any).DOMParser = new JSDOM().window.DOMParser;
 const root = path.resolve(process.argv[2]);
@@ -1041,6 +1042,47 @@ ok(!!dbl && studentResults(session, dbl, defaultSettings)[0].text === defaultSet
   };
   const vs = new Set(Object.values(versions));
   ok(vs.size === 1 && !vs.has(undefined), `version files match (${vs.size === 1 ? [...vs][0] : Object.entries(versions).map(([f, v]) => `${f} ${v}`).join(", ")})`);
+}
+
+// picture reports: what each picture shows
+{
+  const P = (id: string, x: number, y: number): Pin =>
+    ({ id, studentId: id, slide: "VMS1", rawTitle: "Q1", details: "", q: 1, candidates: [], titleGuessed: false, xNm: x, yNm: y, annotationType: "pin" }) as Pin;
+  const pins = [P("a", 0, 0), P("b", 10_000, 0), P("c", 20_000, 0), P("d", 900_000, 0), P("e", 50_000, 50_000), P("f", 60_000, 50_000), P("g", 70_000, 50_000), P("h", 80_000, 50_000), P("i", 90_000, 50_000)];
+  const g = emptyGrades();
+  const grade = (id: string, status: "correct" | "wrong", text: string, ids: string[]) => {
+    g.groups[id] = { id, taskId: "Q1|VMS1", status, text, pinIds: ids, createdAt: 1 };
+    ids.forEach((p) => (g.pinGroup[p] = id));
+  };
+  grade("g1", "correct", "", ["a", "b", "c", "d"]);
+  grade("g2", "wrong", "Duct", ["e", "f"]);
+  grade("g3", "wrong", "duct ", ["g"]);
+  grade("g4", "wrong", "", ["h"]);
+  // class reference: the median of correct pins, so the stray one at 900 µm doesn't move it
+  const ref = correctRef([], pins.slice(0, 4));
+  ok(ref?.from === "class" && ref.box.x0 === 15_000, `class reference at the median: ${JSON.stringify(ref)}`);
+  // key areas win over the class
+  const mark = { id: "m", q: 1, slide: "VMS1", kind: "correct" as const, reason: "", createdAt: 1, ops: [{ kind: "brush" as const, mode: "add" as const, pts: [{ x: 100_000, y: 0 }], rNm: 5_000 }] };
+  const kref = correctRef([mark], pins.slice(0, 4));
+  ok(kref?.from === "key" && kref.box.x0 === 95_000 && kref.box.x1 === 105_000, "key reference is the painted area");
+  // the crop holds the student's pin and the reference, 4:3, at least 150 µm across
+  const c = answerCrop({ xNm: 50_000, yNm: 50_000 }, ref!.box);
+  ok(c.x0 < 15_000 && c.x1 > 50_000 && c.y0 < 0 && c.y1 > 50_000 && Math.abs((c.x1 - c.x0) / (c.y1 - c.y0) - 4 / 3) < 1e-9, `crop holds both ${JSON.stringify(c)}`);
+  ok(answerCrop({ xNm: 0, yNm: 0 }, null).x1 - answerCrop({ xNm: 0, yNm: 0 }, null).x0 === 150_000, "a lone pin gets the minimum field");
+  const far = answerCrop({ xNm: 0, yNm: 0 }, { x0: 9e6, y0: 0, x1: 9e6, y1: 0 });
+  ok(far.x1 < 1e6, "a reference far away is left out of the crop");
+  // map: reasons grouped ignoring capitals and spaces, most common first, correct green
+  const lg = mapLegend(pins, g);
+  ok(lg.reasons[0].text === "Duct" && lg.reasons[0].n === 3 && lg.reasons[1].text === "(no reason)" && lg.correct === 4 && lg.wrong === 4, `legend ${JSON.stringify(lg.reasons)}`);
+  ok(lg.color.get("g") === REASON_COLORS[0] && lg.color.get("a") === CORRECT_COLOR && !lg.color.has("i"), "pin colours (ungraded left out)");
+  const many = Array.from({ length: 8 }, (_, i) => P(`w${i}`, i * 1000, 0));
+  many.forEach((p, i) => grade(`r${i}`, "wrong", `reason ${i}`, [p.id]));
+  ok(mapLegend(many, g).other === 2 && mapLegend(many, g).color.get("w7") === OTHER_COLOR, "reasons after the sixth are Other");
+  // the map crop leaves out the far outlier once there are enough pins
+  const crowd = [...Array.from({ length: 30 }, (_, i) => P(`k${i}`, (i % 6) * 10_000, Math.floor(i / 6) * 10_000)), P("out", 5e6, 0)];
+  const mc = mapCrop(crowd, [])!;
+  ok(mc.x1 < 1e6 && mc.x0 < 0, `map crop ignores the outlier ${JSON.stringify(mc)}`);
+  ok(escapeHtml(`<b a="x">&'`) === "&lt;b a=&quot;x&quot;&gt;&amp;&#39;", "student names are escaped in the pages");
 }
 
 process.exit(fails ? 1 : 0);

@@ -560,6 +560,54 @@ await step("export grades.csv (item columns) + feedback; statistics tab saves it
   return `${lines.length - 1} rows, ${fb.length} feedback files. Header: ${lines[0]} | e.g. ${lines[1]}\n      feedback: ${one.replace(/\n/g, " / ")}`;
 });
 
+await step("picture reports: hidden until turned on in Preferences ▸ Export; feedback pages and wrong-answer maps", async () => {
+  // the export step ends by closing the session: open it again
+  if (await page.getByText("Demo exam", { exact: true }).isVisible().catch(() => false)) {
+    await page.getByText("Demo exam", { exact: true }).click();
+    await page.getByRole("button", { name: /^Export/ }).first().waitFor({ timeout: 30_000 });
+  }
+  await page.getByRole("button", { name: /^Export/ }).first().click();
+  await page.waitForTimeout(300);
+  expect((await page.locator(".modal .ex-head").getByRole("button", { name: "Pictures" }).count()) === 0, "Pictures tab hidden by default");
+  await page.keyboard.press("Escape");
+  await page.locator(".modal").waitFor({ state: "detached", timeout: 3000 }).catch(() => {});
+  await page.locator('button[title="Preferences (⌘,)"]').click();
+  await page.locator(".prefs-nav button", { hasText: "Export" }).click();
+  await page.locator(".ex-pictures input[type=checkbox]").check();
+  await snap("prefs-pictures");
+  await page.keyboard.press("Escape");
+  await page.locator(".prefs").waitFor({ state: "detached", timeout: 3000 }).catch(() => {});
+  await page.getByRole("button", { name: /^Export/ }).first().click();
+  await page.waitForTimeout(300);
+  await page.locator(".modal .ex-head").getByRole("button", { name: "Pictures" }).click();
+  await snap("export-pictures");
+  const exp = path.join(WORK, "export");
+  await page.locator(".modal").getByRole("button", { name: "Every answer" }).click();
+  await page.locator(".modal").getByRole("button", { name: "Save picture feedback" }).click();
+  await page.locator(".ex-pics .ok-text, .ex-pics .warn").first().waitFor({ timeout: 300_000 });
+  const msg1 = await page.locator(".ex-pics .ok-text, .ex-pics .warn").first().innerText();
+  expect(/wrote \d+ pages/.test(msg1), msg1);
+  await page.locator(".modal").getByRole("button", { name: "Save wrong-answer maps" }).click();
+  await page.locator(".ex-pics .ok-text", { hasText: "wrong-answer-maps" }).waitFor({ timeout: 120_000 });
+  const pages = fs.readdirSync(path.join(exp, "picture-feedback"));
+  expect(pages.length === 238, `${pages.length} feedback pages`);
+  const withPic = pages.map((f) => fs.readFileSync(path.join(exp, "picture-feedback", f), "utf8")).filter((t) => t.includes("data:image/jpeg"));
+  expect(withPic.length > 0, "some pages have pictures");
+  const maps = fs.readFileSync(path.join(exp, "wrong-answer-maps.html"), "utf8");
+  const nMaps = (maps.match(/data:image\/jpeg/g) ?? []).length;
+  expect(nMaps > 0, "maps drawn");
+  // keep a picture of each kind for a look
+  const save = (html, name) => {
+    const m = html.match(/data:image\/jpeg;base64,([^"]+)/);
+    if (m) fs.writeFileSync(path.join(OUT, name), Buffer.from(m[1], "base64"));
+  };
+  save(withPic[0], "picture-feedback-sample.jpg");
+  save(maps, "wrong-answer-map-sample.jpg");
+  await page.keyboard.press("Escape");
+  await page.getByRole("button", { name: "Close" }).click().catch(() => {});
+  return `${msg1}; ${pages.length} pages, ${withPic.length} with pictures; ${nMaps} maps`;
+});
+
 await step("autosave + resume after reload", async () => {
   const before = groups().length;
   await page.reload();

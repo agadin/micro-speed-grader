@@ -85,6 +85,7 @@ const SETTINGS_INDEX: { label: string; pane: Pane; words?: string }[] = [
   { label: "All wording as fields", pane: "text", words: "header correct wrong multiple pins no answer ungraded" },
   { label: "Columns", pane: "export", words: "csv grades uid surname first name order header preset item analysis" },
   { label: "Ungraded items", pane: "export", words: "blank zero" },
+  { label: "Picture reports", pane: "export", words: "pictures images feedback map wrong answers misconceptions slide crop" },
   { label: "Version", pane: "about", words: "about updates check update licence license" },
 ];
 const COLOR_LABELS: Record<keyof Settings["colors"], string> = {
@@ -851,6 +852,7 @@ const SAMPLE: ExportRow[] = (
 });
 
 function ExportPane({ s }: { s: Settings }) {
+  const set = useSettings((x) => x.set);
   const t = exportTable(SAMPLE, [1, 2, 3, 4], { columns: s.exportColumns, uidFrom: s.exportUid, ungradedItem: s.exportUngraded });
   return (
     <div className="ex-pref">
@@ -860,6 +862,18 @@ function ExportPane({ s }: { s: Settings }) {
         <span className="muted small">made-up students, 4 questions · drag headers to reorder</span>
       </div>
       <CsvPreviewTable table={t} qCount={4} clip={24} />
+      <div className="group ex-pictures">
+        <div className="prow2">
+          <label>Picture reports</label>
+          <div className="ctl">
+            <label className="check">
+              <input type="checkbox" checked={s.exportPictures} onChange={(e) => set({ exportPictures: e.target.checked })} />
+              show a Pictures tab in Export
+            </label>
+            <span className="help">feedback pages with each student's pin on the slide, and maps of where the class went wrong</span>
+          </div>
+        </div>
+      </div>
     </div>
   );
 }
