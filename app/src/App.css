@@ -4508,3 +4508,33 @@ select.lgrader {
   align-self: flex-start;
   margin-top: 2px;
 }
+
+/* Export ▸ Pictures */
+.ex-pics {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+}
+.pic-card {
+  padding: 14px 16px;
+  border-radius: 12px;
+  background: var(--well);
+}
+.pic-card h3 {
+  margin: 0 0 4px;
+  font-size: 14px;
+}
+.pic-card p {
+  margin: 0 0 10px;
+  line-height: 1.5;
+}
+.pic-row,
+.pic-progress {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+}
+.pbar.wide {
+  flex: 1;
+  width: auto;
+}

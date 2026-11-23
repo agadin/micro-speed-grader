@@ -86,6 +86,8 @@ export interface Settings {
   exportUngraded: "blank" | "0";
   /** export: also write feedback/<student>.txt */
   exportFeedback: boolean;
+  /** export: show the Pictures tab (picture feedback, wrong-answer maps); off unless turned on */
+  exportPictures: boolean;
   /** background of the marker preview in Preferences (he / toluidine / ihc / reticulin) */
   previewStain: string;
   /** collapsed side panels (by id) */
@@ -173,6 +175,7 @@ export const defaultSettings: Settings = {
   exportUid: "folder",
   exportUngraded: "blank",
   exportFeedback: true,
+  exportPictures: false,
   collapsedPanels: ["reasons"],
   panelsVersion: 1,
   colors: {
