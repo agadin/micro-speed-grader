@@ -1,6 +1,6 @@
 [package]
 name = "app"
-version = "0.4.1"
+version = "0.4.2"
 description = "Grade histology practicals one question at a time"
 authors = ["agadin"]
 edition = "2024"
